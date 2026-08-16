@@ -239,12 +239,12 @@ export default function LoadScreen({ onDone, debugMode = false } = {}) {
       <CoverParticleSphere imageUrls={imageUrls} seed={runSeed ?? 1} />
       <div className={styles.vignette} aria-hidden="true" />
       <section className={styles.status} aria-live="polite">
-        <p>표지의 조형 규칙을 분석하고 있어요</p>
-        <div className={styles.indicator} aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
+        <p>
+          <span>당신의 오마주 표지를 생성하고 있어요</span>
+          <span className={styles.statusGlare} aria-hidden="true">
+            당신의 오마주 표지를 생성하고 있어요
+          </span>
+        </p>
       </section>
     </main>
   );

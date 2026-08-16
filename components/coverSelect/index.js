@@ -1403,7 +1403,7 @@ export default function CoverSelectScreen({ onSubmit, debugState = null } = {}) 
             as="button"
             type="button"
             className={styles.continueButton}
-            borderRadius={displayedPrompt ? 10 : 999}
+            borderRadius={999}
             timedGlare={voiceButtonIdle || pendingSubmit}
             timedGlareMode={pendingSubmit ? 'confirm' : 'idle'}
             data-expanded={voiceButtonExpanded ? 'true' : 'false'}

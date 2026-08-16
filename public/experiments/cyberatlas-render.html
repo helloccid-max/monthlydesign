@@ -159,16 +159,17 @@ const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 const nextSeed=s=>((Math.imul(s,1103515245)+12345)>>>0)%2147483647;
 function faithfulEdgeColor(analysisId,f,alpha){
-  if(analysisId==='communities'||analysisId==='medusa') return `hsla(${72+54*f},92%,${34+38*f}%,${alpha})`;
-  if(analysisId==='traces'||analysisId==='bridges') return `hsla(${93-9*f},36%,${52+34*f}%,${alpha})`;
-  if(analysisId==='cone') return `hsla(${86+12*f},96%,${32+44*f}%,${alpha})`;
-  return `hsla(${96-18*f},92%,${30+38*f}%,${alpha})`;
+  // Walrus reads as a hierarchy because the tree lives in a restrained
+  // olive spectrum. Keeping the hue range narrow also prevents thousands of
+  // overlapping links from washing into the pale neon cloud we had before.
+  const sceneShift=(analysisId==='communities'||analysisId==='medusa')?4:
+    ((analysisId==='traces'||analysisId==='bridges')?-3:0);
+  return `hsla(${82+sceneShift+12*f},${42+34*f}%,${24+34*f}%,${alpha})`;
 }
 function faithfulNodeColor(analysisId,degree,alpha){
-  if(analysisId==='communities'||analysisId==='medusa') return `hsla(${74+48*(1-degree)},96%,${50+22*degree}%,${alpha})`;
-  if(analysisId==='traces'||analysisId==='bridges') return `hsla(${92-8*degree},48%,${64+22*degree}%,${alpha})`;
-  if(analysisId==='cone') return `hsla(${82+18*(1-degree)},100%,${50+24*degree}%,${alpha})`;
-  return `hsla(${125-70*degree},100%,${52+22*degree}%,${alpha})`;
+  const sceneShift=(analysisId==='communities'||analysisId==='medusa')?5:
+    ((analysisId==='traces'||analysisId==='bridges')?-2:0);
+  return `hsla(${85+sceneShift+10*(1-degree)},${68+27*degree}%,${40+28*degree}%,${alpha})`;
 }
 
 const S = {
@@ -443,15 +444,44 @@ function buildGraph(seed,topology=sceneAt(0)){
   }
   const cxA=Int32Array.from(peerA), cyA=Int32Array.from(peerB), nx=cxA.length;
 
+  // Preserve the actual representative membership of each observed AS anchor.
+  // The renderer uses these bounded samples to estimate screen-space density
+  // and covariance, so every aura follows the data instead of a decorative
+  // circle. Direct children are kept separately to emphasize real hub fans.
+  const clusterSummaries=anchorIndexes.map(anchor=>{
+    const members=membersByAnchor.get(anchor.index)||[anchor.index];
+    const sampleCount=Math.min(36,members.length);
+    const samples=new Int32Array(sampleCount);
+    for(let j=0;j<sampleCount;j++){
+      const at=sampleCount===1?0:Math.round(j*(members.length-1)/(sampleCount-1));
+      samples[j]=members[at];
+    }
+    const direct=members
+      .filter(index=>index!==anchor.index&&par[index]===anchor.index)
+      .sort((a,b)=>deg[b]-deg[a]||a-b)
+      .slice(0,18);
+    return {
+      index:anchor.index,
+      population:members.length,
+      samples,
+      spokes:Int32Array.from(direct)
+    };
+  }).sort((a,b)=>b.population-a.population||deg[b.index]-deg[a.index]);
+
+  const hubEdges=[];
+  for(let i=1;i<n;i++) if(role[par[i]]>=2) hubEdges.push(i-1);
+  hubEdges.sort((a,b)=>deg[b+1]-deg[a+1]||a-b);
+
   // ---- hue per top-level branch ----
   const bh=new Map(); let bi=0;
   for(let i=1;i<n;i++) if(dep[i]===1) bh.set(i,bi++);
 
   const G={
     n,par,dep,deg,branch,role,anchorOf,ang,rad,x2,y2,cx:cxA,cy:cyA,nx,maxDep,bh,
-    nb:Math.max(1,bi),seed,analysisId:topology.id,analysisLayout:layout,anchorIndexes,anchorIndexByAsn
+    nb:Math.max(1,bi),seed,analysisId:topology.id,analysisLayout:layout,anchorIndexes,anchorIndexByAsn,
+    clusterSummaries,hubEdges:Int32Array.from(hubEdges.slice(0,160))
   };
-  G.b3 = build3D(n,par,w,cw,rad,rnd,nx,cxA,cyA);
+  G.b3 = build3D(n,par,rad,role,dep,deg,layout,rnd,nx,cxA,cyA);
   // per-edge colour bucket, precomputed for both treatments
   G.bkF=new Int8Array(Math.max(1,n-1)); G.bkS=new Int8Array(Math.max(1,n-1));
   for(let e=0;e<n-1;e++){
@@ -462,10 +492,123 @@ function buildGraph(seed,topology=sceneAt(0)){
   return G;
 }
 
-/* H3-style cone tree in the Poincare ball: each node owns a solid angle, its
-   children divide it in proportion to subtree weight. Link geodesics are
-   sampled once here, so rotating is only a matrix multiply per frame. */
-function build3D(n,par,w,cw,rad,rnd,nx,cxA,cyA){
+/* Browser-native interpretation of the layout principles used by CAIDA's
+   Walrus graph visualizer (https://github.com/moderneinc/walrus):
+   - subtree area determines a hyperbolic packing radius;
+   - larger children are packed first into polar bands;
+   - a stable radial projection places the hierarchy in the Poincare ball;
+   - the unit boundary represents infinity and supplies the fisheye falloff.
+
+   This is an independent Canvas implementation, not a port of the GPL Java3D
+   source. Link geodesics are sampled once here, so each animation frame only
+   performs interpolation, rotation and projection. */
+const WALRUS_LAYOUT={curvature:2,hemisphereScale:7.2,leafArea:0.005,maxRadius:0.972,orbitCount:10};
+
+function walrusCircleArea(radius){
+  return Math.PI*2*(Math.cosh(radius/WALRUS_LAYOUT.curvature)-1);
+}
+
+function walrusRadiusFromArea(area){
+  const K=WALRUS_LAYOUT.curvature;
+  return K*Math.asinh(Math.sqrt(Math.max(0,area)/(Math.PI*2*K*K)));
+}
+
+function walrusDeltaPhi(childRadius,parentRadius){
+  const K=WALRUS_LAYOUT.curvature;
+  return Math.atan(Math.tanh(childRadius/K)/Math.max(1e-7,Math.sinh(parentRadius/K)));
+}
+
+function walrusDeltaTheta(childRadius,parentRadius,phi){
+  const K=WALRUS_LAYOUT.curvature;
+  const denominator=Math.max(1e-7,Math.sinh(parentRadius/K)*Math.sin(Math.max(1e-5,phi)));
+  return Math.atan(Math.tanh(childRadius/K)/denominator);
+}
+
+function walrusPackChildren(parent,cnt,st,kid,radius,theta,phi,rnd){
+  const start=st[parent], count=cnt[parent];
+  if(!count) return;
+  const children=kid.subarray(start,start+count);
+  children.sort((a,b)=>radius[b]-radius[a]||a-b);
+  const parentRadius=Math.max(radius[parent],1e-6);
+  const twist=(parent%2)*Math.PI*0.5;
+
+  // The graph root represents the full Internet rather than an ordinary
+  // subtree. Give its major topology regions equal-area directions across
+  // the whole sphere, then let Walrus-style bands take over below them.
+  if(parent===0){
+    if(count===2){
+      // Most live analysis scenes resolve to two dominant routing systems.
+      // Keep them visibly separate instead of letting a camera projection
+      // collapse both hemispheres into one horizontal spindle.
+      theta[children[0]]=-2.34; phi[children[0]]=Math.PI*0.43;
+      theta[children[1]]=0.78; phi[children[1]]=Math.PI*0.58;
+      return;
+    }
+    const goldenAngle=2.399963229728653;
+    for(let index=0;index<count;index++){
+      const child=children[index];
+      const z=1-2*((index+0.5)/count);
+      phi[child]=Math.acos(clamp(z,-1,1));
+      theta[child]=index*goldenAngle+(rnd()-0.5)*0.035*S.jit;
+    }
+    return;
+  }
+
+  if(count===1){
+    theta[children[0]]=twist;
+    phi[children[0]]=0;
+    return;
+  }
+  if(count===2){
+    const first=children[0], second=children[1];
+    const firstHalf=walrusDeltaPhi(radius[first],parentRadius);
+    const secondHalf=walrusDeltaPhi(radius[second],parentRadius);
+    const total=firstHalf+secondHalf;
+    theta[first]=twist;
+    theta[second]=twist+Math.PI;
+    phi[first]=Math.max(0,total-firstHalf);
+    phi[second]=Math.max(0,total-secondHalf);
+    return;
+  }
+
+  const pole=children[0];
+  theta[pole]=twist;
+  phi[pole]=0;
+  let bandEdge=walrusDeltaPhi(radius[pole],parentRadius);
+  let index=1, band=0;
+  while(index<count){
+    const first=children[index];
+    const centerPhi=clamp(
+      bandEdge+walrusDeltaPhi(radius[first],parentRadius),
+      1e-4,
+      Math.PI-1e-4
+    );
+    const packed=[];
+    let demand=0, maxHalfPhi=0;
+    while(index<count){
+      const child=children[index];
+      const halfTheta=walrusDeltaTheta(radius[child],parentRadius,centerPhi);
+      const nextDemand=demand+halfTheta*2;
+      if(packed.length&&nextDemand>Math.PI*2*0.94) break;
+      packed.push({child,halfTheta});
+      demand=nextDemand;
+      maxHalfPhi=Math.max(maxHalfPhi,walrusDeltaPhi(radius[child],parentRadius));
+      index++;
+    }
+    const gap=Math.max(0,(Math.PI*2-demand)/packed.length);
+    let cursor=twist+(band%2?gap*0.5:0)+(rnd()-0.5)*0.025*S.jit;
+    for(const item of packed){
+      cursor+=item.halfTheta;
+      theta[item.child]=cursor;
+      phi[item.child]=centerPhi;
+      cursor+=item.halfTheta+gap;
+    }
+    bandEdge=Math.min(Math.PI-1e-4,centerPhi+maxHalfPhi);
+    band++;
+  }
+}
+
+function build3D(n,par,rad,role,dep,deg,layout,rnd,nx,cxA,cyA){
   const cnt=new Int32Array(n);
   for(let i=1;i<n;i++) cnt[par[i]]++;
   const st=new Int32Array(n+1); let acc=0;
@@ -473,33 +616,67 @@ function build3D(n,par,w,cw,rad,rnd,nx,cxA,cyA){
   const fill=new Int32Array(n), kid=new Int32Array(Math.max(1,n-1));
   for(let i=1;i<n;i++){ const p=par[i]; kid[st[p]+fill[p]++]=i; }
 
-  const ax=new Float64Array(n), ay=new Float64Array(n), az=new Float64Array(n), th=new Float64Array(n);
-  ax[0]=0; ay[0]=0; az[0]=1; th[0]=Math.PI;
-  const GOLD=2.399963229728653;
-  for(let p=0;p<n;p++){
-    const m=cnt[p]; if(!m) continue;
-    const cosP=Math.cos(th[p]), Op=2*Math.PI*(1-cosP);
-    const Ax=ax[p],Ay=ay[p],Az=az[p];
+  const radius=new Float64Array(n);
+  const leafRadius=walrusRadiusFromArea(WALRUS_LAYOUT.leafArea);
+  for(let parent=n-1;parent>=0;parent--){
+    if(!cnt[parent]){ radius[parent]=leafRadius; continue; }
+    let area=0;
+    for(let k=st[parent];k<st[parent]+cnt[parent];k++) area+=walrusCircleArea(radius[kid[k]]);
+    radius[parent]=walrusRadiusFromArea(area*WALRUS_LAYOUT.hemisphereScale);
+  }
+
+  const theta=new Float64Array(n), phi=new Float64Array(n);
+  for(let parent=0;parent<n;parent++)
+    walrusPackChildren(parent,cnt,st,kid,radius,theta,phi,rnd);
+
+  const px=new Float32Array(n), py=new Float32Array(n), pz=new Float32Array(n);
+  const axisX=new Float64Array(n), axisY=new Float64Array(n), axisZ=new Float64Array(n);
+  axisZ[0]=1;
+  for(let parent=0;parent<n;parent++){
+    const m=cnt[parent]; if(!m) continue;
+    let Ax=axisX[parent], Ay=axisY[parent], Az=axisZ[parent];
+    const axisLength=Math.hypot(Ax,Ay,Az)||1;
+    Ax/=axisLength; Ay/=axisLength; Az/=axisLength;
     let ux,uy,uz;
-    if(Math.abs(Az)<0.9){ ux=-Ay; uy=Ax; uz=0; } else { ux=0; uy=-Az; uz=Ay; }
+    if(Math.abs(Az)<0.9){ ux=-Ay; uy=Ax; uz=0; }
+    else { ux=0; uy=-Az; uz=Ay; }
     const ul=Math.hypot(ux,uy,uz)||1; ux/=ul; uy/=ul; uz/=ul;
     const vx=Ay*uz-Az*uy, vy=Az*ux-Ax*uz, vz=Ax*uy-Ay*ux;
-    for(let k=0;k<m;k++){
-      const c=kid[st[p]+k];
-      const frac = p===0 ? 1/m : w[c]/(cw[p]||1);   // root splits the sphere evenly
-      let Oc=Op*frac*S.gap*S.spread; if(Oc>2*Math.PI) Oc=2*Math.PI;
-      th[c]=Math.acos(clamp(1-Oc/(2*Math.PI),-1,1));
-      const t=(k+0.5)/m*(0.9+0.2*rnd());
-      const al=Math.acos(clamp(1-(1-cosP)*Math.min(1,t),-1,1));
-      const ph=k*GOLD+rnd()*S.jit*1.2;
-      const sa=Math.sin(al), ca=Math.cos(al), cp=Math.cos(ph), sp=Math.sin(ph);
-      const nx3=Ax*ca+(ux*cp+vx*sp)*sa, ny3=Ay*ca+(uy*cp+vy*sp)*sa, nz3=Az*ca+(uz*cp+vz*sp)*sa;
-      const l=Math.hypot(nx3,ny3,nz3)||1;
-      ax[c]=nx3/l; ay[c]=ny3/l; az[c]=nz3/l;
+
+    for(let k=st[parent];k<st[parent]+m;k++){
+      const child=kid[k];
+      // The synthetic regional layer must open wide, while the real AS
+      // anchors keep their descendants in compressed, leaf-like lobes.
+      // That contrast is what gives the original Walrus views an asymmetric
+      // botanical structure instead of a uniformly bristling ball.
+      const parentRole=role[parent];
+      const angularGain=parent===0?1:
+        (parentRole===1?3.05:(parentRole>=2?1.42:clamp(0.30+dep[parent]*0.018,0.34,0.56)));
+      const polar=clamp(phi[child]*angularGain,0,Math.PI);
+      const azimuth=theta[child];
+      const sinPolar=Math.sin(polar), cosPolar=Math.cos(polar);
+      const cosAzimuth=Math.cos(azimuth), sinAzimuth=Math.sin(azimuth);
+      const flatten=parentRole>=2?0.38:(parentRole===1?0.72:0.58);
+      let dx=Ax*cosPolar+(ux*cosAzimuth+vx*sinAzimuth*flatten)*sinPolar;
+      let dy=Ay*cosPolar+(uy*cosAzimuth+vy*sinAzimuth*flatten)*sinPolar;
+      let dz=Az*cosPolar+(uz*cosAzimuth+vz*sinAzimuth*flatten)*sinPolar;
+      const directionLength=Math.hypot(dx,dy,dz)||1;
+      dx/=directionLength; dy/=directionLength; dz/=directionLength;
+      axisX[child]=dx; axisY[child]=dy; axisZ[child]=dz;
+      const code=role[child];
+      const projectedRadius=Math.min(
+        WALRUS_LAYOUT.maxRadius,
+        code===1
+          ? 0.13+rad[child]*0.18
+          : (code>=2
+            ? 0.38+rad[child]*0.38
+            : 0.17+0.82*Math.pow(Math.max(0,rad[child]),0.64))
+      );
+      px[child]=dx*projectedRadius;
+      py[child]=dy*projectedRadius;
+      pz[child]=dz*projectedRadius;
     }
   }
-  const px=new Float32Array(n), py=new Float32Array(n), pz=new Float32Array(n);
-  for(let i=0;i<n;i++){ px[i]=ax[i]*rad[i]; py[i]=ay[i]*rad[i]; pz[i]=az[i]*rad[i]; }
 
   const ep=new Float32Array(Math.max(1,n-1)*(SEG+1)*3);
   for(let i=1;i<n;i++)
@@ -509,7 +686,25 @@ function build3D(n,par,w,cw,rad,rnd,nx,cxA,cyA){
     const a=cxA[i], b=cyA[i];
     ballGeo(px[a],py[a],pz[a], px[b],py[b],pz[b], xp,i*(XSEG+1)*3, XSEG, 1);
   }
-  return {px,py,pz,ep,xp};
+
+  // A few long, quiet geodesics make the spherical topology legible. They
+  // are selected from analytical anchors only and remain subordinate to the
+  // data tree; the full sphere is deliberately never outlined.
+  const anchors=[];
+  for(let i=1;i<n;i++) if(role[i]>=2) anchors.push(i);
+  anchors.sort((a,b)=>deg[b]-deg[a]||a-b);
+  const orbitCount=anchors.length>1?WALRUS_LAYOUT.orbitCount:0;
+  const orbitSeg=XSEG+5;
+  const op=new Float32Array(Math.max(1,orbitCount)*(orbitSeg+1)*3);
+  const oa=new Int32Array(orbitCount), ob=new Int32Array(orbitCount);
+  for(let i=0;i<orbitCount;i++){
+    const a=anchors[i%anchors.length];
+    let b=anchors[(i*5+3)%anchors.length];
+    if(a===b) b=anchors[(i+1)%anchors.length];
+    oa[i]=a; ob[i]=b;
+    ballGeo(px[a],py[a],pz[a],px[b],py[b],pz[b],op,i*(orbitSeg+1)*3,orbitSeg,1);
+  }
+  return {px,py,pz,ep,xp,op,oa,ob,orbitCount,orbitSeg,radius};
 }
 
 /* geodesic between two points of the Poincare ball, sampled into `out` */
@@ -788,7 +983,96 @@ function drawSkitter2D(ctx,W,H,t){
 }
 
 /* ====================== 3D renderer ====================== */
+const WALRUS_CAMERA={ focal:3.45, scale:0.86, depthBins:28 };
 let _xy=null,_lay=null,_bk=null,_tr=null,_cnt=null,_ord=null,_fast=false;
+let _nodeX=null,_nodeY=null,_nodeZ=null,_nodeP=null,_nodeBin=null,_nodeOrder=null,_nodeCount=null;
+
+function walrusPerspective(depth){
+  return WALRUS_CAMERA.scale*WALRUS_CAMERA.focal/Math.max(1.5,WALRUS_CAMERA.focal-depth);
+}
+
+function walrusProjectPoint(x,y,z,cA,sA,cB,sB,cC,sC,cx,cy,RX,RY){
+  const x1=x*cA+z*sA, z1=-x*sA+z*cA;
+  const y1=y*cB-z1*sB, z2=y*sB+z1*cB;
+  const x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
+  const perspective=walrusPerspective(z2);
+  return [cx+x2*RX*perspective,cy-y2*RY*perspective,z2,perspective];
+}
+
+function walrusInterpolatedProjection(index,A,B,cA,sA,cB,sB,cC,sC,cx,cy,RX,RY){
+  const s=lifeOf(index);
+  return walrusProjectPoint(
+    A.px[index]+(B.px[index]-A.px[index])*s,
+    A.py[index]+(B.py[index]-A.py[index])*s,
+    A.pz[index]+(B.pz[index]-A.pz[index])*s,
+    cA,sA,cB,sB,cC,sC,cx,cy,RX,RY
+  );
+}
+
+function drawWalrusDensityAuras(ctx,graph,A,B,cA,sA,cB,sB,cC,sC,cx,cy,RX,RY){
+  if(_fast||!graph.clusterSummaries?.length) return;
+  const summaries=graph.clusterSummaries.slice(0,Math.min(8,graph.clusterSummaries.length));
+  const topPopulation=Math.max(1,summaries[0]?.population||1);
+  const layoutGain=graph.analysisLayout==='communities'?1.18:(graph.analysisLayout==='bridges'?0.78:0.96);
+  ctx.save();
+  ctx.globalCompositeOperation='screen';
+  for(let clusterIndex=0;clusterIndex<summaries.length;clusterIndex++){
+    const summary=summaries[clusterIndex], samples=summary.samples;
+    if(samples.length<3) continue;
+    let meanX=0,meanY=0,meanZ=0;
+    const projected=new Float32Array(samples.length*3);
+    for(let j=0;j<samples.length;j++){
+      const point=walrusInterpolatedProjection(samples[j],A,B,cA,sA,cB,sB,cC,sC,cx,cy,RX,RY);
+      projected[j*3]=point[0]; projected[j*3+1]=point[1]; projected[j*3+2]=point[2];
+      meanX+=point[0]; meanY+=point[1]; meanZ+=point[2];
+    }
+    meanX/=samples.length; meanY/=samples.length; meanZ/=samples.length;
+    let xx=0,xy=0,yy=0;
+    for(let j=0;j<samples.length;j++){
+      const dx=projected[j*3]-meanX,dy=projected[j*3+1]-meanY;
+      xx+=dx*dx; xy+=dx*dy; yy+=dy*dy;
+    }
+    xx/=samples.length; xy/=samples.length; yy/=samples.length;
+    const trace=xx+yy, delta=Math.sqrt(Math.max(0,(xx-yy)*(xx-yy)+4*xy*xy));
+    const lambdaMajor=Math.max(1,(trace+delta)*0.5),lambdaMinor=Math.max(1,(trace-delta)*0.5);
+    const populationGain=Math.sqrt(summary.population/topPopulation);
+    const major=clamp(Math.sqrt(lambdaMajor)*2.65,22,Math.max(RX,RY)*0.26);
+    const minor=clamp(Math.sqrt(lambdaMinor)*2.35,8,major*0.78);
+    const angle=0.5*Math.atan2(2*xy,xx-yy);
+    const alpha=(0.042+0.082*populationGain)*(0.76+0.28*Math.max(0,meanZ))*layoutGain;
+    ctx.save(); ctx.translate(meanX,meanY); ctx.rotate(angle); ctx.scale(1,minor/major);
+    const glow=ctx.createRadialGradient(0,0,major*0.04,0,0,major);
+    glow.addColorStop(0,`rgba(128,180,65,${alpha*1.32})`);
+    glow.addColorStop(0.45,`rgba(102,155,57,${alpha*0.78})`);
+    glow.addColorStop(0.78,`rgba(75,121,51,${alpha*0.30})`);
+    glow.addColorStop(1,'rgba(54,92,46,0)');
+    ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0,major,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=`rgba(157,201,61,${0.10+populationGain*0.13})`;
+    ctx.lineWidth=clusterIndex===0?0.78:0.48;
+    ctx.beginPath(); ctx.arc(0,0,major*0.72,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawWalrusHubFans(ctx,graph){
+  if(_fast||!graph.hubEdges?.length||!_xy) return;
+  ctx.save();
+  ctx.globalCompositeOperation='screen';
+  ctx.beginPath();
+  for(let index=0;index<graph.hubEdges.length;index++){
+    const edge=graph.hubEdges[index];
+    if(edge<0||edge>=graph.n-1) continue;
+    const base=edge*(SEG+1)*2;
+    ctx.moveTo(_xy[base],_xy[base+1]);
+    for(let j=1;j<=SEG;j++) ctx.lineTo(_xy[base+j*2],_xy[base+j*2+1]);
+  }
+  ctx.strokeStyle=graph.analysisLayout==='communities'?'rgba(178,214,68,.23)':'rgba(155,197,62,.18)';
+  ctx.lineWidth=0.72;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawSkitter3D(ctx,W,H,t){
   const n=GA.n, nE=n-1, A=GA.b3, B=GB.b3;
   ctx.fillStyle = S.fid==='faithful' ? '#020302' : '#241a2e';
@@ -817,14 +1101,37 @@ function drawSkitter3D(ctx,W,H,t){
       const x1=x*cA+z*sA, z1=-x*sA+z*cA;
       const y1=y*cB-z1*sB, z2=y*sB+z1*cB;
       const x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
+      const perspective=walrusPerspective(z2);
       const q=(e*(SEG+1)+k)*2;
-      _xy[q]=cx+x2*RX; _xy[q+1]=cy-y2*RY; zs+=z2;
+      _xy[q]=cx+x2*RX*perspective; _xy[q+1]=cy-y2*RY*perspective; zs+=z2;
     }
     const z=zs/(SEG+1);
     _lay[e]= z<-0.28?0:(z<0.28?1:2);
   }
 
   ctx.lineCap='round'; ctx.lineJoin='round';
+
+  // Sparse high-level geodesics reveal the hyperbolic ball without drawing
+  // a literal circular outline. Their cool, low-contrast tone follows the
+  // non-tree-link treatment used by Walrus.
+  if(A.orbitCount&&!_fast){
+    const oa=A.op, ob=B.op, orbitSeg=A.orbitSeg;
+    for(let i=0;i<A.orbitCount;i++){
+      ctx.beginPath();
+      for(let k=0;k<=orbitSeg;k++){
+        const o=(i*(orbitSeg+1)+k)*3;
+        const mix=0.5*(lifeOf(A.oa[i])+lifeOf(A.ob[i]));
+        const x=oa[o]+(ob[o]-oa[o])*mix;
+        const y=oa[o+1]+(ob[o+1]-oa[o+1])*mix;
+        const z=oa[o+2]+(ob[o+2]-oa[o+2])*mix;
+        const [sx,sy]=walrusProjectPoint(x,y,z,cA,sA,cB,sB,cC,sC,cx,cy,RX,RY);
+        if(k===0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
+      }
+      ctx.strokeStyle=`rgba(91,132,113,${0.115+(i%3)*0.025})`;
+      ctx.lineWidth=i%4===0?0.78:0.48;
+      ctx.stroke();
+    }
+  }
 
   if(GA.nx && !_fast){                    // peering links, behind everything
     const xa=A.xp, xb=B.xp;
@@ -835,16 +1142,21 @@ function drawSkitter3D(ctx,W,H,t){
         const o=(i*(XSEG+1)+k)*3;
         const x=xa[o]+(xb[o]-xa[o])*s, y=xa[o+1]+(xb[o+1]-xa[o+1])*s, z=xa[o+2]+(xb[o+2]-xa[o+2])*s;
         const x1=x*cA+z*sA, z1=-x*sA+z*cA, y1=y*cB-z1*sB;
-        const x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
-        const sx=cx+x2*RX, sy=cy-y2*RY;
+        const z2=y*sB+z1*cB, x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
+        const perspective=walrusPerspective(z2);
+        const sx=cx+x2*RX*perspective, sy=cy-y2*RY*perspective;
         if(k===0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
       }
     }
     ctx.strokeStyle = S.fid==='faithful'
-      ? (visualGraph.analysisLayout==='bridges'?'rgba(226,236,218,.16)':(visualGraph.analysisLayout==='communities'?'rgba(192,242,42,.16)':'rgba(168,242,42,.13)'))
+      ? (visualGraph.analysisLayout==='bridges'?'rgba(137,156,148,.13)':(visualGraph.analysisLayout==='communities'?'rgba(105,150,135,.11)':'rgba(104,137,128,.095)'))
       : 'rgba(215,215,225,.12)';
-    ctx.lineWidth=0.5; ctx.stroke();
+    ctx.lineWidth=0.42; ctx.stroke();
   }
+
+  // Screen-space covariance of the actual nodes assigned to each AS anchor
+  // produces tilted, data-shaped cluster fields behind the topology.
+  drawWalrusDensityAuras(ctx,visualGraph,A,B,cA,sA,cB,sB,cC,sC,cx,cy,RX,RY);
 
   // counting-sort edges into (transit x depth x colour) groups: one stroke each
   const NG=2*3*BUCKETS;
@@ -868,8 +1180,8 @@ function drawSkitter3D(ctx,W,H,t){
     }
     const f=bk/(BUCKETS-1), a=LA[layer]*(tr? (1-S.twk*0.75):1);
     if(S.fid==='faithful'){
-      ctx.strokeStyle=faithfulEdgeColor(visualGraph.analysisId,f,(0.26+0.34*f)*a);
-      ctx.lineWidth=(0.5+f*0.5)*(0.8+0.3*layer);
+      ctx.strokeStyle=faithfulEdgeColor(visualGraph.analysisId,f,(0.095+0.22*f)*a);
+      ctx.lineWidth=(0.30+f*0.44)*(0.82+0.25*layer);
     } else {
       ctx.strokeStyle=`hsla(${(bk*360/BUCKETS+12)%360},92%,58%,${0.40*a})`;
       ctx.lineWidth=0.62*(0.8+0.3*layer);
@@ -877,22 +1189,54 @@ function drawSkitter3D(ctx,W,H,t){
     ctx.stroke();
   }
 
+  // Emphasize only real parent-child edges whose origin is an analytical
+  // anchor. This reveals hub fans without inventing additional connections.
+  drawWalrusHubFans(ctx,visualGraph);
+
   const step=_fast&&n>2500?3:1;
+  if(!_nodeX||_nodeX.length!==n){
+    _nodeX=new Float32Array(n); _nodeY=new Float32Array(n); _nodeZ=new Float32Array(n);
+    _nodeP=new Float32Array(n); _nodeBin=new Int8Array(n); _nodeOrder=new Int32Array(n);
+  }
+  if(!_nodeCount||_nodeCount.length!==WALRUS_CAMERA.depthBins+1)
+    _nodeCount=new Int32Array(WALRUS_CAMERA.depthBins+1);
+  _nodeCount.fill(0);
+  let nodeCount=0;
   for(let i=0;i<n;i+=step){
-    const s=lifeOf(i), G0=s<0.5?GA:GB;
+    const s=lifeOf(i);
     const x=A.px[i]+(B.px[i]-A.px[i])*s, y=A.py[i]+(B.py[i]-A.py[i])*s, z=A.pz[i]+(B.pz[i]-A.pz[i])*s;
     const x1=x*cA+z*sA, z1=-x*sA+z*cA;
     const y1=y*cB-z1*sB, z2=y*sB+z1*cB;
     const x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
+    const perspective=walrusPerspective(z2);
+    const depthBin=clamp(Math.floor((z2+1)*0.5*WALRUS_CAMERA.depthBins),0,WALRUS_CAMERA.depthBins-1);
+    _nodeX[i]=cx+x2*RX*perspective; _nodeY[i]=cy-y2*RY*perspective;
+    _nodeZ[i]=z2; _nodeP[i]=perspective; _nodeBin[i]=depthBin;
+    _nodeCount[depthBin+1]++; nodeCount++;
+  }
+  for(let bin=0;bin<WALRUS_CAMERA.depthBins;bin++) _nodeCount[bin+1]+=_nodeCount[bin];
+  const nodePut=_nodeCount.slice(0,WALRUS_CAMERA.depthBins);
+  for(let i=0;i<n;i+=step) _nodeOrder[nodePut[_nodeBin[i]]++]=i;
+
+  // Far nodes are painted first, then progressively nearer planes. The
+  // perspective factor changes apparent size rather than mutating graph scale.
+  for(let orderIndex=0;orderIndex<nodeCount;orderIndex++){
+    const i=_nodeOrder[orderIndex],s=lifeOf(i),G0=s<0.5?GA:GB;
+    const x=A.px[i]+(B.px[i]-A.px[i])*s, y=A.py[i]+(B.py[i]-A.py[i])*s, z=A.pz[i]+(B.pz[i]-A.pz[i])*s;
+    const z2=_nodeZ[i];
     const dep3=(z2+1)/2, roleBoost=G0.role[i]===3?0.22:(G0.role[i]>=2?0.14:0);
+    const boundaryMagnification=clamp(1-(x*x+y*y+z*z),0.08,1);
+    const fisheyeSize=0.50+0.85*Math.sqrt(boundaryMagnification);
     const d=Math.min(1,Math.log(G0.deg[i]+1)/Math.log(16)+roleBoost);
     const life=1-S.twk*Math.sin(Math.PI*s);
-    const al=(0.30+0.55*d)*(0.35+0.75*dep3)*life;
+    const al=(0.24+0.62*d)*(0.42+0.65*dep3)*(0.52+0.48*Math.sqrt(boundaryMagnification))*life;
     if(al<0.02) continue;
     ctx.fillStyle = S.fid==='faithful'
       ? faithfulNodeColor(G0.analysisId,d,al)
       : `hsla(${((G0.bh.get(G0.branch[i])||0)*360/G0.nb+12)%360},95%,${58+16*d}%,${al})`;
-    ctx.beginPath(); ctx.arc(cx+x2*RX, cy-y2*RY, (0.45+d*2.5)*(0.7+0.5*dep3)*(0.4+0.6*life),0,6.2832);
+    const roleScale=G0.role[i]>=2?1.42:(G0.role[i]===1?1.18:1);
+    const perspectiveScale=clamp(_nodeP[i]/WALRUS_CAMERA.scale,0.72,1.46);
+    ctx.beginPath(); ctx.arc(_nodeX[i],_nodeY[i],(0.48+d*2.65)*(0.70+0.52*dep3)*fisheyeSize*roleScale*perspectiveScale*(0.4+0.6*life),0,6.2832);
     ctx.fill();
   }
 
@@ -908,10 +1252,7 @@ function drawSkitter3D(ctx,W,H,t){
     ctx.textBaseline='middle';
     for(const anchor of [...roots,...shared]){
       const i=anchor.index, x=A.px[i], y=A.py[i], z=A.pz[i];
-      const x1=x*cA+z*sA, z1=-x*sA+z*cA;
-      const y1=y*cB-z1*sB;
-      const x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
-      const sx=cx+x2*RX, sy=cy-y2*RY;
+      const [sx,sy]=walrusProjectPoint(x,y,z,cA,sA,cB,sB,cC,sC,cx,cy,RX,RY);
       const label=`AS${anchor.asn}`;
       const width=Math.ceil(ctx.measureText(label).width)+10;
       ctx.strokeStyle=`rgba(230,238,224,${0.34*annotationAlpha})`;

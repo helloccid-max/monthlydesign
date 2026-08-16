@@ -4,8 +4,9 @@ import styles from './styles.module.css';
 const INTRO_IDLE_MS = 1800;
 const INTRO_AUTO_ADVANCE_ENABLED = false;
 const COVER_ENTRY_DURATION_MS = 3600;
-const COVER_FLIP_START_MS = 3100;
-const COVER_FLIP_DURATION_MS = 1650;
+const COVER_CENTER_HOLD_MS = 3000;
+const COVER_FLIP_START_MS = COVER_ENTRY_DURATION_MS + COVER_CENTER_HOLD_MS;
+const COVER_FLIP_DURATION_MS = 1350;
 const COVER_BACK_HOLD_MS = 5000;
 const COVER_SEQUENCE_DURATION_MS = Math.max(
   COVER_ENTRY_DURATION_MS,
@@ -381,7 +382,8 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
   const finalTitle = easeOutQuint(segment(scrubProgress, 0.765, 0.855));
   const finalTranslation = easeOutQuint(segment(scrubProgress, 0.795, 0.88));
   const finalSplitActive = scrubProgress >= 0.745;
-  const coverTransform = `translate3d(0, ${(-132 * coverRise).toFixed(3)}dvh, 0) perspective(1400px) rotateY(${(30 * coverRise).toFixed(3)}deg) scale(0.7)`;
+  const coverExitScale = 0.7 * (1 - 0.2 * coverRise);
+  const coverTransform = `translate3d(0, ${(-132 * coverRise).toFixed(3)}dvh, 0) perspective(1400px) rotateY(${(45 * coverRise).toFixed(3)}deg) scale(${coverExitScale.toFixed(4)})`;
 
   useEffect(() => {
     rendererRef.current?.contentWindow?.postMessage(
@@ -469,7 +471,13 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
           className={styles.coverFilm}
           style={started ? { transform: coverTransform } : undefined}
         >
-          <div className={styles.coverCard}>
+          <div
+            className={styles.coverCard}
+            style={{
+              '--cover-flip-delay': `${COVER_FLIP_START_MS}ms`,
+              '--cover-flip-duration': `${COVER_FLIP_DURATION_MS}ms`,
+            }}
+          >
             <div className={`${styles.coverFace} ${styles.coverFront}`}>
               <img
                 className={styles.coverImage}

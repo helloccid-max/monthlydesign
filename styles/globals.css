@@ -18,6 +18,13 @@ html {
   --editorial-black: #020302;
   --editorial-ink: #080b07;
   --editorial-lime: #a8f22a;
+  --editorial-lime-surface: #8df22a;
+  --editorial-lime-gradient: linear-gradient(
+    135deg,
+    #a8f22a 0%,
+    #9af22a 52%,
+    #8df22a 100%
+  );
   --editorial-lime-soft: #75a91f;
   --editorial-bone: #f1f1e9;
   --editorial-red: #ef2b12;

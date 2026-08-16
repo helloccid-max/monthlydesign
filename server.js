@@ -8,7 +8,10 @@ const hostname = process.env.HOSTNAME || 'localhost';
 const app = next({ dev, hostname, port: defaultPort });
 const handle = app.getRequestHandler();
 
-function tryListen(server, port, maxTries = 5) {
+// Do not silently start a second Next dev server on a neighbouring port.
+// Two servers from the same checkout share `.next` and can trigger an HMR
+// full-refresh loop as they overwrite each other's hot-update manifests.
+function tryListen(server, port, maxTries = 0) {
   return new Promise((resolve, reject) => {
     const doListen = (p) => {
       server.listen(p, () => {
@@ -50,6 +53,11 @@ app.prepare().then(() => {
           console.log(`> Open in browser: ${url}/mobile or ${url}/wall`);
         })
         .catch((err) => {
+          if (err?.code === 'EADDRINUSE') {
+            console.error(
+              `Port ${defaultPort} is already in use. Reuse the running server or stop it before starting another one.`
+            );
+          }
           console.error(err);
           process.exit(1);
         });

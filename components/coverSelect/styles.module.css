@@ -301,11 +301,11 @@
     width 760ms cubic-bezier(0.16, 1, 0.3, 1),
     min-height 620ms cubic-bezier(0.16, 1, 0.3, 1),
     padding 620ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-radius 620ms cubic-bezier(0.16, 1, 0.3, 1),
     transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 220ms ease,
-    background 220ms ease,
-    box-shadow 220ms ease;
+    border-color 440ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 440ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 440ms cubic-bezier(0.16, 1, 0.3, 1),
+    backdrop-filter 440ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .continueButton::before {
@@ -327,9 +327,16 @@
 }
 
 .continueButton[data-has-transcript='true'] {
-  /* A 58px pill reads as roughly a 29px visual radius; one third is ~10px. */
   min-height: 58px;
   padding: 14px var(--voice-state-inline-space);
+  background: rgba(5, 6, 7, 0.88);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -0.5px 0 rgba(255, 255, 255, 0.025),
+    0 7px 22px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(9px) saturate(104%);
+  -webkit-backdrop-filter: blur(9px) saturate(104%);
+  cursor: default;
 }
 
 .continueButton[data-cancellable='true'] {
