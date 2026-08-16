@@ -190,7 +190,7 @@ function steeringVector(desiredX, desiredY, velocityX, velocityY, maximumSpeed, 
   return limitVector(scaledX - velocityX, scaledY - velocityY, maximumForce);
 }
 
-export default function CoverSelectScreen({ onNext, debugState = null } = {}) {
+export default function CoverSelectScreen({ onSubmit, debugState = null } = {}) {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedParticleId, setSelectedParticleId] = useState(null);
   const [promptValue, setPromptValue] = useState('');
@@ -775,14 +775,16 @@ export default function CoverSelectScreen({ onNext, debugState = null } = {}) {
     const safePrompt = value.trim().slice(0, POSTCARD_QUOTE_MAX_CHARS);
     if (!selected || !safePrompt) return;
 
-    try {
-      localStorage.setItem('monthlyDesign:selectedCover', selected.id);
-      localStorage.setItem('monthlyDesign:prompt', safePrompt);
-      localStorage.setItem('platforml:userText', safePrompt);
-    } catch (_) {}
-
-    onNext?.();
-  }, [onNext, selected]);
+    // GENERATION_HANDOFF_START: everything after CoverSelect consumes this payload.
+    // Keep this contract in sync with components/generation/contract.js.
+    onSubmit?.({
+      coverId: selected.id,
+      coverImageUrl: selected.imageUrl,
+      issue: selected.issue,
+      date: selected.date,
+      prompt: safePrompt,
+    });
+  }, [onSubmit, selected]);
 
   useEffect(() => {
     if (!pendingSubmit || !promptValue.trim() || displayedPrompt !== promptValue) return undefined;
@@ -961,10 +963,6 @@ export default function CoverSelectScreen({ onNext, debugState = null } = {}) {
     setSpeechSendReady(false);
     setSpeechError('');
     setPendingSubmit(false);
-    try {
-      localStorage.removeItem('monthlyDesign:prompt');
-      localStorage.removeItem('platforml:userText');
-    } catch (_) {}
     requestMicrophonePermission('');
   }, [requestMicrophonePermission, stopInputMeter]);
 
@@ -975,9 +973,6 @@ export default function CoverSelectScreen({ onNext, debugState = null } = {}) {
       return;
     }
     event?.currentTarget?.blur();
-    try {
-      localStorage.setItem('monthlyDesign:selectedCover', selected.id);
-    } catch (_) {}
 
     if (speechStatus === 'requesting-permission') return;
     if (speechError === SPEECH_ERROR_MESSAGES['not-allowed']) {
@@ -1003,9 +998,6 @@ export default function CoverSelectScreen({ onNext, debugState = null } = {}) {
     voiceLongPressTimerRef.current = window.setTimeout(() => {
       voiceLongPressStartedRef.current = true;
       suppressVoiceClickRef.current = true;
-      try {
-        localStorage.setItem('monthlyDesign:selectedCover', selected.id);
-      } catch (_) {}
       requestMicrophonePermission();
     }, VOICE_LONG_PRESS_MS);
   }, [pendingSubmit, requestMicrophonePermission, selected, speechError]);
@@ -1218,11 +1210,6 @@ export default function CoverSelectScreen({ onNext, debugState = null } = {}) {
       setSpeechStatus('listening');
       setSpeechActive(false);
       setSpeechSendReady(true);
-      try {
-        localStorage.setItem('monthlyDesign:selectedCover', qaParticle.cover.id);
-        localStorage.setItem('monthlyDesign:prompt', qaPrompt);
-        localStorage.setItem('platforml:userText', qaPrompt);
-      } catch (_) {}
     }
   }, [debugState, particles, releaseParticle, selectParticle, stopInputMeter]);
 

@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import IntroScreen from '@/components/intro';
 import CoverSelectScreen from '@/components/coverSelect';
-import LoadScreen from '@/components/load';
-import HomageScreen from '@/components/homage';
+import GenerationFlow, {
+  DEFAULT_GENERATION_REQUEST,
+  GENERATION_PHASES,
+  normalizeGenerationRequest,
+} from '@/components/generation';
 import End2Screen from '@/components/end2';
 import styles from './styles.module.css';
 
@@ -46,6 +49,7 @@ export default function MobileScreen() {
   const [transitioningToCover, setTransitioningToCover] = useState(false);
   const [loadMounted, setLoadMounted] = useState(false);
   const [transitioningToLoad, setTransitioningToLoad] = useState(false);
+  const [generationRequest, setGenerationRequest] = useState(null);
   const [qaIndex, setQaIndex] = useState(null);
   const qaStage = qaIndex == null ? null : QA_STAGES[qaIndex];
 
@@ -106,11 +110,7 @@ export default function MobileScreen() {
       setTransitioningToLoad(false);
 
       if (nextStage.state === 'transcript' || nextStage.scene === STEPS.LOAD || nextStage.scene === STEPS.HOMAGE) {
-        try {
-          localStorage.setItem('monthlyDesign:selectedCover', 'design-277-2001-07');
-          localStorage.setItem('monthlyDesign:prompt', '데이터가 유기체처럼 자라나는 우주');
-          localStorage.setItem('platforml:userText', '데이터가 유기체처럼 자라나는 우주');
-        } catch (_) {}
+        setGenerationRequest(DEFAULT_GENERATION_REQUEST);
       }
     };
 
@@ -126,7 +126,12 @@ export default function MobileScreen() {
         setTransitioningToLoad(false);
         go(STEPS.COVER);
       },
-      goLoad: () => setLoadMounted(true),
+      // GENERATION_HANDOFF_START: downstream ownership begins at this callback.
+      // Generation implementation belongs under components/generation/.
+      submitGeneration: (request) => {
+        setGenerationRequest(normalizeGenerationRequest(request));
+        setLoadMounted(true);
+      },
       goHomage: () => go(STEPS.HOMAGE),
       goEnd2: () => go(STEPS.END2),
       goIntro: () => {
@@ -134,6 +139,7 @@ export default function MobileScreen() {
         setLoadMounted(false);
         setTransitioningToCover(false);
         setTransitioningToLoad(false);
+        setGenerationRequest(null);
         go(STEPS.INTRO);
       },
     };
@@ -151,8 +157,10 @@ export default function MobileScreen() {
       >
         {showLoad && (
           <div className={styles.loadLayer}>
-            <LoadScreen
-              onDone={handlers.goHomage}
+            <GenerationFlow
+              phase={GENERATION_PHASES.LOADING}
+              request={generationRequest}
+              onGenerated={handlers.goHomage}
               debugMode={Boolean(qaStage) || step !== STEPS.LOAD || transitioningToLoad}
             />
           </div>
@@ -162,7 +170,10 @@ export default function MobileScreen() {
             className={styles.coverLayer}
             aria-hidden={step === STEPS.INTRO ? 'true' : undefined}
           >
-            <CoverSelectScreen onNext={handlers.goLoad} debugState={qaStage?.state || null} />
+            <CoverSelectScreen
+              onSubmit={handlers.submitGeneration}
+              debugState={qaStage?.state || null}
+            />
           </div>
         )}
         {step === STEPS.INTRO && (
@@ -177,7 +188,15 @@ export default function MobileScreen() {
       </main>
     );
   }
-  if (step === STEPS.HOMAGE) return <HomageScreen onDone={handlers.goEnd2} onEdit={handlers.goCover} />;
+  if (step === STEPS.HOMAGE) {
+    return (
+      <GenerationFlow
+        phase={GENERATION_PHASES.RESULT}
+        request={generationRequest}
+        onEdit={handlers.goCover}
+      />
+    );
+  }
   if (step === STEPS.END2) return <End2Screen onRestart={handlers.goIntro} />;
   return null;
 }

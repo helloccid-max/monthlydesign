@@ -1,27 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import GlassSurface from '@/components/GlassSurface';
 import { createHomageCoverUrl } from '@/lib/homageCover';
-import { getMonthlyDesignCover } from '@/lib/monthlyDesignCovers';
 import styles from './styles.module.css';
 
-const DEFAULT_PROMPT = '데이터가 유기체처럼 자라나는 우주';
-
-export default function HomageScreen({ onEdit } = {}) {
-  const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
-  const [coverId, setCoverId] = useState('design-277-2001-07');
+export default function HomageScreen({ request, onEdit } = {}) {
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    try {
-      setPrompt(localStorage.getItem('monthlyDesign:prompt') || DEFAULT_PROMPT);
-      setCoverId(localStorage.getItem('monthlyDesign:selectedCover') || 'design-277-2001-07');
-    } catch (_) {}
-  }, []);
-
-  const cover = getMonthlyDesignCover(coverId);
+  const prompt = request?.prompt || '';
+  const issue = request?.issue || '277';
+  const date = request?.date || '2001.07';
   const generatedUrl = useMemo(
-    () => createHomageCoverUrl({ prompt, issue: cover.issue, date: cover.date }),
-    [cover.date, cover.issue, prompt]
+    () => createHomageCoverUrl({ prompt, issue, date }),
+    [date, issue, prompt]
   );
 
   const renderPngBlob = useCallback(async () => {
@@ -60,7 +49,7 @@ export default function HomageScreen({ onEdit } = {}) {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `monthly-design-homage-${cover.issue}.png`;
+      anchor.download = `monthly-design-homage-${issue}.png`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -68,14 +57,14 @@ export default function HomageScreen({ onEdit } = {}) {
     } catch (_) {
       const anchor = document.createElement('a');
       anchor.href = generatedUrl;
-      anchor.download = `monthly-design-homage-${cover.issue}.svg`;
+      anchor.download = `monthly-design-homage-${issue}.svg`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
     } finally {
       setSaving(false);
     }
-  }, [cover.issue, generatedUrl, renderPngBlob, saving]);
+  }, [generatedUrl, issue, renderPngBlob, saving]);
 
   return (
     <main className={styles.page}>
