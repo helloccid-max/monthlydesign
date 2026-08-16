@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "analyze:covers": "node scripts/analyze-monthly-design-covers.mjs",
     "dev": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON server.js",
     "build": "next build",
     "start": "node server.js",

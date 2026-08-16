@@ -162,14 +162,15 @@ function faithfulEdgeColor(analysisId,f,alpha){
   // Walrus reads as a hierarchy because the tree lives in a restrained
   // olive spectrum. Keeping the hue range narrow also prevents thousands of
   // overlapping links from washing into the pale neon cloud we had before.
-  const sceneShift=(analysisId==='communities'||analysisId==='medusa')?4:
-    ((analysisId==='traces'||analysisId==='bridges')?-3:0);
+  const sceneShift=(analysisId==='communities'||analysisId==='medusa'||analysisId==='visual-genealogy')?4:
+    ((analysisId==='traces'||analysisId==='bridges'||analysisId==='palette-constellations')?-3:0);
   return `hsla(${82+sceneShift+12*f},${42+34*f}%,${24+34*f}%,${alpha})`;
 }
-function faithfulNodeColor(analysisId,degree,alpha){
-  const sceneShift=(analysisId==='communities'||analysisId==='medusa')?5:
-    ((analysisId==='traces'||analysisId==='bridges')?-2:0);
-  return `hsla(${85+sceneShift+10*(1-degree)},${68+27*degree}%,${40+28*degree}%,${alpha})`;
+function faithfulNodeColor(analysisId,degree,alpha,measuredTone=0.5){
+  const sceneShift=(analysisId==='communities'||analysisId==='medusa'||analysisId==='visual-genealogy')?5:
+    ((analysisId==='traces'||analysisId==='bridges'||analysisId==='palette-constellations')?-2:0);
+  const tone=clamp(Number(measuredTone)||0.5,0,1);
+  return `hsla(${85+sceneShift+10*(1-degree)},${66+25*degree}%,${35+23*degree+13*tone}%,${alpha})`;
 }
 
 const S = {
@@ -244,6 +245,7 @@ function fallbackScene(id,title,method,predicate){
 }
 
 let TOPOLOGY_META={
+  kind:'internet',
   source:'embedded topology snapshot',
   queryTime:'2026-08',
   observedAsnCount:FALLBACK_INTERNET.totalAs,
@@ -274,7 +276,150 @@ const weightedPick=(items,weightOf,rnd)=>{
 };
 
 /* ====================== the graph ====================== */
+function buildCoverGraph(seed,topology){
+  const rnd=mulberry32(seed);
+  const nodes=Array.isArray(topology.nodes)?topology.nodes:[];
+  const sourceParents=Array.isArray(topology.parents)?topology.parents:[];
+  const n=nodes.length;
+  if(n<2||sourceParents.length!==n) throw new Error('Invalid Monthly Design cover topology');
+  const coverImageUrls=new Array(n).fill('');
+  for(const cover of topology.covers||[]){
+    const nodeIndex=Number(cover?.node);
+    if(Number.isInteger(nodeIndex)&&nodeIndex>=0&&nodeIndex<n&&cover.imageUrl)
+      coverImageUrls[nodeIndex]=String(cover.imageUrl);
+  }
+
+  const par=new Int32Array(n).fill(-1),dep=new Int32Array(n),deg=new Int32Array(n),
+    branch=new Int32Array(n).fill(-1),role=new Int8Array(n),anchorOf=new Int32Array(n).fill(-1),
+    nodeTone=new Float32Array(n).fill(0.5),nodeComplexity=new Float32Array(n),nodeKind=new Int8Array(n);
+  role[0]=5;
+  nodeKind[0]=3;
+  anchorOf[0]=0;
+  for(let i=0;i<n;i++){
+    const node=nodes[i]||{};
+    const color=Array.isArray(node.color)?node.color:[50,0,0];
+    const chroma=Math.hypot(Number(color[1])||0,Number(color[2])||0);
+    nodeTone[i]=clamp((Number(color[0])||50)/135+chroma/210,0.08,1);
+    nodeComplexity[i]=clamp(Number(node.complexity)||Number(node.variance)*4||0,0,1);
+    if(i===0) continue;
+    const proposed=Number(sourceParents[i]);
+    const p=Number.isInteger(proposed)&&proposed>=0&&proposed<i?proposed:0;
+    const kind=node.kind;
+    par[i]=p;
+    dep[i]=dep[p]+1;
+    role[i]=kind==='cluster'||kind==='decade'?1:(kind==='cover'?2:0);
+    nodeKind[i]=kind==='cluster'||kind==='decade'?2:(kind==='cover'?1:0);
+    anchorOf[i]=kind==='region'?p:(kind==='cover'?i:anchorOf[p]);
+    branch[i]=p===0?i:(branch[p]>=0?branch[p]:p);
+    deg[p]++; deg[i]++;
+  }
+
+  const peerA=[],peerB=[];
+  for(const link of topology.links||[]){
+    const a=Number(link?.[0]),b=Number(link?.[1]);
+    if(!Number.isInteger(a)||!Number.isInteger(b)||a<0||b<0||a>=n||b>=n||a===b) continue;
+    peerA.push(a); peerB.push(b); deg[a]++; deg[b]++;
+  }
+  const cxA=Int32Array.from(peerA),cyA=Int32Array.from(peerB),nx=cxA.length;
+
+  const size=new Float64Array(n).fill(1);
+  for(let i=n-1;i>=1;i--) size[par[i]]+=size[i];
+  const weight=new Float64Array(n),childWeight=new Float64Array(n);
+  for(let i=0;i<n;i++){
+    const measured=0.76+0.34*clamp(Number(nodes[i]?.weight)||0.5,0.08,1);
+    weight[i]=Math.pow(size[i],S.alpha)*measured;
+  }
+  for(let i=1;i<n;i++) childWeight[par[i]]+=weight[i];
+
+  const dist=new Float64Array(n);
+  for(let i=1;i<n;i++){
+    const kind=nodes[i]?.kind;
+    const step=role[i]===1
+      ? 0.20+0.08*rnd()
+      : (role[i]>=2
+        ? 0.36+nodeComplexity[i]*0.16
+        : 0.34+nodeComplexity[i]*0.30+0.20*rnd());
+    dist[i]=dist[par[i]]+step;
+    if(kind==='region') dist[i]+=clamp(1-(Number(nodes[i]?.weight)||0.2),0,1)*0.12;
+  }
+  const sample=[];
+  for(let i=0;i<n;i+=Math.max(1,(n/1500)|0)) sample.push(dist[i]);
+  sample.sort((a,b)=>a-b);
+  const maxDistance=sample[Math.floor(sample.length*0.92)]||1;
+  const layout=topology.layout||topology.id;
+  const sceneCurvature=layout==='communities'?S.curv*1.13:(layout==='bridges'?S.curv*0.84:S.curv);
+  const denominator=Math.tanh(sceneCurvature*Math.max(1,maxDistance));
+
+  const a0=new Float64Array(n),aw=new Float64Array(n),cursor=new Float64Array(n);
+  const ang=new Float64Array(n),rad=new Float64Array(n);
+  a0[0]=0; aw[0]=Math.PI*2;
+  let maxDep=0;
+  for(let i=0;i<n;i++){
+    maxDep=Math.max(maxDep,dep[i]);
+    if(i>0){
+      const p=par[i];
+      const share=(weight[i]/(childWeight[p]||1))*aw[p]*S.gap;
+      a0[i]=a0[p]+cursor[p]+aw[p]*(1-S.gap)/2;
+      cursor[p]+=share;
+      aw[i]=Math.min(share*S.spread,Math.PI*0.92);
+      a0[i]-=(aw[i]-share)/2;
+    }
+    ang[i]=a0[i]+aw[i]/2+(rnd()-0.5)*aw[i]*S.jit;
+    const spatial=nodes[i]?.spatial;
+    if(Array.isArray(spatial)) ang[i]+=(Number(spatial[0])-.5)*aw[i]*0.68;
+    rad[i]=(Math.tanh(sceneCurvature*dist[i])/denominator)*(1+(rnd()-0.5)*0.045*S.jit);
+    if(Array.isArray(spatial)) rad[i]*=0.95+clamp(Number(spatial[1]),0,1)*0.08;
+    rad[i]=Math.min(0.955,rad[i]);
+  }
+  const x2=new Float64Array(n),y2=new Float64Array(n);
+  for(let i=0;i<n;i++){ x2[i]=Math.cos(ang[i])*rad[i]; y2[i]=Math.sin(ang[i])*rad[i]; }
+
+  const bh=new Map(); let branchIndex=0;
+  for(let i=1;i<n;i++) if(dep[i]===1) bh.set(i,branchIndex++);
+
+  // The aura is derived from the measured descendants of each active archive
+  // branch. It is covariance, not a decorative circle, so dense cover families
+  // form their own tilted field while sparse branches remain quiet.
+  const membersByBranch=new Map();
+  for(let i=1;i<n;i++){
+    const key=branch[i];
+    const members=membersByBranch.get(key)||[];
+    members.push(i); membersByBranch.set(key,members);
+  }
+  const clusterSummaries=[];
+  membersByBranch.forEach((members,index)=>{
+    if(members.length<4) return;
+    const sampleCount=Math.min(36,members.length);
+    const samples=new Int32Array(sampleCount);
+    for(let j=0;j<sampleCount;j++) samples[j]=members[Math.round(j*(members.length-1)/Math.max(1,sampleCount-1))];
+    const spokes=members.filter(member=>par[member]===index).sort((a,b)=>deg[b]-deg[a]||a-b).slice(0,18);
+    clusterSummaries.push({index,population:members.length,samples,spokes:Int32Array.from(spokes)});
+  });
+  clusterSummaries.sort((a,b)=>b.population-a.population||deg[b.index]-deg[a.index]);
+
+  const hubEdges=[];
+  for(let i=1;i<n;i++) if(role[par[i]]>=2) hubEdges.push(i-1);
+  hubEdges.sort((a,b)=>deg[b+1]-deg[a+1]||a-b);
+
+  const G={
+    n,par,dep,deg,branch,role,anchorOf,ang,rad,x2,y2,cx:cxA,cy:cyA,nx,maxDep,bh,
+    nb:Math.max(1,branchIndex),seed,analysisId:topology.id,analysisLayout:layout,
+    anchorIndexes:[],anchorIndexByAsn:new Map(),clusterSummaries,
+    hubEdges:Int32Array.from(hubEdges.slice(0,260)),nodeTone,nodeComplexity,nodeKind,coverImageUrls
+  };
+  G.b3=build3D(n,par,rad,role,dep,deg,layout,rnd,nx,cxA,cyA);
+  G.bkF=new Int8Array(Math.max(1,n-1)); G.bkS=new Int8Array(Math.max(1,n-1));
+  for(let edge=0;edge<n-1;edge++){
+    const i=edge+1;
+    const degreeTone=Math.min(1,Math.log(deg[i]+1)/Math.log(14));
+    G.bkF[edge]=Math.min(BUCKETS-1,Math.floor(clamp(degreeTone*0.56+nodeTone[i]*0.30+nodeComplexity[i]*0.14,0,0.999)*BUCKETS));
+    G.bkS[edge]=(bh.get(branch[i])||0)%BUCKETS;
+  }
+  return G;
+}
+
 function buildGraph(seed,topology=sceneAt(0)){
+  if(topology.kind==='cover-archive') return buildCoverGraph(seed,topology);
   const rnd = mulberry32(seed);
   const layout=topology.layout||topology.id;
   const n = S.n|0;
@@ -813,6 +958,7 @@ function acceptLiveTopology(payload){
   const scenes=payload.scenes.filter(scene=>(scene.groups?.length&&scene.anchors?.length));
   if(scenes.length<3) return;
   TOPOLOGY_META={
+    kind:'internet',
     source:payload.source||'RIPE NCC RIS',
     queryTime:payload.queryTime||payload.fetchedAt||new Date().toISOString(),
     observedAsnCount:Number(payload.observedAsnCount)||0,
@@ -823,6 +969,35 @@ function acceptLiveTopology(payload){
   reseed(true);
 }
 
+function acceptCoverTopology(payload){
+  if(!payload||payload.kind!=='cover-archive'||!Array.isArray(payload.nodes)||!Array.isArray(payload.scenes)) return false;
+  const scenes=payload.scenes.filter(scene=>Array.isArray(scene.parents)&&scene.parents.length===payload.nodes.length);
+  if(scenes.length<3) return false;
+  TOPOLOGY_META={
+    kind:'cover-archive',
+    source:payload.source||'Monthly Design cover archive',
+    queryTime:payload.generatedAt||'',
+    coverCount:Number(payload.coverCount)||0,
+    nodeCount:Number(payload.nodeCount)||payload.nodes.length,
+    range:payload.range||'',
+    referenceCover:payload.referenceCover||'2001_07',
+    live:false
+  };
+  TOPOLOGY_SCENES=scenes.map(scene=>({
+    ...scene,
+    kind:'cover-archive',
+    nodes:payload.nodes,
+    covers:payload.covers,
+    links:payload.links||[],
+    isLive:false
+  }));
+  S.n=payload.nodes.length;
+  S.seed=Number(payload.seed)||200107;
+  S.live=true;
+  reseed(true);
+  return true;
+}
+
 async function loadLiveTopology(){
   try{
     const response=await fetch('/api/internet-topology',{headers:{Accept:'application/json'}});
@@ -831,6 +1006,17 @@ async function loadLiveTopology(){
   }catch(error){
     // The visual remains fully functional with the labelled embedded snapshot.
     console.warn('Using embedded topology snapshot',error);
+  }
+}
+
+async function loadCoverTopology(){
+  try{
+    const response=await fetch('/data/monthly-design-cover-topology.json',{headers:{Accept:'application/json'}});
+    if(!response.ok) throw new Error(`cover topology ${response.status}`);
+    if(!acceptCoverTopology(await response.json())) throw new Error('invalid cover topology');
+  }catch(error){
+    console.warn('Using Internet topology fallback',error);
+    loadLiveTopology();
   }
 }
 
@@ -970,13 +1156,16 @@ function drawSkitter2D(ctx,W,H,t){
   }
   for(let i=0;i<n;i++){
     const s=L[i], G0=s<0.5?GA:GB;
-    const roleBoost=G0.role[i]===3?0.22:(G0.role[i]>=2?0.14:0);
+    const archiveKind=G0.nodeKind?.[i];
+    const roleBoost=archiveKind===undefined
+      ? (G0.role[i]===3?0.22:(G0.role[i]>=2?0.14:0))
+      : (archiveKind===3?0.20:(archiveKind===2?0.12:(archiveKind===1?0.025:0)));
     const d=Math.min(1,Math.log(G0.deg[i]+1)/Math.log(16)+roleBoost);
     const life=1-S.twk*Math.sin(Math.PI*s);
     const al=(0.5+0.45*d)*life;
     if(al<0.02) continue;
     ctx.fillStyle = S.fid==='faithful'
-      ? faithfulNodeColor(G0.analysisId,d,al)
+      ? faithfulNodeColor(G0.analysisId,d,al,G0.nodeTone?.[i]??0.5)
       : `hsla(${((G0.bh.get(G0.branch[i])||0)*360/G0.nb+12)%360},95%,${58+16*d}%,${al})`;
     ctx.beginPath(); ctx.arc(X[i],Y[i],(0.5+d*2.6)*(0.35+0.65*life),0,6.2832); ctx.fill();
   }
@@ -1071,6 +1260,70 @@ function drawWalrusHubFans(ctx,graph){
   ctx.lineWidth=0.72;
   ctx.stroke();
   ctx.restore();
+}
+
+const COVER_THUMBNAIL_CACHE=new Map();
+const COVER_THUMBNAIL_CACHE_LIMIT=96;
+
+function coverThumbnail(src){
+  let entry=COVER_THUMBNAIL_CACHE.get(src);
+  const now=performance.now();
+  if(entry){ entry.usedAt=now; return entry; }
+  const image=new Image();
+  image.decoding='async';
+  entry={image,state:'loading',usedAt:now};
+  image.onload=()=>{ entry.state='ready'; entry.usedAt=performance.now(); kick(); };
+  image.onerror=()=>{ entry.state='error'; };
+  image.src=src;
+  COVER_THUMBNAIL_CACHE.set(src,entry);
+  if(COVER_THUMBNAIL_CACHE.size>COVER_THUMBNAIL_CACHE_LIMIT){
+    const removable=[...COVER_THUMBNAIL_CACHE.entries()]
+      .filter(([,candidate])=>candidate.state!=='loading')
+      .sort((left,right)=>left[1].usedAt-right[1].usedAt);
+    for(let i=0;i<removable.length&&COVER_THUMBNAIL_CACHE.size>COVER_THUMBNAIL_CACHE_LIMIT;i++)
+      COVER_THUMBNAIL_CACHE.delete(removable[i][0]);
+  }
+  return entry;
+}
+
+function drawCoverThumbnails(ctx,graph,W,H,cx,cy,RX,RY){
+  if(_fast||!graph.coverImageUrls?.length) return;
+  const candidates=[];
+  for(let i=0;i<graph.n;i++){
+    const src=graph.coverImageUrls[i];
+    if(!src) continue;
+    const x=_nodeX[i],y=_nodeY[i],z=_nodeZ[i];
+    if(!Number.isFinite(x)||!Number.isFinite(y)||x<-64||x>W+64||y<-72||y>H+72) continue;
+    const reference=graph.nodeKind?.[i]===3;
+    const score=z*2.25+(graph.nodeComplexity?.[i]||0)*0.34+(reference?3.2:0);
+    candidates.push({i,src,x,y,z,score,reference});
+  }
+  const limit=Math.min(candidates.length,W<640?44:60);
+  candidates.sort((left,right)=>right.score-left.score||left.i-right.i);
+  const visible=candidates.slice(0,limit).sort((left,right)=>left.z-right.z);
+  const minimum=Math.min(W,H);
+  for(const candidate of visible){
+    const entry=coverThumbnail(candidate.src);
+    if(entry.state!=='ready'||!entry.image.naturalWidth||!entry.image.naturalHeight) continue;
+    const near=clamp((candidate.z+0.48)/1.45,0,1);
+    const height=minimum*(candidate.reference?0.14:(0.036+0.052*near*near));
+    const width=height*(entry.image.naturalWidth/entry.image.naturalHeight);
+    const horizontal=clamp((candidate.x-cx)/Math.max(1,RX),-1,1);
+    const vertical=clamp((candidate.y-cy)/Math.max(1,RY),-1,1);
+    const angle=horizontal*0.18-vertical*0.075;
+    const face=0.66+0.34*near;
+    ctx.save();
+    ctx.translate(candidate.x,candidate.y);
+    ctx.rotate(angle);
+    ctx.scale(face,1);
+    ctx.shadowColor='rgba(0,0,0,.15)';
+    ctx.shadowBlur=7+near*7;
+    ctx.shadowOffsetY=2+near*2;
+    // Covers retain their source colour and full opacity: no lime tint and no
+    // translucent LOD. Only their position, apparent size and plane tilt vary.
+    ctx.drawImage(entry.image,-width/2,-height/2,width,height);
+    ctx.restore();
+  }
 }
 
 function drawSkitter3D(ctx,W,H,t){
@@ -1226,7 +1479,10 @@ function drawSkitter3D(ctx,W,H,t){
     const i=_nodeOrder[orderIndex],s=lifeOf(i),G0=s<0.5?GA:GB;
     const x=A.px[i]+(B.px[i]-A.px[i])*s, y=A.py[i]+(B.py[i]-A.py[i])*s, z=A.pz[i]+(B.pz[i]-A.pz[i])*s;
     const z2=_nodeZ[i];
-    const dep3=(z2+1)/2, roleBoost=G0.role[i]===3?0.22:(G0.role[i]>=2?0.14:0);
+    const archiveKind=G0.nodeKind?.[i];
+    const dep3=(z2+1)/2, roleBoost=archiveKind===undefined
+      ? (G0.role[i]===3?0.22:(G0.role[i]>=2?0.14:0))
+      : (archiveKind===3?0.20:(archiveKind===2?0.12:(archiveKind===1?0.025:0)));
     const boundaryMagnification=clamp(1-(x*x+y*y+z*z),0.08,1);
     const fisheyeSize=0.50+0.85*Math.sqrt(boundaryMagnification);
     const d=Math.min(1,Math.log(G0.deg[i]+1)/Math.log(16)+roleBoost);
@@ -1234,13 +1490,17 @@ function drawSkitter3D(ctx,W,H,t){
     const al=(0.24+0.62*d)*(0.42+0.65*dep3)*(0.52+0.48*Math.sqrt(boundaryMagnification))*life;
     if(al<0.02) continue;
     ctx.fillStyle = S.fid==='faithful'
-      ? faithfulNodeColor(G0.analysisId,d,al)
+      ? faithfulNodeColor(G0.analysisId,d,al,G0.nodeTone?.[i]??0.5)
       : `hsla(${((G0.bh.get(G0.branch[i])||0)*360/G0.nb+12)%360},95%,${58+16*d}%,${al})`;
-    const roleScale=G0.role[i]>=2?1.42:(G0.role[i]===1?1.18:1);
+    const roleScale=archiveKind===undefined
+      ? (G0.role[i]>=2?1.42:(G0.role[i]===1?1.18:1))
+      : (archiveKind===3?1.42:(archiveKind===2?1.16:(archiveKind===1?0.72:0.94)));
     const perspectiveScale=clamp(_nodeP[i]/WALRUS_CAMERA.scale,0.72,1.46);
     ctx.beginPath(); ctx.arc(_nodeX[i],_nodeY[i],(0.48+d*2.65)*(0.70+0.52*dep3)*fisheyeSize*roleScale*perspectiveScale*(0.4+0.6*life),0,6.2832);
     ctx.fill();
   }
+
+  drawCoverThumbnails(ctx,visualGraph,W,H,cx,cy,RX,RY);
 
   // The bridge analysis briefly exposes the actual analytical anchors as
   // hairline boxes, echoing a machine-vision pass without turning the graph
@@ -1290,7 +1550,9 @@ function updateAnalysisHud(force=false){
   const metaKey=`${TOPOLOGY_META.source}:${TOPOLOGY_META.queryTime}:${TOPOLOGY_META.live}`;
   if(!force&&sceneIndex===_hudSceneIndex&&metaKey===_hudMetaKey) return;
   _hudSceneIndex=sceneIndex; _hudMetaKey=metaKey;
-  analysisKicker.textContent=`${TOPOLOGY_META.live?'LIVE OBSERVATION':'NETWORK SNAPSHOT'} · ${formatQueryTime(TOPOLOGY_META.queryTime)}`;
+  analysisKicker.textContent=TOPOLOGY_META.kind==='cover-archive'
+    ? `ARCHIVE ANALYSIS · ${Number(TOPOLOGY_META.coverCount||0).toLocaleString()} COVERS`
+    : `${TOPOLOGY_META.live?'LIVE OBSERVATION':'NETWORK SNAPSHOT'} · ${formatQueryTime(TOPOLOGY_META.queryTime)}`;
   analysisTitle.textContent=scene.title;
 }
 
@@ -1305,8 +1567,10 @@ function render(){
   ctx.setTransform(_dpr,0,0,_dpr,0,0);
   const W=cv.width/_dpr, H=cv.height/_dpr;
   (S.dim==='3d'?drawSkitter3D:drawSkitter2D)(ctx,W,H,tt);
-  const m=`${Number(TOPOLOGY_META.observedAsnCount||0).toLocaleString()} observed ASes · ${GA.n} representative nodes · `+
-    `${formatQueryTime(TOPOLOGY_META.queryTime)} · ${S.dim==='3d'?'Poincaré ball':'Poincaré disk'}`;
+  const m=TOPOLOGY_META.kind==='cover-archive'
+    ? `${Number(TOPOLOGY_META.coverCount||0).toLocaleString()} measured covers · ${GA.n.toLocaleString()} feature nodes · ${TOPOLOGY_META.range} · ${S.dim==='3d'?'Poincaré ball':'Poincaré disk'}`
+    : `${Number(TOPOLOGY_META.observedAsnCount||0).toLocaleString()} observed ASes · ${GA.n} representative nodes · `+
+      `${formatQueryTime(TOPOLOGY_META.queryTime)} · ${S.dim==='3d'?'Poincaré ball':'Poincaré disk'}`;
   if(m!==_metaTxt){ _metaTxt=m; meta.textContent=m; }
   updateAnalysisHud();
   const hudReveal=smooth(clamp((VIEW_REVEAL.value-0.48)/0.42,0,1));
@@ -1630,7 +1894,7 @@ window.addEventListener('keydown',e=>{
 });
 window.addEventListener('resize',fit);
 
-reseed(true); fit(); kick(); loadLiveTopology();
+reseed(true); fit(); kick(); loadCoverTopology();
 </script>
 </body>
 </html>

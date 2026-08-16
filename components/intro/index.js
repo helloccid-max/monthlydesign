@@ -28,11 +28,6 @@ const seededUnit = (value) => {
 
 const clamp01 = (value) => Math.min(1, Math.max(0, value));
 const segment = (value, start, end) => clamp01((value - start) / Math.max(0.0001, end - start));
-const easeInOut = (value) => (
-  value < 0.5
-    ? 4 * value * value * value
-    : 1 - ((-2 * value + 2) ** 3) / 2
-);
 // A physically suggestive move: a short gathering phase, a pronounced burst
 // of speed, then a longer controlled settle. The two halves meet with the
 // same velocity, so the acceleration reads as intentional rather than jerky.
@@ -392,14 +387,19 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
     continueInteraction();
   }, [continueInteraction, debugState, engaged]);
 
-  const coverRise = easeInOut(segment(scrubProgress, 0, 0.24));
+  // The exit is intentionally offset instead of driving every property from
+  // one progress value. The cover contracts first, then catches rotation and
+  // finally accelerates upward, so the departure reads as one physical impulse.
+  const coverExitScaleProgress = easeOutQuint(segment(scrubProgress, 0, 0.085));
+  const coverExitSpinProgress = easeHumanImpulse(segment(scrubProgress, 0.018, 0.18));
+  const coverRise = easeHumanImpulse(segment(scrubProgress, 0.045, 0.24));
   const topologyReveal = easeHumanImpulse(segment(scrubProgress, 0.075, 0.29));
   const finalSplit = easeOutQuint(segment(scrubProgress, 0.745, 0.825));
   const finalTitle = easeOutQuint(segment(scrubProgress, 0.765, 0.855));
   const finalTranslation = easeOutQuint(segment(scrubProgress, 0.795, 0.88));
   const finalSplitActive = scrubProgress >= 0.745;
-  const coverExitScale = 0.7 * (1 - 0.2 * coverRise);
-  const coverTransform = `translate3d(0, ${(-132 * coverRise).toFixed(3)}dvh, 0) perspective(1400px) rotateY(${(45 * coverRise).toFixed(3)}deg) scale(${coverExitScale.toFixed(4)})`;
+  const coverExitScale = 0.7 * (1 - 0.2 * coverExitScaleProgress);
+  const coverTransform = `translate3d(0, ${(-132 * coverRise).toFixed(3)}dvh, 0) perspective(1400px) rotateY(${(45 * coverExitSpinProgress).toFixed(3)}deg) scale(${coverExitScale.toFixed(4)})`;
 
   useEffect(() => {
     rendererRef.current?.contentWindow?.postMessage(
@@ -487,25 +487,27 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
           className={styles.coverFilm}
           style={started ? { transform: coverTransform } : undefined}
         >
-          <div
-            className={styles.coverCard}
-            style={{
-              '--cover-flip-delay': `${COVER_FLIP_START_MS}ms`,
-              '--cover-flip-duration': `${COVER_FLIP_DURATION_MS}ms`,
-            }}
-          >
-            <div className={`${styles.coverFace} ${styles.coverFront}`}>
-              <img
-                className={styles.coverImage}
-                src="/covers/D277-2001-07-intro.jpg"
-                alt="월간 디자인 2001년 7월호 277호 표지"
+          <div className={styles.coverArrivalTilt}>
+            <div
+              className={styles.coverCard}
+              style={{
+                '--cover-flip-delay': `${COVER_FLIP_START_MS}ms`,
+                '--cover-flip-duration': `${COVER_FLIP_DURATION_MS}ms`,
+              }}
+            >
+              <div className={`${styles.coverFace} ${styles.coverFront}`}>
+                <img
+                  className={styles.coverImage}
+                  src="/covers/D277-2001-07-intro.jpg"
+                  alt="월간 디자인 2001년 7월호 277호 표지"
+                />
+              </div>
+              <div
+                className={`${styles.coverFace} ${styles.coverBack}`}
+                role="img"
+                aria-label="추후 다른 표지가 들어갈 파란색 뒷면"
               />
             </div>
-            <div
-              className={`${styles.coverFace} ${styles.coverBack}`}
-              role="img"
-              aria-label="추후 다른 표지가 들어갈 파란색 뒷면"
-            />
           </div>
         </div>
 

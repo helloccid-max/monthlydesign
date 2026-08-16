@@ -73,7 +73,19 @@
 }
 
 .page[data-engaged='true'][data-started='false'] .coverFilm {
-  animation: coverArrival 3600ms cubic-bezier(0.36, 0, 0.16, 1) forwards;
+  animation: coverArrival 3600ms cubic-bezier(0.72, 0, 0.22, 1) forwards;
+}
+
+.coverArrivalTilt {
+  position: absolute;
+  inset: 0;
+  transform: perspective(1400px) rotateY(-45deg);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.page[data-engaged='true'] .coverArrivalTilt {
+  animation: coverArrivalTilt 3600ms cubic-bezier(0.72, 0, 0.22, 1) forwards;
 }
 
 .coverCard {
@@ -85,7 +97,7 @@
 }
 
 .page[data-engaged='true'] .coverCard {
-  animation: coverFlip var(--cover-flip-duration, 1350ms) cubic-bezier(0.4, 0, 0.15, 1) var(--cover-flip-delay, 6600ms) forwards;
+  animation: coverFlip var(--cover-flip-duration, 1350ms) cubic-bezier(0.72, 0, 0.18, 1) var(--cover-flip-delay, 6600ms) forwards;
 }
 
 .coverFace {
@@ -123,6 +135,16 @@
 
   100% {
     transform: translate3d(0, 0, 0) scale(0.7);
+  }
+}
+
+@keyframes coverArrivalTilt {
+  0% {
+    transform: perspective(1400px) rotateY(-45deg);
+  }
+
+  100% {
+    transform: perspective(1400px) rotateY(0deg);
   }
 }
 
