@@ -33,6 +33,22 @@ const easeInOut = (value) => (
     ? 4 * value * value * value
     : 1 - ((-2 * value + 2) ** 3) / 2
 );
+// A physically suggestive move: a short gathering phase, a pronounced burst
+// of speed, then a longer controlled settle. The two halves meet with the
+// same velocity, so the acceleration reads as intentional rather than jerky.
+const easeHumanImpulse = (value) => {
+  const progress = clamp01(value);
+  const split = 0.4;
+  const risePower = 2.8;
+  const settlePower = 4.2;
+  const anchor = (settlePower * split)
+    / (risePower * (1 - split) + settlePower * split);
+  if (progress <= split) {
+    return anchor * ((progress / split) ** risePower);
+  }
+  const settle = (progress - split) / (1 - split);
+  return anchor + (1 - anchor) * (1 - ((1 - settle) ** settlePower));
+};
 const easeOutQuint = (value) => 1 - ((1 - value) ** 5);
 
 function createCyberAtlasSoundEngine() {
@@ -377,7 +393,7 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
   }, [continueInteraction, debugState, engaged]);
 
   const coverRise = easeInOut(segment(scrubProgress, 0, 0.24));
-  const topologyReveal = easeInOut(segment(scrubProgress, 0.07, 0.31));
+  const topologyReveal = easeHumanImpulse(segment(scrubProgress, 0.075, 0.29));
   const finalSplit = easeOutQuint(segment(scrubProgress, 0.745, 0.825));
   const finalTitle = easeOutQuint(segment(scrubProgress, 0.765, 0.855));
   const finalTranslation = easeOutQuint(segment(scrubProgress, 0.795, 0.88));
