@@ -1,0 +1,501 @@
+{
+  "input": {
+    "workflow": {
+      "94": {
+        "inputs": {
+          "images": [
+            "158",
+            0
+          ],
+          "filename_prefix": "Flux2-Klein"
+        },
+        "class_type": "SaveImage",
+        "_meta": {
+          "title": "SaveImage"
+        }
+      },
+      "141": {
+        "inputs": {
+          "model": [
+            "153",
+            0
+          ],
+          "positive": [
+            "144",
+            0
+          ],
+          "negative": [
+            "143",
+            0
+          ],
+          "latent_image": [
+            "152",
+            0
+          ],
+          "seed": 1099846055827134,
+          "steps": 8,
+          "cfg": 1,
+          "sampler_name": "res_multistep",
+          "scheduler": "simple",
+          "denoise": 1
+        },
+        "class_type": "KSampler",
+        "_meta": {
+          "title": "KSampler"
+        }
+      },
+      "143": {
+        "inputs": {
+          "conditioning": [
+            "144",
+            0
+          ]
+        },
+        "class_type": "ConditioningZeroOut",
+        "_meta": {
+          "title": "ConditioningZeroOut"
+        }
+      },
+      "144": {
+        "inputs": {
+          "clip": [
+            "148",
+            0
+          ],
+          "text": [
+            "145",
+            0
+          ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+          "title": "CLIPTextEncode"
+        }
+      },
+      "145": {
+        "inputs": {
+          "string_a": [
+            "147",
+            0
+          ],
+          "string_b": [
+            "146",
+            0
+          ],
+          "delimiter": ","
+        },
+        "class_type": "StringConcatenate",
+        "_meta": {
+          "title": "StringConcatenate"
+        }
+      },
+      "146": {
+        "inputs": {
+          "value": "[KEYWORD]\n\nCreate a premium abstract wallpaper inspired by the keyword above, with texture, materiality, and surface qualities as the primary visual focus.\n\nInterpret the keyword as a tactile visual language rather than a literal object or scene. Translate its meaning and emotional character into materials, textures, surfaces, patterns, particles, layers, density, transparency, roughness, softness, gloss, reflection, refraction, erosion, flowing forms, and organic or synthetic structures.\n\nThe image should feel highly tactile and physically believable, as if the viewer could imagine touching the surface.\n\nPrioritize:\n- rich material detail\n- sophisticated surface textures\n- layered depth\n- subtle imperfections\n- micro-details\n- natural material variation\n- atmospheric lighting interacting with surfaces\n- controlled reflections and highlights\n- visual rhythm created through texture and form\n\nAvoid obvious literal representations of the keyword unless necessary. Instead, express the concept through material behavior, texture, color, light, density, and spatial composition.\n\nCreate a refined contemporary composition with an experimental material-design aesthetic, balancing abstraction and visual clarity.\n\nFull-frame, edge-to-edge wallpaper composition with no central poster-like object. The visual interest should naturally spread across the entire canvas.\n\nPremium art direction, highly detailed, tactile, immersive, sophisticated, visually memorable.\n\nNo text, typography, letters, logos, symbols, watermark, border, frame, mockup, UI, or graphic overlay."
+        },
+        "class_type": "PrimitiveStringMultiline",
+        "_meta": {
+          "title": "Text (Multiline)_base"
+        }
+      },
+      "147": {
+        "inputs": {
+          "value": "wood"
+        },
+        "class_type": "PrimitiveStringMultiline",
+        "_meta": {
+          "title": "Text (Multiline)_User"
+        }
+      },
+      "148": {
+        "inputs": {
+          "clip_name": "qwen_3_4b.safetensors",
+          "type": "lumina2",
+          "device": "default"
+        },
+        "class_type": "CLIPLoader",
+        "_meta": {
+          "title": "CLIPLoader"
+        }
+      },
+      "149": {
+        "inputs": {
+          "vae_name": "ae.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": {
+          "title": "VAELoader"
+        }
+      },
+      "150": {
+        "inputs": {
+          "samples": [
+            "141",
+            0
+          ],
+          "vae": [
+            "149",
+            0
+          ]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {
+          "title": "VAEDecode"
+        }
+      },
+      "151": {
+        "inputs": {
+          "unet_name": "z_image_turbo_bf16.safetensors",
+          "weight_dtype": "default"
+        },
+        "class_type": "UNETLoader",
+        "_meta": {
+          "title": "UNETLoader"
+        }
+      },
+      "152": {
+        "inputs": {
+          "width": 1024,
+          "height": 1024,
+          "batch_size": 1
+        },
+        "class_type": "EmptySD3LatentImage",
+        "_meta": {
+          "title": "EmptySD3LatentImage"
+        }
+      },
+      "153": {
+        "inputs": {
+          "model": [
+            "151",
+            0
+          ],
+          "shift": 3
+        },
+        "class_type": "ModelSamplingAuraFlow",
+        "_meta": {
+          "title": "ModelSamplingAuraFlow"
+        }
+      },
+      "154": {
+        "inputs": {
+          "sampler_name": "euler"
+        },
+        "class_type": "KSamplerSelect",
+        "_meta": {
+          "title": "KSamplerSelect"
+        }
+      },
+      "155": {
+        "inputs": {
+          "width": [
+            "170",
+            0
+          ],
+          "height": [
+            "170",
+            1
+          ],
+          "steps": 4
+        },
+        "class_type": "Flux2Scheduler",
+        "_meta": {
+          "title": "Flux2Scheduler"
+        }
+      },
+      "156": {
+        "inputs": {
+          "model": [
+            "160",
+            0
+          ],
+          "positive": [
+            "180",
+            0
+          ],
+          "negative": [
+            "178",
+            0
+          ],
+          "cfg": 1
+        },
+        "class_type": "CFGGuider",
+        "_meta": {
+          "title": "CFGGuider"
+        }
+      },
+      "157": {
+        "inputs": {
+          "noise": [
+            "159",
+            0
+          ],
+          "guider": [
+            "156",
+            0
+          ],
+          "sampler": [
+            "154",
+            0
+          ],
+          "sigmas": [
+            "155",
+            0
+          ],
+          "latent_image": [
+            "169",
+            0
+          ]
+        },
+        "class_type": "SamplerCustomAdvanced",
+        "_meta": {
+          "title": "SamplerCustomAdvanced"
+        }
+      },
+      "158": {
+        "inputs": {
+          "samples": [
+            "157",
+            0
+          ],
+          "vae": [
+            "163",
+            0
+          ]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {
+          "title": "VAEDecode"
+        }
+      },
+      "159": {
+        "inputs": {
+          "noise_seed": 404108624015429
+        },
+        "class_type": "RandomNoise",
+        "_meta": {
+          "title": "RandomNoise"
+        }
+      },
+      "160": {
+        "inputs": {
+          "unet_name": "flux-2-klein-4b-fp8.safetensors",
+          "weight_dtype": "default"
+        },
+        "class_type": "UNETLoader",
+        "_meta": {
+          "title": "UNETLoader"
+        }
+      },
+      "161": {
+        "inputs": {
+          "clip_name": "qwen_3_4b.safetensors",
+          "type": "flux2",
+          "device": "default"
+        },
+        "class_type": "CLIPLoader",
+        "_meta": {
+          "title": "CLIPLoader"
+        }
+      },
+      "162": {
+        "inputs": {
+          "clip": [
+            "161",
+            0
+          ],
+          "text": "**Change the material of the first image to match the material of the second image.**"
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+          "title": "CLIP Text Encode (Positive Prompt)"
+        }
+      },
+      "163": {
+        "inputs": {
+          "vae_name": "flux2-vae.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": {
+          "title": "VAELoader"
+        }
+      },
+      "164": {
+        "inputs": {
+          "image": [
+            "150",
+            0
+          ],
+          "upscale_method": "nearest-exact",
+          "megapixels": 1,
+          "resolution_steps": 1
+        },
+        "class_type": "ImageScaleToTotalPixels",
+        "_meta": {
+          "title": "ImageScaleToTotalPixels"
+        }
+      },
+      "165": {
+        "inputs": {
+          "image": [
+            "171",
+            0
+          ],
+          "upscale_method": "nearest-exact",
+          "megapixels": 1,
+          "resolution_steps": 1
+        },
+        "class_type": "ImageScaleToTotalPixels",
+        "_meta": {
+          "title": "ImageScaleToTotalPixels"
+        }
+      },
+      "168": {
+        "inputs": {
+          "conditioning": [
+            "162",
+            0
+          ]
+        },
+        "class_type": "ConditioningZeroOut",
+        "_meta": {
+          "title": "ConditioningZeroOut"
+        }
+      },
+      "169": {
+        "inputs": {
+          "width": [
+            "170",
+            0
+          ],
+          "height": [
+            "170",
+            1
+          ],
+          "batch_size": 1
+        },
+        "class_type": "EmptyFlux2LatentImage",
+        "_meta": {
+          "title": "EmptyFlux2LatentImage"
+        }
+      },
+      "170": {
+        "inputs": {
+          "image": [
+            "165",
+            0
+          ]
+        },
+        "class_type": "GetImageSize",
+        "_meta": {
+          "title": "GetImageSize"
+        }
+      },
+      "171": {
+        "inputs": {
+          "url_or_path": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRlQPtsb07b_xHaWQXtP_8ynqCXYv1y6rAeTMG1SHDIlRwUzr23YbOMkQ&s=10"
+        },
+        "class_type": "LoadImageFromUrlOrPath",
+        "_meta": {
+          "title": "LoadImageFromUrlOrPath"
+        }
+      },
+      "175": {
+        "inputs": {
+          "conditioning": [
+            "168",
+            0
+          ],
+          "latent": [
+            "176",
+            0
+          ]
+        },
+        "class_type": "ReferenceLatent",
+        "_meta": {
+          "title": "ReferenceLatent"
+        }
+      },
+      "176": {
+        "inputs": {
+          "pixels": [
+            "164",
+            0
+          ],
+          "vae": [
+            "163",
+            0
+          ]
+        },
+        "class_type": "VAEEncode",
+        "_meta": {
+          "title": "VAEEncode"
+        }
+      },
+      "177": {
+        "inputs": {
+          "conditioning": [
+            "162",
+            0
+          ],
+          "latent": [
+            "176",
+            0
+          ]
+        },
+        "class_type": "ReferenceLatent",
+        "_meta": {
+          "title": "ReferenceLatent"
+        }
+      },
+      "178": {
+        "inputs": {
+          "conditioning": [
+            "175",
+            0
+          ],
+          "latent": [
+            "179",
+            0
+          ]
+        },
+        "class_type": "ReferenceLatent",
+        "_meta": {
+          "title": "ReferenceLatent"
+        }
+      },
+      "179": {
+        "inputs": {
+          "pixels": [
+            "165",
+            0
+          ],
+          "vae": [
+            "163",
+            0
+          ]
+        },
+        "class_type": "VAEEncode",
+        "_meta": {
+          "title": "VAEEncode"
+        }
+      },
+      "180": {
+        "inputs": {
+          "conditioning": [
+            "177",
+            0
+          ],
+          "latent": [
+            "179",
+            0
+          ]
+        },
+        "class_type": "ReferenceLatent",
+        "_meta": {
+          "title": "ReferenceLatent"
+        }
+      }
+    }
+  }
+}

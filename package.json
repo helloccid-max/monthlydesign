@@ -10,9 +10,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1111.0",
+    "dotenv": "^17.4.2",
     "googleapis": "^171.4.0",
     "html2canvas": "^1.4.1",
     "next": "^14.2.0",
+    "openai": "^7.4.0",
     "p5": "^2.2.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

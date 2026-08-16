@@ -196,10 +196,18 @@ function CoverParticleSphere({ imageUrls, seed }) {
   return <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" />;
 }
 
-export default function LoadScreen({ onDone, debugMode = false } = {}) {
-  useLoadLogic({ onDone, paused: debugMode });
+export default function LoadScreen({ request, onDone, debugMode = false } = {}) {
+  useLoadLogic({ request, onDone, paused: debugMode });
   const [archiveCovers, setArchiveCovers] = useState([]);
   const [runSeed, setRunSeed] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const values = new Uint32Array(1);
@@ -236,6 +244,20 @@ export default function LoadScreen({ onDone, debugMode = false } = {}) {
 
   return (
     <main className={styles.page}>
+      <div style={{
+        position: 'absolute',
+        top: '40px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        color: 'white',
+        zIndex: 100,
+        fontSize: '24px',
+        fontWeight: 'bold',
+        fontVariantNumeric: 'tabular-nums',
+        textShadow: '0 2px 8px rgba(0,0,0,0.8)'
+      }}>
+        {elapsed}s
+      </div>
       <CoverParticleSphere imageUrls={imageUrls} seed={runSeed ?? 1} />
       <div className={styles.vignette} aria-hidden="true" />
       <section className={styles.status} aria-live="polite">

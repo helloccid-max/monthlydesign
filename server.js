@@ -1,3 +1,6 @@
+const { loadEnvConfig } = require('@next/env');
+loadEnvConfig('./', process.env.NODE_ENV !== 'production');
+
 const http = require('http');
 const next = require('next');
 
@@ -43,7 +46,7 @@ app.prepare().then(() => {
         handle(req, res);
       });
 
-      tryListen(server, defaultPort)
+      tryListen(server, defaultPort, 10)
         .then((port) => {
           const url = `http://${hostname}:${port}`;
           console.log(`> Ready on ${url}`);

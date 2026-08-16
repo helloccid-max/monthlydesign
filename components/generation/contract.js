@@ -26,5 +26,6 @@ export function normalizeGenerationRequest(request = {}) {
     issue: normalizeText(request.issue, DEFAULT_GENERATION_REQUEST.issue, 16),
     date: normalizeText(request.date, DEFAULT_GENERATION_REQUEST.date, 16),
     prompt: normalizeText(request.prompt, DEFAULT_GENERATION_REQUEST.prompt, 180),
+    generatedImageUrl: typeof request.generatedImageUrl === 'string' ? request.generatedImageUrl : null,
   };
 }

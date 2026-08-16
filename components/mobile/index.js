@@ -132,7 +132,18 @@ export default function MobileScreen() {
         setGenerationRequest(normalizeGenerationRequest(request));
         setLoadMounted(true);
       },
-      goHomage: () => go(STEPS.HOMAGE),
+      goHomage: (generatedImageUrl) => {
+        let finalUrl = null;
+        if (typeof generatedImageUrl === 'string') {
+          finalUrl = generatedImageUrl;
+        }
+        setGenerationRequest(prev => {
+          const next = { ...prev, generatedImageUrl: finalUrl };
+          console.log('goHomage called, updating generationRequest. generatedImageUrl length:', next.generatedImageUrl ? next.generatedImageUrl.length : 0);
+          return next;
+        });
+        setTimeout(() => go(STEPS.HOMAGE), 50);
+      },
       goEnd2: () => go(STEPS.END2),
       goIntro: () => {
         setCoverMounted(false);
