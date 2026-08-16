@@ -1,356 +1,390 @@
-/* 랜딩 페이지 - Figma 16:417 스펙 반영, Pretendard, 리사이즈 대응 */
-
-/* 모바일 첫 화면 — 세로 일러스트 비율 유지하며 전체가 보이도록 (contain) */
 .landing-page {
-  font-family: var(--app-font-family);
   min-height: 100dvh;
   min-height: 100vh;
-  background-color: #ffffff;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  /* 제거된 상단바 높이만큼 여백 유지 → 나머지 div 위치 그대로 */
-  padding-top: max(clamp(3.5rem, 15vw, 4.25rem), env(safe-area-inset-top, 0));
-  padding-bottom: 0;
-  overflow: hidden;
   position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--editorial-black);
+  color: var(--editorial-bone);
+  font-family: var(--editorial-sans);
   --landing-blur: 0px;
   --landing-overlay-opacity: 0;
   --landing-bg-opacity: 1;
 }
 
-/* 포스터 배경은 가장 아래 레이어에서만 보여주고, 전환 시 서서히 사라지도록 */
-.landing-page::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  /* 아래는 살짝 더 흰 그라데이션, 포스터는 약간 아래로 내려서 두 번째 예시처럼 */
-  background:
-    linear-gradient(0deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0) 40%),
-    #ffffff url('/ui/Jandi_20260311_172605.png') center calc(70px + env(safe-area-inset-top, 0)) / contain no-repeat;
-  opacity: var(--landing-bg-opacity);
-  transition: opacity 0.55s ease-in-out;
-}
-
-/* 스크롤로 카드 올릴 때 전체 블러 오버레이 */
+.landing-page::before,
 .landing-page::after {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: 5;
   pointer-events: none;
+}
+
+.landing-page::before {
+  z-index: 0;
+  opacity: var(--landing-bg-opacity);
+  background:
+    radial-gradient(circle at 72% 58%, rgba(168, 242, 42, 0.2) 0 9%, transparent 9.4%),
+    repeating-conic-gradient(from 198deg at 72% 58%, rgba(168, 242, 42, 0.28) 0deg 0.32deg, transparent 0.32deg 3.3deg),
+    radial-gradient(circle at 72% 58%, transparent 0 22%, rgba(117, 169, 31, 0.2) 22.15% 22.3%, transparent 22.45% 100%),
+    linear-gradient(180deg, #020302 0%, #061004 56%, #020302 100%);
+  transition: opacity 0.55s ease-in-out;
+}
+
+.landing-page::after {
+  z-index: 8;
   opacity: var(--landing-overlay-opacity);
   backdrop-filter: blur(var(--landing-blur));
   -webkit-backdrop-filter: blur(var(--landing-blur));
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(2, 3, 2, 0.32);
   transition: opacity 0.45s ease, backdrop-filter 0.45s ease;
 }
 
-/* 페이지 인디케이터 */
-.landing-indicator {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: clamp(0.32rem, 2.4vw, 0.7rem);
-  padding: clamp(0.35rem, 2vw, 0.5rem) 0;
-  flex-shrink: 0;
-  transform: translateY(-10px);
-  user-select: none;
-  -webkit-user-select: none;
-  cursor: default;
-  caret-color: transparent;
-}
-
-/* 미선택: 밝은 회색 / 선택: 어두운 회색 */
-.landing-dot {
-  width: clamp(0.175rem, 2vw, 0.5rem);
-  height: clamp(0.175rem, 2vw, 0.5rem);
-  border-radius: 50%;
-  user-select: none;
-  -webkit-user-select: none;
+.landing-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: var(--landing-bg-opacity);
   pointer-events: none;
-  background: #a3a3a3;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.12);
-  filter: blur(0.15px);
-  transition: background 0.2s, box-shadow 0.2s;
-  opacity: 1;
-  animation: landingDotGlow 3.2s ease-in-out infinite;
+  transition: opacity 0.55s ease-in-out;
 }
 
-.active {
-  background: #3f3f3f;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.22);
-  filter: blur(0px);
-  opacity: 1;
-  animation: landingDotGlowActive 3.2s ease-in-out infinite;
+.landing-field::before,
+.landing-field::after {
+  content: '';
+  position: absolute;
+  border: 1px solid rgba(168, 242, 42, 0.34);
+  border-radius: 50%;
 }
 
-/* Figma: 제목 left 27px top 146px, 40px, #646464, line-height 1.2 */
-.landing-text-section {
-  padding: clamp(0.5rem, 3.5vw, 1rem) 6.7% 0;
-  text-align: left;
-  flex-shrink: 0;
+.landing-field::before {
+  width: 88vw;
+  height: 88vw;
+  left: -34vw;
+  bottom: 10vh;
+  box-shadow:
+    0 0 0 5vw rgba(168, 242, 42, 0.025),
+    0 0 0 15vw rgba(168, 242, 42, 0.018),
+    0 0 0 27vw rgba(168, 242, 42, 0.012);
 }
 
-.landing-title {
-  font-size: clamp(1.6rem, 10vw, 2.5rem);
-  font-weight: 400;
-  color: #646464;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+.landing-field::after {
+  width: 128vw;
+  height: 58vw;
+  right: -64vw;
+  top: 20vh;
+  transform: rotate(-18deg);
+  border-color: rgba(117, 169, 31, 0.26);
+}
+
+.landing-orb {
+  position: absolute;
+  right: 7vw;
+  top: 47%;
+  width: min(34vw, 210px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(168, 242, 42, 0.5);
+  background:
+    repeating-radial-gradient(circle at 35% 42%, rgba(168, 242, 42, 0.22) 0 1px, transparent 1px 5px),
+    radial-gradient(circle at 42% 38%, rgba(168, 242, 42, 0.34), rgba(70, 116, 18, 0.08) 58%, transparent 70%);
+  box-shadow: 0 0 54px rgba(168, 242, 42, 0.12);
+  animation: landingOrbBreath 7s ease-in-out infinite;
+}
+
+.landing-masthead {
+  position: absolute;
+  z-index: 1;
+  top: max(22px, env(safe-area-inset-top));
+  left: 6vw;
+  right: 6vw;
+  height: min(30vh, 230px);
+  opacity: var(--landing-bg-opacity);
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.landing-issue {
+  position: absolute;
+  top: -0.18em;
+  left: 0;
+  font-family: var(--editorial-serif);
+  font-size: clamp(4.4rem, 22vw, 8rem);
+  line-height: 0.8;
+  letter-spacing: -0.08em;
+}
+
+.landing-kicker {
+  position: absolute;
+  top: 0.3rem;
+  left: clamp(78px, 24vw, 130px);
   margin: 0;
-}
-
-.landing-title-line {
-  display: block;
-}
-
-/* Figma: 구분선 42px, 저자 left 76px 14px #646464 */
-.landing-divider-wrap {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: clamp(0.5rem, 2.5vw, 0.9rem);
+  gap: 0.55rem;
+  max-width: calc(100% - clamp(78px, 24vw, 130px));
+  overflow: hidden;
+  color: var(--editorial-bone);
+  font-size: clamp(0.56rem, 2.2vw, 0.74rem);
+  font-style: italic;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
-.landing-divider {
-  width: clamp(1.35rem, 6.2vw, 1.8rem);
-  height: 2px;
-  background: #646464;
-  flex-shrink: 0;
+.landing-kicker span {
+  width: 11px;
+  aspect-ratio: 1;
+  flex: none;
+  border-radius: 50%;
+  background: var(--editorial-red);
 }
 
-.landing-author {
-  font-size: clamp(0.9375rem, 3.5vw, 1rem);
-  font-weight: 400;
-  color: #646464;
-  line-height: 1.2;
+.landing-brand {
+  position: absolute;
+  top: clamp(54px, 9vh, 76px);
+  left: 0;
   margin: 0;
+  font-family: var(--editorial-serif);
+  font-size: clamp(3.5rem, 17vw, 6.4rem);
+  font-weight: 400;
+  line-height: 0.72;
+  letter-spacing: -0.075em;
+  white-space: nowrap;
 }
 
-/* 스와이프 영역 - 이미지2 수준, 박스가 적당히 올라온 위치 */
+.landing-brand em {
+  color: var(--editorial-lime);
+  font: inherit;
+  font-style: italic;
+  font-size: 0.42em;
+  letter-spacing: -0.04em;
+}
+
+.landing-meta {
+  position: absolute;
+  top: clamp(118px, 18vh, 150px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.45rem 0;
+  border-top: 1px solid rgba(168, 242, 42, 0.8);
+  border-bottom: 1px solid rgba(168, 242, 42, 0.25);
+  color: var(--editorial-bone);
+  font-size: clamp(0.56rem, 2.35vw, 0.72rem);
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.landing-feature {
+  position: absolute;
+  z-index: 1;
+  left: 6vw;
+  bottom: 21vh;
+  padding-left: 0.72rem;
+  border-left: 2px solid var(--editorial-lime);
+  opacity: var(--landing-bg-opacity);
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.landing-feature small {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--editorial-lime);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.landing-feature p {
+  margin: 0;
+  font-family: var(--app-font-family);
+  font-size: clamp(0.82rem, 3.5vw, 1rem);
+  line-height: 1.45;
+}
+
+.landing-indicator {
+  position: absolute;
+  z-index: 5;
+  top: max(19px, env(safe-area-inset-top));
+  right: 6vw;
+  display: flex;
+  gap: 6px;
+}
+
+.landing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(241, 241, 233, 0.35);
+}
+
+.landing-dot.active,
+.active {
+  background: var(--editorial-lime);
+  box-shadow: 0 0 8px rgba(168, 242, 42, 0.6);
+}
+
 .landing-swipe-area {
-  flex: 0 0 auto;
-  min-height: 10vh;
-  max-height: 14vh;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   touch-action: none;
   cursor: grab;
   -webkit-tap-highlight-color: transparent;
-}
-
-.landing-cta-wrap,
-.landing-cta {
-  -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-  user-select: none;
 }
 
 .landing-swipe-area:active {
   cursor: grabbing;
 }
 
-/* CTA 카드 - 상단(82vh) 고정, 하단만 화면 밖으로 길게 연장 */
+.landing-cta-wrap,
+.landing-cta {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
 .landing-cta-wrap {
   position: fixed;
+  z-index: 6;
   top: 82vh;
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 0 4.2%;
-  padding-bottom: env(safe-area-inset-bottom, 0);
-  z-index: 1;
+  width: min(100%, 480px);
+  margin-inline: auto;
+  padding: 0 4.2% env(safe-area-inset-bottom, 0);
   touch-action: none;
   transition: top 0.75s cubic-bezier(0.33, 1, 0.68, 1);
-  will-change: transform;
 }
 
-/* 초기 안내: 4초마다 위로 두 번 살짝 튕겨 스크롤 유도 */
-@media (prefers-reduced-motion: no-preference) {
-  .landing-cta-wrap:not(.expanded):not(.slide-up) {
-    animation: landingCtaNudgeUp 4s cubic-bezier(0.34, 1.25, 0.64, 1) infinite;
-  }
-}
-
-/* 스크롤 모달 카드 면 — 랜딩 CTA / end2 종료 버튼 등에서 그대로 재사용 */
 .landing-cta-face {
   position: relative;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(168, 242, 42, 0.75);
+  border-bottom: 0;
+  border-radius: 0;
+  background: rgba(2, 3, 2, 0.82);
+  box-shadow: 0 -18px 70px rgba(0, 0, 0, 0.7);
   text-align: center;
-  color: #ffffff;
-  background: linear-gradient(180deg, rgba(230, 242, 255, 0.22) 0%, rgba(205, 228, 250, 0.24) 40%, rgba(178, 212, 245, 0.26) 100%);
-  border-radius: 25px 25px 0 0;
-  box-shadow: 0 13px 34px rgba(0, 0, 0, 0.42), inset -3px -2px 4px rgba(255, 255, 255, 0.12);
-  opacity: 0.72;
-  transition: transform 0.85s cubic-bezier(0.33, 1, 0.68, 1), background 0.45s ease, border-radius 0.45s ease, opacity 0.85s ease;
+  color: var(--editorial-bone);
+  transition: transform 0.85s cubic-bezier(0.33, 1, 0.68, 1), background 0.45s ease, opacity 0.85s ease;
 }
 
 .landing-cta-face::after {
   content: '';
   position: absolute;
+  top: 0;
   left: 0;
   right: 0;
-  top: 0;
-  height: min(24vh, 230px);
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.12) 38%,
-    rgba(255, 255, 255, 0.28) 72%,
-    rgba(255, 255, 255, 0.48) 100%
-  );
+  height: 2px;
+  background: var(--editorial-lime);
+  box-shadow: 0 0 18px rgba(168, 242, 42, 0.55);
 }
 
 .landing-cta {
   display: flex;
+  min-height: 220vh;
+  padding: 1.35rem 1rem max(1.4rem, env(safe-area-inset-bottom));
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  width: 100%;
-  height: 100%;
-  min-height: 220vh;
-  padding: clamp(1rem, 4vw, 1.5rem) 1rem;
-  padding-bottom: max(clamp(1.25rem, 5vw, 1.75rem), env(safe-area-inset-bottom, 0));
-  text-decoration: none;
+  color: var(--editorial-bone);
   cursor: grab;
 }
 
-/* text 페이지 박스 상태: 박스가 화면 전체로 올라와 멈춤 */
 .landing-cta-wrap.expanded {
   top: 0;
-  padding-top: max(clamp(3.5rem, 15vw, 4.25rem), env(safe-area-inset-top, 0));
+  padding-top: max(12px, env(safe-area-inset-top));
   animation: none;
-  transform: none;
 }
 
 .landing-cta-wrap.expanded .landing-cta {
   min-height: auto;
   height: 100%;
-  color: #646464;
   justify-content: center;
 }
 
 .landing-cta-wrap.expanded .landing-cta-face {
-  background: linear-gradient(180deg, rgba(121, 124, 128, 0) 0%, rgb(244, 245, 252) 16.83%, rgb(255, 252, 240) 51.44%, rgb(255, 252, 240) 100%);
-  border-radius: 0 0 25px 25px;
-  opacity: 0.85;
+  background:
+    repeating-conic-gradient(from 200deg at 70% 65%, rgba(168, 242, 42, 0.08) 0deg 0.35deg, transparent 0.35deg 4deg),
+    var(--editorial-black);
+  opacity: 1;
 }
 
-.landing-cta-wrap.expanded .landing-cta-line1,
-.landing-cta-wrap.expanded .landing-cta-line2 {
-  color: #646464;
-}
-
-/* 박스가 완전히 화면 밖(위)으로 나가도록 */
 .landing-cta-wrap.slide-up {
   overflow: hidden;
-  animation: none;
 }
 
 .landing-cta-wrap.slide-up .landing-cta {
   transform: translateY(-120%);
 }
 
-.landing-cta-wrap.slide-up .landing-cta-face {
-  opacity: 1;
-}
-
-.landing-cta-line1,
-.landing-cta-line2,
-.landing-cta-arrow {
-  color: #666666;
-}
-
-.landing-cta-wrap:not(.expanded) .landing-cta-line1,
-.landing-cta-wrap:not(.expanded) .landing-cta-line2,
-.landing-cta-wrap:not(.expanded) .landing-cta-arrow {
-  color: transparent;
-  background-image: linear-gradient(
-    105deg,
-    rgba(80, 80, 80, 0.85) 26%,
-    rgba(30, 30, 30, 1) 50%,
-    rgba(80, 80, 80, 0.85) 74%
-  );
-  background-size: 220% 100%;
-  background-position: 130% 50%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  animation: landingCtaSweep 2.8s linear infinite;
-}
-
 .landing-cta-line1,
 .landing-cta-line2 {
   display: block;
-  font-size: clamp(0.9375rem, 3.5vw, 1rem);
+  color: var(--editorial-bone);
+  font-size: clamp(0.82rem, 3.4vw, 0.96rem);
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .landing-cta-line1 {
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.05rem;
+  color: var(--editorial-lime);
 }
 
 .landing-cta-line2 {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.45rem;
 }
 
-.landing-cta-arrow {
-  display: block;
-  font-size: clamp(1rem, 4vw, 1.25rem);
-  line-height: 1;
-}
+.expanded {}
+.slide-up {}
 
-@keyframes landingCtaSweep {
-  0% {
-    background-position: 130% 50%;
-  }
-  100% {
-    background-position: -40% 50%;
+@media (prefers-reduced-motion: no-preference) {
+  .landing-cta-wrap:not(.expanded):not(.slide-up) {
+    animation: landingCtaNudgeUp 4s cubic-bezier(0.34, 1.25, 0.64, 1) infinite;
   }
 }
 
-/* 한 사이클 4s: 앞쪽 ~12%에서 두 번 위로 튕김, 나머지는 정지 */
 @keyframes landingCtaNudgeUp {
-  0%,
-  20%,
-  100% {
-    transform: translate3d(0, 0, 0);
+  0%, 20%, 100% { transform: translate3d(0, 0, 0); }
+  4% { transform: translate3d(0, -16px, 0); }
+  8% { transform: translate3d(0, 0, 0); }
+  12% { transform: translate3d(0, -9px, 0); }
+  16% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes landingOrbBreath {
+  0%, 100% { transform: scale(0.96) rotate(-3deg); opacity: 0.72; }
+  50% { transform: scale(1.04) rotate(3deg); opacity: 1; }
+}
+
+@media (min-width: 700px) {
+  .landing-masthead,
+  .landing-feature {
+    left: max(6vw, calc(50vw - 230px));
+    right: max(6vw, calc(50vw - 230px));
   }
-  3% {
-    transform: translate3d(0, -18px, 0);
+
+  .landing-indicator {
+    right: max(6vw, calc(50vw - 220px));
   }
-  6% {
-    transform: translate3d(0, 0, 0);
-  }
-  9% {
-    transform: translate3d(0, -12px, 0);
-  }
-  12% {
-    transform: translate3d(0, 0, 0);
+
+  .landing-field::before {
+    width: 55vw;
+    height: 55vw;
+    left: 8vw;
   }
 }
 
-@keyframes landingDotGlow {
-  0%,
-  100% {
-    background: #9a9a9a;
-    box-shadow: 0 0 8px rgba(0, 0, 0, 0.12);
-  }
-  50% {
-    background: #b0b0b0;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.14);
+@media (prefers-reduced-motion: reduce) {
+  .landing-orb,
+  .landing-cta-wrap {
+    animation: none !important;
   }
 }
-
-@keyframes landingDotGlowActive {
-  0%,
-  100% {
-    background: #3a3a3a;
-    box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
-  }
-  50% {
-    background: #4d4d4d;
-    box-shadow: 0 0 12px rgba(0, 0, 0, 0.26);
-  }
-}
-

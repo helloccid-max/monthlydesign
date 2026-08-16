@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 
 export function useEnd2Logic({ onRestart } = {}) {
   const router = useRouter();
-  const [scale, setScale] = useState(1);
   const [touchStartY, setTouchStartY] = useState(null);
 
   useEffect(() => {
@@ -25,20 +24,14 @@ export function useEnd2Logic({ onRestart } = {}) {
     };
   }, []);
 
-  useEffect(() => {
-    const update = () => {
-      const next = Math.min(window.innerWidth / 402, window.innerHeight / 876);
-      setScale(Number.isFinite(next) ? next : 1);
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-
   const goHome = useCallback(() => {
     if (typeof onRestart === 'function') return onRestart();
     router.push('/landing');
   }, [onRestart, router]);
+
+  const goWall = useCallback(() => {
+    router.push('/wall');
+  }, [router]);
 
   const onTouchStart = useCallback((e) => {
     setTouchStartY(e.touches[0].clientY);
@@ -62,11 +55,10 @@ export function useEnd2Logic({ onRestart } = {}) {
   );
 
   return {
-    scale,
     goHome,
+    goWall,
     onTouchStart,
     onTouchEnd,
     onWheel,
   };
 }
-

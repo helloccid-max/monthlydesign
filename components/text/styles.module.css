@@ -386,3 +386,115 @@
   border-radius: 17px;
 }
 
+/* Editorial system — acid green generative magazine */
+.text-figma-page {
+  background: var(--editorial-black);
+  color: var(--editorial-bone);
+}
+
+.text-figma-page::before {
+  background:
+    radial-gradient(circle at 78% 66%, rgba(168, 242, 42, 0.17) 0 10%, transparent 10.4%),
+    repeating-conic-gradient(from 205deg at 78% 66%, rgba(168, 242, 42, 0.2) 0deg 0.3deg, transparent 0.3deg 4deg),
+    var(--editorial-black);
+  filter: none;
+}
+
+.text-figma-page::after {
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at center, transparent 20%, rgba(0, 0, 0, 0.5) 100%);
+  box-shadow: none;
+}
+
+.text-figma-card {
+  width: min(calc(100% - 2 * var(--flow-gutter)), var(--flow-content-medium));
+  min-height: min(74vh, 720px);
+  margin: 0 auto;
+  padding-inline: clamp(22px, 5vw, 64px);
+  overflow: visible;
+  border: 1px solid rgba(168, 242, 42, 0.68);
+  border-top: 0;
+  border-radius: 0;
+  background: rgba(2, 3, 2, 0.88);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.68);
+}
+
+.text-figma-indicator {
+  padding-top: max(2.4rem, env(safe-area-inset-top));
+}
+
+.text-figma-dot {
+  width: 5px;
+  height: 5px;
+  background: rgba(241, 241, 233, 0.32);
+  box-shadow: none;
+  filter: none;
+}
+
+.text-figma-dot.active,
+.active {
+  background: var(--editorial-lime);
+  box-shadow: 0 0 8px rgba(168, 242, 42, 0.55);
+}
+
+.text-figma-question {
+  margin-top: clamp(3rem, 9vh, 5.4rem);
+  color: var(--editorial-bone);
+  font-family: var(--editorial-serif);
+  font-size: clamp(1.35rem, 3.8vw, 2.35rem);
+  font-weight: 400;
+  line-height: 1.14;
+  letter-spacing: -0.025em;
+}
+
+.text-figma-question::after {
+  content: '';
+  display: block;
+  width: 54px;
+  height: 2px;
+  margin-top: 1.2rem;
+  background: var(--editorial-red);
+}
+
+.text-figma-quote-open,
+.text-figma-quote-close {
+  color: var(--editorial-lime);
+  font-family: var(--editorial-serif);
+  font-weight: 400;
+  text-shadow: none;
+}
+
+.text-figma-quote-hint {
+  color: rgba(241, 241, 233, 0.38);
+}
+
+.text-figma-quote-line {
+  background: rgba(168, 242, 42, 0.42);
+  box-shadow: none;
+}
+
+.text-figma-quote-input,
+.text-figma-quote-input:focus {
+  color: var(--editorial-lime);
+  caret-color: var(--editorial-red);
+}
+
+.text-figma-date {
+  border: 1px solid rgba(168, 242, 42, 0.5);
+  border-radius: 0;
+  background: transparent;
+  color: rgba(241, 241, 233, 0.62);
+  font-family: var(--editorial-sans);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+}
+
+.text-figma-below-card-hint,
+.text-figma-slide-hint {
+  color: var(--editorial-lime);
+  font-family: var(--editorial-sans);
+  font-size: clamp(0.78rem, 2vw, 1rem);
+  font-weight: 650;
+  letter-spacing: 0.05em;
+}

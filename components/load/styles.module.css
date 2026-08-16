@@ -1,241 +1,121 @@
-/* 로딩 페이지 - Figma 10-772 기준 */
-
-.load-figma-page {
-  position: relative;
+.page {
+  position: fixed;
+  inset: 0;
   width: 100%;
   height: 100dvh;
-  height: 100vh;
   overflow: hidden;
-  font-family: var(--app-font-family);
-  touch-action: none;
+  background: #020302;
+  color: #fff;
+  font-family: var(--ui-sans);
+  isolation: isolate;
 }
 
-/* 배경 — 랜딩과 동일 포스터, 블러만 약하게 */
-.load-figma-page::before {
+.page::after {
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 0;
-  background: #ffffff url('/ui/Jandi_20260311_172605.png') center calc(70px + env(safe-area-inset-top, 0)) / contain no-repeat;
-  background-attachment: scroll;
-  filter: blur(5px);
-  transform: scale(1.07);
-  transform-origin: center top;
-}
-
-/* 상단 라이트 그라데이션(랜딩과 동일) + 아주 약한 딤 — 흰 로딩 문구 대비 */
-.load-figma-page::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
+  z-index: 4;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 4px);
   pointer-events: none;
-  background:
-    linear-gradient(0deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0) 40%),
-    rgba(0, 0, 0, 0.14);
 }
 
-/* 애니메이션 레이어(텍스트 뒤) */
-.load-anim-layer {
+.canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  animation: sphereReveal 620ms cubic-bezier(0.16, 1, 0.3, 1) 80ms forwards;
+}
+
+.vignette {
   position: absolute;
   inset: 0;
   z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(2, 3, 2, 0.24), transparent 20% 68%, rgba(2, 3, 2, 0.66)),
+    radial-gradient(circle at 50% 48%, transparent 36%, rgba(2, 3, 2, 0.15) 68%, rgba(2, 3, 2, 0.42) 112%);
   pointer-events: none;
 }
 
-.load-anim-track {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 200%;
-  animation: loadDriftUp 10s linear infinite;
-  will-change: transform;
-}
-
-@keyframes loadDriftUp {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(-50%);
-  }
-}
-
-/* 카드 공통 */
-.load-card {
-  position: absolute;
-  width: 202.855px;
-  height: 349.331px;
-  border-radius: 25px;
-  box-shadow: 0 11px 28.8px rgba(0, 0, 0, 0.38);
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-  will-change: transform;
-}
-
-.load-card img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* Figma 위치/회전 근사 (원래 좌표) */
-.a {
-  left: -109px;
-  top: 237px;
-  transform: rotate(15deg);
-}
-
-.b {
-  left: 151px;
-  top: 571px;
-  transform: rotate(-30deg);
-}
-
-.c {
-  left: 222px;
-  top: -39px;
-  transform: rotate(-30deg);
-}
-
-/* 좌우 흔들림은 마지막 1장만 */
-.c.sway {
-  animation: loadCardSwayC 3.2s ease-in-out infinite;
-}
-
-@keyframes loadCardSwayC {
-  0%,
-  100% {
-    transform: translateX(0) rotate(-30deg);
-  }
-  25% {
-    transform: translateX(-9px) rotate(-30.6deg);
-  }
-  50% {
-    transform: translateX(0) rotate(-31.2deg);
-  }
-  75% {
-    transform: translateX(8px) rotate(-30.4deg);
-  }
-}
-
-.sway {}
-
-/* cx('load-dot','active')용 export — 스타일은 .load-dot.active에 정의 */
-.active {}
-
-/* 인디케이터 — 바쁜 엽서 배경 위에서 도트가 읽히도록 뒤에 그림자/소프트 블롭 */
-.load-indicator {
+.status {
   position: absolute;
   left: 50%;
-  top: 430px;
-  transform: translateX(-50%);
+  bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
+  z-index: 5;
   display: flex;
-  gap: 13px;
-  z-index: 3;
-  isolation: isolate;
-  user-select: none;
-  -webkit-user-select: none;
-  cursor: default;
-  caret-color: transparent;
-}
-
-.load-indicator::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 118px;
-  height: 42px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.42);
-  filter: blur(14px);
-  opacity: 0.9;
-  z-index: -1;
-  pointer-events: none;
-}
-
-/* 세 점 모두 화이트 (바운스·딜레이로만 강조) */
-.load-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #ffffff;
-  animation: loadDotBounce 0.9s cubic-bezier(0.33, 1, 0.68, 1) infinite;
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.35),
-    0 4px 12px rgba(0, 0, 0, 0.2);
-  user-select: none;
-  -webkit-user-select: none;
-  pointer-events: none;
-}
-
-.load-dot.active {
-  animation-name: loadDotBounceSelected;
-}
-
-.load-dot:nth-child(1) { animation-delay: 0s; }
-.load-dot:nth-child(2) { animation-delay: 0.12s; }
-.load-dot:nth-child(3) { animation-delay: 0.24s; }
-
-@keyframes loadDotBounce {
-  0%,
-  100% {
-    transform: translateY(0) scale(0.92);
-    background: #ffffff;
-  }
-  35% {
-    transform: translateY(-10px) scale(1);
-    background: #ffffff;
-  }
-  55% {
-    transform: translateY(0) scale(0.98);
-    background: #ffffff;
-  }
-}
-
-@keyframes loadDotBounceSelected {
-  0%,
-  100% {
-    transform: translateY(0) scale(0.92);
-    background: #ffffff;
-  }
-  35% {
-    transform: translateY(-10px) scale(1);
-    background: #ffffff;
-  }
-  55% {
-    transform: translateY(0) scale(0.98);
-    background: #ffffff;
-  }
-}
-
-/* 중앙 로딩 문구 — 배경 박스/그라데이션 없이 텍스트 드롭쉐도우만 */
-.load-figma-title {
-  position: absolute;
-  left: 31px;
-  top: 152px;
-  z-index: 3;
-  display: inline-flex;
+  width: max-content;
+  max-width: min(calc(100vw - 40px), 360px);
+  min-height: 64px;
+  padding: 14px clamp(18px, 5.2vw, 24px) 13px;
   flex-direction: column;
-  gap: 2px;
-  padding: 0;
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.25;
-  color: rgba(255, 255, 255, 1);
-  opacity: 1;
-  text-shadow:
-    0 1px 1px rgba(0, 0, 0, 0.12),
-    0 1px 4px rgba(0, 0, 0, 0.08);
+  align-items: center;
+  justify-content: center;
+  gap: 3.5px;
+  border: 0.5px solid rgba(5, 8, 3, 0.2);
+  border-radius: 999px;
+  background: var(--editorial-lime);
+  color: #080a06;
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.3),
+    0 10px 26px rgba(0, 0, 0, 0.26),
+    0 0 18px rgba(168, 242, 42, 0.08);
+  font-size: 0.9757rem;
+  font-weight: 520;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  text-align: center;
+  transform: translateX(-50%);
 }
 
-@media (max-width: 420px) {
-  .load-card {
-    transform-origin: center;
-    zoom: 0.95;
+.status p {
+  margin: 0;
+  padding: 0 2px;
+  line-height: 1.28;
+  white-space: nowrap;
+}
+
+.indicator {
+  display: flex;
+  height: 4px;
+  align-items: center;
+  gap: 6px;
+}
+
+.indicator > span {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(8, 10, 6, 0.56);
+  box-shadow: none;
+  animation: indicatorPulse 1.15s ease-in-out infinite;
+}
+
+.indicator > span:nth-child(2) { animation-delay: 140ms; }
+.indicator > span:nth-child(3) { animation-delay: 280ms; }
+
+@keyframes sphereReveal {
+  from { opacity: 0; transform: scale(1.035); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes indicatorPulse {
+  0%, 100% { opacity: 0.28; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (min-width: 768px) {
+  .status {
+    bottom: max(30px, calc(env(safe-area-inset-bottom) + 20px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas,
+  .indicator > span {
+    animation: none;
+    opacity: 1;
   }
 }

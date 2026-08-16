@@ -12,6 +12,20 @@ html {
 
 :root {
   --app-font-family: 'SD Jan', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  --ui-sans: 'Inter Tight', Inter, 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --editorial-serif: 'Iowan Old Style', 'Bodoni 72', Didot, 'Times New Roman', serif;
+  --editorial-sans: var(--ui-sans);
+  --editorial-black: #020302;
+  --editorial-ink: #080b07;
+  --editorial-lime: #a8f22a;
+  --editorial-lime-soft: #75a91f;
+  --editorial-bone: #f1f1e9;
+  --editorial-red: #ef2b12;
+  --flow-gutter: clamp(18px, 4vw, 72px);
+  --flow-gutter-wide: clamp(20px, 6vw, 108px);
+  --flow-content-wide: 720px;
+  --flow-content-medium: 620px;
+  --flow-content-narrow: 560px;
 }
 
 html,
@@ -23,6 +37,7 @@ body {
   min-height: 100vh;
   margin: 0;
   overflow-x: hidden;
+  background: var(--editorial-black);
 }
 
 /* 네이티브 컨트롤이 시스템 산세리프로 굳는 것 방지 */

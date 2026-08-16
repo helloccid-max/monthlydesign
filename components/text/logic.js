@@ -59,6 +59,7 @@ export function useTextLogic({ onNext } = {}) {
   const persistInput = useCallback(() => {
     try {
       const safe = inputValue.slice(0, POSTCARD_QUOTE_MAX_CHARS);
+      localStorage.setItem('monthlyDesign:prompt', safe);
       localStorage.setItem('platforml:userText', safe);
     } catch (_) {
       // ignore
@@ -112,4 +113,3 @@ export function useTextLogic({ onNext } = {}) {
     handleWheel,
   };
 }
-

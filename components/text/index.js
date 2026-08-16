@@ -20,7 +20,7 @@ export default function TextScreen({ onNext } = {}) {
 
   const hasText = inputValue.trim().length > 0;
   const [introOn, setIntroOn] = useState(false);
-  const questionLines = useMemo(() => ['하루키의 세계를 지나온 당신,', '지금 마음속에 떠오르는', '단 하나의 문장이 있나요?'], []);
+  const questionLines = useMemo(() => ['이 표지가 오늘 만들어진다면,', '어떤 세계를 담고 있어야 할까요?', '색·형태·움직임을 자유롭게 적어주세요.'], []);
   const questionText = useMemo(() => questionLines.join('\n'), [questionLines]);
   const [typedText, setTypedText] = useState('');
   const typingTimeoutRef = useRef(null);
@@ -127,11 +127,11 @@ export default function TextScreen({ onNext } = {}) {
               }}
               rows={2}
               maxLength={POSTCARD_QUOTE_MAX_CHARS}
-              aria-label="무라카미 하루키에게 보낼 한 문장"
+              aria-label="오마주 표지 생성을 위한 프롬프트"
             />
             {!hasText && (
               <div className={styles['text-figma-quote-prompt']} aria-hidden="true">
-                <p className={styles['text-figma-quote-hint']}>여기에 한 문장을 입력하세요</p>
+                <p className={styles['text-figma-quote-hint']}>예: 데이터가 유기체처럼 자라나는 우주</p>
                 <span className={styles['text-figma-quote-line']} aria-hidden="true" />
               </div>
             )}
@@ -144,16 +144,15 @@ export default function TextScreen({ onNext } = {}) {
         <span className={styles['text-figma-date']}>{dateText}</span>
 
         {!hasText ? (
-          <p className={styles['text-figma-below-card-hint']}>터치하여 타이핑</p>
+          <p className={styles['text-figma-below-card-hint']}>터치하여 프롬프트 입력</p>
         ) : (
           <p className={cx('text-figma-below-card-hint', 'text-figma-slide-hint')}>
             <span>위로 슬라이드 하여</span>
             <br />
-            <span>엽서를 완성</span>
+            <span>오마주 표지 생성</span>
           </p>
         )}
       </div>
     </div>
   );
 }
-

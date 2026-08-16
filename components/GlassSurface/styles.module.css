@@ -1,0 +1,269 @@
+@property --thumb-glow-angle {
+  syntax: '<angle>';
+  initial-value: 135deg;
+  inherits: false;
+}
+
+.surface {
+  overflow: visible !important;
+  /* isolation: isolate 는 Backdrop Root를 만들어 자식의 backdrop-filter가
+     표면 바깥(뒤로 흐르는 표지들)을 보지 못하게 한다. 유리 효과의 전제 조건. */
+  border: 0.5px solid transparent !important;
+  font-family: var(--ui-sans) !important;
+  font-size: 0.9757rem !important;
+  font-weight: 380 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.01em !important;
+}
+
+.surface::after {
+  content: '';
+  position: absolute;
+  inset: -0.35px;
+  z-index: 4;
+  padding: 0.35px;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0.5) 48%,
+    rgba(255, 255, 255, 0.3) 100%
+  );
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: thumbGlowSpin 9s linear infinite;
+  animation-play-state: paused;
+}
+
+.glow {
+  position: absolute;
+  inset: -3px;
+  z-index: 0;
+  padding: 3px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--thumb-glow-angle),
+    rgba(255, 255, 255, 0.46) 0deg,
+    rgba(170, 170, 170, 0.15) 88deg,
+    rgba(235, 235, 235, 0.32) 178deg,
+    rgba(118, 118, 118, 0.1) 270deg,
+    rgba(255, 255, 255, 0.46) 360deg
+  );
+  filter: blur(6px);
+  opacity: 0.16;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: thumbGlowSpin 9s linear infinite;
+  animation-play-state: paused;
+}
+
+.effects {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.filterDefinitions {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.refraction,
+.channel {
+  position: absolute;
+  inset: -18%;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.refraction {
+  background:
+    radial-gradient(circle at 22% 0%, rgba(255, 255, 255, 0.28), transparent 34%),
+    radial-gradient(circle at 78% 118%, rgba(255, 255, 255, 0.1), transparent 42%),
+    linear-gradient(112deg, rgba(255, 255, 255, 0.1), transparent 34% 62%, rgba(255, 255, 255, 0.08));
+  background-position: 0% 48%;
+  background-size: 180% 180%;
+  opacity: var(--glass-opacity);
+  mix-blend-mode: var(--glass-blend-mode);
+  backdrop-filter: blur(1.5px) brightness(var(--glass-brightness));
+  -webkit-backdrop-filter: blur(1.5px) brightness(var(--glass-brightness));
+  animation: glassSurfaceDrift 7.4s ease-in-out infinite alternate;
+}
+
+.channel {
+  opacity: calc(var(--glass-opacity) * 0.1);
+  filter: blur(7px);
+  mix-blend-mode: screen;
+}
+
+.timedGlare {
+  position: absolute;
+  inset: -48%;
+  z-index: 2;
+  background: linear-gradient(
+    108deg,
+    transparent 41%,
+    rgba(255, 255, 255, 0.06) 45%,
+    rgba(255, 255, 255, 0.52) 50%,
+    rgba(255, 255, 255, 0.08) 55%,
+    transparent 59%
+  );
+  opacity: 0;
+  transform: translate3d(-72%, 0, 0);
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: timedGlarePair 3800ms linear 2700ms 1 both;
+}
+
+.timedGlare[data-mode='confirm'] {
+  background: linear-gradient(
+    108deg,
+    transparent 20%,
+    rgba(168, 242, 42, 0.06) 27%,
+    rgba(168, 242, 42, 0.38) 41%,
+    rgba(168, 242, 42, 0.82) 50%,
+    rgba(168, 242, 42, 0.42) 59%,
+    rgba(168, 242, 42, 0.08) 73%,
+    transparent 80%
+  );
+  animation: confirmGlarePair 2800ms linear 1000ms 1 both;
+}
+
+.red {
+  background: linear-gradient(108deg, transparent 34%, rgba(255, 255, 255, 0.42) 50%, transparent 66%);
+  transform: translate3d(var(--glass-red-offset), 0, 0);
+}
+
+.green {
+  background: linear-gradient(108deg, transparent 34%, rgba(190, 190, 190, 0.32) 50%, transparent 66%);
+  transform: translate3d(var(--glass-green-offset), 0, 0);
+}
+
+.blue {
+  background: linear-gradient(108deg, transparent 34%, rgba(232, 232, 232, 0.38) 50%, transparent 66%);
+  transform: translate3d(var(--glass-blue-offset), 0, 0);
+}
+
+.content {
+  position: relative;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+  pointer-events: none;
+}
+
+.surface[data-expanded='true'] .content {
+  width: 100%;
+}
+
+.surface[data-permission='true'] .content {
+  width: 100%;
+}
+
+@keyframes thumbGlowSpin {
+  to { --thumb-glow-angle: 495deg; }
+}
+
+@media (hover: hover) {
+  .surface[data-idle='true']:hover .content {
+    width: 100%;
+  }
+
+  .surface:hover::after,
+  .surface:hover .glow {
+    animation-play-state: running;
+  }
+}
+
+@keyframes glassSurfaceDrift {
+  0% {
+    background-position: 0% 48%;
+    transform: translate3d(-1.5%, -0.5%, 0) scale(1.02);
+  }
+
+  100% {
+    background-position: 100% 54%;
+    transform: translate3d(1.5%, 0.75%, 0) scale(1.045);
+  }
+}
+
+@keyframes timedGlarePair {
+  0% {
+    opacity: 0;
+    transform: translate3d(-72%, 0, 0);
+  }
+  1% {
+    opacity: 1;
+    transform: translate3d(-72%, 0, 0);
+  }
+  21% {
+    opacity: 0;
+    transform: translate3d(72%, 0, 0);
+  }
+  21.1%, 78.9% {
+    opacity: 0;
+    transform: translate3d(-72%, 0, 0);
+  }
+  79% {
+    opacity: 1;
+    transform: translate3d(-72%, 0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(72%, 0, 0);
+  }
+}
+
+@keyframes confirmGlarePair {
+  0% {
+    opacity: 1;
+    transform: translate3d(-72%, 0, 0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  30% {
+    opacity: 0;
+    transform: translate3d(72%, 0, 0);
+  }
+  30.1%, 65.7% {
+    opacity: 0;
+    transform: translate3d(-72%, 0, 0);
+  }
+  66% {
+    opacity: 1;
+    transform: translate3d(-72%, 0, 0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  96%, 100% {
+    opacity: 0;
+    transform: translate3d(72%, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refraction {
+    animation: none;
+  }
+
+  .surface::after,
+  .glow,
+  .timedGlare {
+    animation: none;
+  }
+
+}

@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internet Topology 2026 — hyperbolic living map</title>
+<style>
+  :root{ --bg:#0b0b0c; --panel:#121214; --line:#26262b; --ink:#e8e8ea; --dim:#8b8b93; }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--ink);
+    font:13px/1.45 ui-sans-serif,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    display:flex;overflow:hidden}
+  #panel{width:286px;flex:0 0 286px;height:100%;overflow-y:auto;background:var(--panel);
+    border-right:1px solid var(--line);padding:18px 16px 40px}
+  #panel h1{font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin:0 0 2px;font-weight:600}
+  #panel .sub{color:var(--dim);font-size:11px;margin:0 0 18px;line-height:1.5}
+  .grp{border-top:1px solid var(--line);padding:14px 0 4px}
+  .grp:first-of-type{border-top:none}
+  .grp h2{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+    margin:0 0 10px;font-weight:600}
+  .seg{display:flex;gap:4px;margin-bottom:12px}
+  .seg button{flex:1;padding:7px 4px;background:#1b1b1f;border:1px solid var(--line);color:var(--dim);
+    border-radius:4px;cursor:pointer;font:inherit;font-size:11px;transition:.12s}
+  .seg button:hover{color:var(--ink);border-color:#3a3a42}
+  .seg button.on{background:var(--ink);color:#0b0b0c;border-color:var(--ink);font-weight:600}
+  .row{margin-bottom:11px}
+  .row label{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:4px}
+  .row label b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;-webkit-appearance:none;background:transparent;height:14px;cursor:pointer}
+  input[type=range]::-webkit-slider-runnable-track{height:2px;background:#33333b;border-radius:2px}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;
+    background:var(--ink);margin-top:-4.5px;border:none}
+  input[type=range]::-moz-range-track{height:2px;background:#33333b}
+  input[type=range]::-moz-range-thumb{width:11px;height:11px;border:none;border-radius:50%;background:var(--ink)}
+  .btn{width:100%;padding:9px;background:#1b1b1f;border:1px solid var(--line);color:var(--ink);
+    border-radius:4px;cursor:pointer;font:inherit;font-size:11px;margin-top:6px;transition:.12s}
+  .btn:hover{background:#26262c;border-color:#3a3a42}
+  .btn.primary{background:var(--ink);color:#0b0b0c;font-weight:600;border-color:var(--ink)}
+  .chk{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim);margin-bottom:9px;cursor:pointer}
+  .chk input{accent-color:var(--ink)}
+  .note{font-size:10px;color:#5f5f68;line-height:1.5;margin-top:12px}
+  #bar{height:2px;background:#26262b;border-radius:2px;overflow:hidden;margin:2px 0 12px}
+  #bar i{display:block;height:100%;width:0;background:var(--ink);opacity:.55}
+  #stage{flex:1;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;position:relative}
+  canvas{max-width:100%;max-height:100%;box-shadow:0 0 0 1px #1e1e22,0 24px 60px rgba(0,0,0,.6);cursor:grab}
+  canvas.grabbing{cursor:grabbing}
+  #meta{position:absolute;bottom:10px;right:16px;font-size:10px;color:#4a4a52;letter-spacing:.08em}
+  #hint{position:absolute;bottom:10px;left:16px;font-size:10px;color:#4a4a52;letter-spacing:.08em}
+  #analysisHud{position:absolute;left:clamp(14px,4vw,28px);bottom:clamp(16px,3.4vh,28px);z-index:3;
+    display:grid;max-width:min(76vw,420px);gap:3px;color:rgba(238,245,234,.88);pointer-events:none;
+    opacity:0;transform:translate3d(0,8px,0);transition:opacity .5s ease,transform .7s cubic-bezier(.16,1,.3,1);
+    text-shadow:0 1px 12px rgba(0,0,0,.76)}
+  #analysisHud.visible{transform:translate3d(0,0,0)}
+  #analysisKicker{font-size:8px;font-weight:560;line-height:1.2;letter-spacing:.14em;text-transform:uppercase;
+    color:rgba(180,250,57,.8)}
+  #analysisTitle{font-size:11px;font-weight:520;line-height:1.15;letter-spacing:.075em}
+  @media (max-width:820px){body{flex-direction:column;overflow:auto}
+    #panel{width:100%;flex:none;height:auto;border-right:none;border-bottom:1px solid var(--line)}
+    #stage{height:70vh}}
+
+  /* Embedded artwork mode: keep the original renderer, hide authoring controls. */
+  html,body{width:100%;height:100%;overflow:hidden;background:#020702}
+  body{display:block}
+  #panel,#meta,#hint{display:none!important}
+  #stage{width:100vw;height:100vh;padding:0;overflow:hidden;background:#020702}
+  canvas{max-width:none;max-height:none;box-shadow:none;touch-action:none}
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <h1>Hyperbolic Topology</h1>
+  <p class="sub">A contemporary AS-level Internet model in the visual tradition of CAIDA's Walrus / H3 graphs. Its stable transit, regional and content clusters are calibrated from CAIDA AS Rank and current public peering patterns; only the edge-level paths keep rewiring.</p>
+
+  <div class="grp">
+    <h2>Space</h2>
+    <div class="seg" id="segDim">
+      <button data-v="3d" class="on">3D ball</button>
+      <button data-v="2d">2D disk</button>
+    </div>
+    <h2>Treatment</h2>
+    <div class="seg" id="segFid">
+      <button data-v="faithful" class="on">Faithful</button>
+      <button data-v="stylized">Stylized</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <h2>Life cycle</h2>
+    <div id="bar"><i id="barFill"></i></div>
+    <label class="chk"><input type="checkbox" id="cLive" checked> Live — drift to the next seed</label>
+    <label class="chk"><input type="checkbox" id="cAnim" checked> Slow rotation</label>
+    <div class="row"><label>Seed lifetime <b id="vCycle">9.0s</b></label>
+      <input type="range" id="sCycle" min="2" max="40" step="0.5" value="9"></div>
+    <div class="row"><label>Lifespan spread <b id="vWin">0.35</b></label>
+      <input type="range" id="sWin" min="0.05" max="1" step="0.01" value="0.35"></div>
+    <div class="row"><label>Death fade <b id="vTwk">0.62</b></label>
+      <input type="range" id="sTwk" min="0" max="1" step="0.01" value="0.62"></div>
+    <div class="row"><label>Cohort binding <b id="vCoh">0.70</b></label>
+      <input type="range" id="sCoh" min="0" max="1" step="0.01" value="0.70"></div>
+    <button class="btn" id="bSkip">Jump to next seed now</button>
+  </div>
+
+  <div class="grp">
+    <h2>Graph structure</h2>
+    <div class="row"><label>Nodes <b id="vNodes">4200</b></label>
+      <input type="range" id="sNodes" min="400" max="9000" step="100" value="4200"></div>
+    <div class="row"><label>Hub dominance <b id="vHub">0.20</b></label>
+      <input type="range" id="sHub" min="0" max="0.95" step="0.01" value="0.20"></div>
+    <div class="row"><label>Preferential attachment <b id="vBias">0.92</b></label>
+      <input type="range" id="sBias" min="0" max="1" step="0.01" value="0.92"></div>
+    <div class="row"><label>Depth decay <b id="vDecay">0.07</b></label>
+      <input type="range" id="sDecay" min="0" max="0.9" step="0.01" value="0.07"></div>
+    <div class="row"><label>Chain growth (depth) <b id="vChain">0.42</b></label>
+      <input type="range" id="sChain" min="0" max="0.9" step="0.01" value="0.42"></div>
+    <div class="row"><label>Angular weighting <b id="vAlpha">0.45</b></label>
+      <input type="range" id="sAlpha" min="0.15" max="1" step="0.01" value="0.45"></div>
+    <div class="row"><label>Branch splay <b id="vSpread">1.80</b></label>
+      <input type="range" id="sSpread" min="1" max="4" step="0.01" value="1.80"></div>
+  </div>
+
+  <div class="grp">
+    <h2>Projection</h2>
+    <div class="row"><label>Curvature <b id="vCurv">0.34</b></label>
+      <input type="range" id="sCurv" min="0.05" max="1.6" step="0.01" value="0.34"></div>
+    <div class="row"><label>Link bend (geodesic) <b id="vBend">1.00</b></label>
+      <input type="range" id="sBend" min="0" max="1" step="0.01" value="1"></div>
+    <div class="row"><label>Wedge gap <b id="vGap">0.86</b></label>
+      <input type="range" id="sGap" min="0.3" max="1" step="0.01" value="0.86"></div>
+    <div class="row"><label>Peering cross-links <b id="vCross">0.10</b></label>
+      <input type="range" id="sCross" min="0" max="0.5" step="0.005" value="0.10"></div>
+    <div class="row"><label>Jitter <b id="vJit">0.70</b></label>
+      <input type="range" id="sJit" min="0" max="1" step="0.01" value="0.70"></div>
+  </div>
+
+  <div class="grp">
+    <h2>Output</h2>
+    <button class="btn primary" id="bRegen">Reseed from scratch</button>
+    <button class="btn" id="bPng">Save PNG (2×)</button>
+    <p class="note">Links are true hyperbolic geodesics — circular arcs meeting the boundary sphere at right angles. Drag to rotate the ball, scroll to zoom, <b>R</b> resets the view.</p>
+  </div>
+</div>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="analysisHud" aria-live="polite">
+    <span id="analysisKicker">NETWORK SNAPSHOT</span>
+    <strong id="analysisTitle">ROUTING HIERARCHY</strong>
+  </div>
+  <div id="meta"></div><div id="hint">drag to rotate · scroll to zoom</div>
+</div>
+
+<script>
+/* ============================== utilities ============================== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
+const nextSeed=s=>((Math.imul(s,1103515245)+12345)>>>0)%2147483647;
+function faithfulEdgeColor(analysisId,f,alpha){
+  if(analysisId==='communities'||analysisId==='medusa') return `hsla(${72+54*f},92%,${34+38*f}%,${alpha})`;
+  if(analysisId==='traces'||analysisId==='bridges') return `hsla(${93-9*f},36%,${52+34*f}%,${alpha})`;
+  if(analysisId==='cone') return `hsla(${86+12*f},96%,${32+44*f}%,${alpha})`;
+  return `hsla(${96-18*f},92%,${30+38*f}%,${alpha})`;
+}
+function faithfulNodeColor(analysisId,degree,alpha){
+  if(analysisId==='communities'||analysisId==='medusa') return `hsla(${74+48*(1-degree)},96%,${50+22*degree}%,${alpha})`;
+  if(analysisId==='traces'||analysisId==='bridges') return `hsla(${92-8*degree},48%,${64+22*degree}%,${alpha})`;
+  if(analysisId==='cone') return `hsla(${82+18*(1-degree)},100%,${50+24*degree}%,${alpha})`;
+  return `hsla(${125-70*degree},100%,${52+22*degree}%,${alpha})`;
+}
+
+const S = {
+  dim:'3d', fid:'faithful', seed:20260813,
+  live:true, anim:true, cycle:12, win:0.32, twk:0.54, coh:0.82,
+  n:4200, hub:0.20, bias:0.92, decay:0.07, chain:0.42, alpha:0.45, spread:1.80,
+  curv:0.34, bend:1, gap:0.86, cross:0.12, jit:0.54,
+  gyaw:0.6, gpit:0.28, grol:0, zoom:1
+};
+const SEG=7, XSEG=13, BUCKETS=14;
+
+/* Offline structural fallback. Live sessions replace this with current
+   RIPE RIS BGP adjacency observations served by /api/internet-topology. */
+const FALLBACK_INTERNET={
+  date:'2026-08', totalAs:87660,
+  groups:[
+    {id:'core',weight:1.35},
+    {id:'content',weight:1.18},
+    {id:'north-america',weight:0.92},
+    {id:'europe',weight:0.92},
+    {id:'asia-pacific',weight:0.92},
+    {id:'latin-america',weight:0.68},
+    {id:'africa-middle-east',weight:0.56}
+  ],
+  anchors:[
+    {asn:3356,group:'core',role:'transit',reach:100}, {asn:1299,group:'core',role:'transit',reach:86},
+    {asn:3257,group:'core',role:'transit',reach:84}, {asn:174,group:'core',role:'transit',reach:84},
+    {asn:2914,group:'core',role:'transit',reach:68}, {asn:6939,group:'core',role:'transit',reach:72},
+    {asn:6453,group:'core',role:'transit',reach:58}, {asn:6461,group:'core',role:'transit',reach:62},
+    {asn:6762,group:'core',role:'transit',reach:56}, {asn:3491,group:'core',role:'transit',reach:48},
+    {asn:9002,group:'core',role:'transit',reach:52}, {asn:5511,group:'core',role:'transit',reach:38},
+    {asn:1273,group:'core',role:'transit',reach:34}, {asn:12956,group:'core',role:'transit',reach:34},
+
+    {asn:13335,group:'content',role:'content',reach:92}, {asn:20940,group:'content',role:'content',reach:78},
+    {asn:32934,group:'content',role:'content',reach:76}, {asn:16509,group:'content',role:'content',reach:74},
+    {asn:8075,group:'content',role:'content',reach:70}, {asn:15169,group:'content',role:'content',reach:68},
+    {asn:54113,group:'content',role:'content',reach:60}, {asn:2906,group:'content',role:'content',reach:54},
+    {asn:396986,group:'content',role:'content',reach:48},
+
+    {asn:7018,group:'north-america',role:'regional',reach:48}, {asn:701,group:'north-america',role:'regional',reach:38},
+    {asn:7922,group:'north-america',role:'regional',reach:36}, {asn:11537,group:'north-america',role:'regional',reach:28},
+    {asn:46887,group:'north-america',role:'regional',reach:26},
+
+    {asn:3320,group:'europe',role:'regional',reach:44}, {asn:6830,group:'europe',role:'regional',reach:36},
+    {asn:8220,group:'europe',role:'regional',reach:40}, {asn:8359,group:'europe',role:'regional',reach:38},
+    {asn:33891,group:'europe',role:'regional',reach:34}, {asn:5405,group:'europe',role:'regional',reach:32},
+
+    {asn:4637,group:'asia-pacific',role:'regional',reach:42}, {asn:9498,group:'asia-pacific',role:'regional',reach:40},
+    {asn:7473,group:'asia-pacific',role:'regional',reach:34}, {asn:4755,group:'asia-pacific',role:'regional',reach:34},
+    {asn:4826,group:'asia-pacific',role:'regional',reach:32}, {asn:4766,group:'asia-pacific',role:'regional',reach:30},
+    {asn:1221,group:'asia-pacific',role:'regional',reach:28},
+
+    {asn:22356,group:'latin-america',role:'regional',reach:36}, {asn:52320,group:'latin-america',role:'regional',reach:34},
+    {asn:16735,group:'latin-america',role:'regional',reach:32}, {asn:10429,group:'latin-america',role:'regional',reach:26},
+    {asn:4230,group:'latin-america',role:'regional',reach:24}, {asn:26615,group:'latin-america',role:'regional',reach:22},
+
+    {asn:37468,group:'africa-middle-east',role:'regional',reach:38}, {asn:15802,group:'africa-middle-east',role:'regional',reach:28},
+    {asn:328578,group:'africa-middle-east',role:'regional',reach:22}, {asn:36944,group:'africa-middle-east',role:'regional',reach:20}
+  ]
+};
+
+function fallbackScene(id,title,method,predicate){
+  const anchors=FALLBACK_INTERNET.anchors.filter(predicate);
+  const groupIds=new Set(anchors.map(anchor=>anchor.group));
+  return {
+    id,title,method,isLive:false,links:[],
+    groups:FALLBACK_INTERNET.groups.filter(group=>groupIds.has(group.id)),
+    anchors,
+    sampledAsnCount:anchors.length,
+    observedEdgeCount:0
+  };
+}
+
+let TOPOLOGY_META={
+  source:'embedded topology snapshot',
+  queryTime:'2026-08',
+  observedAsnCount:FALLBACK_INTERNET.totalAs,
+  live:false
+};
+let TOPOLOGY_SCENES=[
+  fallbackScene(
+    'hierarchy','ROUTING HIERARCHY','provider–customer direction · path-power weighted',
+    anchor=>anchor.group==='core'||anchor.role==='regional'
+  ),
+  fallbackScene(
+    'communities','PEERING COMMUNITIES','shared-neighbour overlap · peer visibility',
+    anchor=>anchor.group==='content'||anchor.role==='regional'
+  ),
+  fallbackScene(
+    'bridges','REGIONAL BRIDGES','cross-cluster recurrence · bridge centrality',
+    (anchor,index)=>anchor.role==='regional'||index%4===0
+  )
+];
+const ANALYSIS_SEQUENCE={index:0,holdMs:2700,transitionMs:1150};
+const sceneAt=offset=>TOPOLOGY_SCENES[(ANALYSIS_SEQUENCE.index+offset+TOPOLOGY_SCENES.length)%TOPOLOGY_SCENES.length];
+
+const weightedPick=(items,weightOf,rnd)=>{
+  let total=0; for(const item of items) total+=Math.max(0.001,weightOf(item));
+  let cursor=rnd()*total;
+  for(const item of items){ cursor-=Math.max(0.001,weightOf(item)); if(cursor<=0) return item; }
+  return items[items.length-1];
+};
+
+/* ====================== the graph ====================== */
+function buildGraph(seed,topology=sceneAt(0)){
+  const rnd = mulberry32(seed);
+  const layout=topology.layout||topology.id;
+  const n = S.n|0;
+  const par=new Int32Array(n).fill(-1), dep=new Int32Array(n),
+        deg=new Int32Array(n), branch=new Int32Array(n).fill(-1),
+        role=new Int8Array(n), anchorOf=new Int32Array(n).fill(-1);
+
+  // Synthetic group nodes exist only to divide the Poincare ball into stable
+  // topological regions. Actual representative AS anchors sit beneath them.
+  const groupIndex=new Map();
+  let cursor=1;
+  for(const group of topology.groups){
+    if(cursor>=n) break;
+    groupIndex.set(group.id,cursor);
+    par[cursor]=0; dep[cursor]=1; branch[cursor]=cursor; role[cursor]=1;
+    deg[0]++; deg[cursor]++; cursor++;
+  }
+
+  const anchorIndexes=[];
+  const anchorIndexByAsn=new Map();
+  const membersByAnchor=new Map();
+  const strongestObservedParent=new Map();
+  if(topology.isLive){
+    for(const link of topology.links||[]){
+      const target=Number(link.target), score=Math.log1p(Number(link.power)||0)+Math.log1p(Number(link.visibility)||0)*0.24;
+      const current=strongestObservedParent.get(target);
+      if(!current||score>current.score) strongestObservedParent.set(target,{asn:Number(link.source),score});
+    }
+  }
+  for(const anchor of topology.anchors){
+    if(cursor>=n) break;
+    const observedParent=strongestObservedParent.get(Number(anchor.asn));
+    const parent=(observedParent&&anchorIndexByAsn.get(observedParent.asn))
+      ?? groupIndex.get(anchor.group)
+      ?? 1;
+    par[cursor]=parent; dep[cursor]=dep[parent]+1; branch[cursor]=parent;
+    role[cursor]=anchor.role==='content'?3:(anchor.role==='transit'?2:(anchor.role==='bridge'?5:4));
+    anchorOf[cursor]=cursor; deg[parent]++; deg[cursor]++;
+    anchorIndexes.push({index:cursor,...anchor});
+    anchorIndexByAsn.set(Number(anchor.asn),cursor);
+    membersByAnchor.set(cursor,[cursor]);
+    cursor++;
+  }
+
+  for(let i=cursor;i<n;i++){
+    const anchor=weightedPick(
+      anchorIndexes,
+      item=>item.reach*(item.role==='content'?1.16:1)*(0.88+rnd()*0.24),
+      rnd
+    );
+    const members=membersByAnchor.get(anchor.index);
+    let p=anchor.index;
+    const directChance=layout==='communities'
+      ? (anchor.role==='content'?0.46:0.34)
+      : (layout==='bridges'?0.18:(anchor.role==='content'?0.34:(anchor.role==='transit'?0.16:0.22)));
+
+    if(members.length>1 && rnd()>directChance){
+      const chainChance=layout==='communities'?S.chain*0.58:(layout==='bridges'?Math.min(0.86,S.chain*1.42):S.chain);
+      if(rnd()<chainChance){
+        const span=Math.min(members.length,anchor.role==='content'?24:68);
+        p=members[members.length-1-Math.floor(Math.pow(rnd(),1.8)*span)];
+      }else{
+        let best=anchor.index, bestScore=-1;
+        for(let attempt=0;attempt<7;attempt++){
+          const candidate=members[(rnd()*members.length)|0];
+          const score=(deg[candidate]+1)*(0.62+rnd()*0.76)
+            / Math.pow(1+Math.max(0,dep[candidate]-2)*S.decay,2.2);
+          if(score>bestScore){ best=candidate; bestScore=score; }
+        }
+        p=best;
+      }
+    }
+
+    par[i]=p; dep[i]=dep[p]+1; branch[i]=branch[p]; anchorOf[i]=anchor.index;
+    deg[p]++; deg[i]++; members.push(i);
+  }
+  const size=new Float64Array(n).fill(1);
+  for(let i=n-1;i>=1;i--) size[par[i]]+=size[i];
+  // sub-linear angular weight: one giant hub stays a compact blob
+  const w=new Float64Array(n), cw=new Float64Array(n);
+  for(let i=0;i<n;i++) w[i]=Math.pow(size[i],S.alpha);
+  for(let i=1;i<n;i++) cw[par[i]]+=w[i];
+
+  // Short global/core hops and deeper access cones reproduce the flattened
+  // core plus long regional/customer tails visible in current AS graphs.
+  const dist=new Float64Array(n);
+  for(let i=1;i<n;i++){
+    const code=role[i];
+    const step=code===1?0.20:(code>=2?0.34:0.48+1.46*Math.pow(rnd(),1.62));
+    dist[i]=dist[par[i]]+step;
+  }
+  const samp=[]; for(let i=0;i<n;i+=Math.max(1,(n/1500)|0)) samp.push(dist[i]);
+  samp.sort((a,b)=>a-b);
+  const maxD=samp[Math.floor(samp.length*0.90)]||1;
+  const sceneCurvature=layout==='communities'?S.curv*1.13:(layout==='bridges'?S.curv*0.84:S.curv);
+  const denom=Math.tanh(sceneCurvature*Math.max(1,maxD));
+
+  // ---- 2D radial wedges ----
+  const a0=new Float64Array(n), aw=new Float64Array(n), cur=new Float64Array(n);
+  a0[0]=0; aw[0]=Math.PI*2;
+  const ang=new Float64Array(n), rad=new Float64Array(n);
+  let maxDep=0; for(let i=0;i<n;i++) if(dep[i]>maxDep) maxDep=dep[i];
+  for(let i=0;i<n;i++){
+    if(i>0){
+      const p=par[i];
+      const share=(w[i]/(cw[p]||1))*aw[p]*S.gap;
+      a0[i]=a0[p]+cur[p]+(aw[p]*(1-S.gap))/2;
+      cur[p]+=share;
+      aw[i]=Math.min(share*S.spread, Math.PI*0.9);   // hyperbolic room to splay
+      a0[i]-=(aw[i]-share)/2;
+    }
+    ang[i]=a0[i]+aw[i]/2+(rnd()-0.5)*aw[i]*S.jit;
+    rad[i]=(Math.tanh(sceneCurvature*dist[i])/denom)*(1+(rnd()-0.5)*0.05*S.jit);
+    if(rad[i]>0.955) rad[i]=0.955;
+  }
+  const x2=new Float64Array(n), y2=new Float64Array(n);
+  for(let i=0;i<n;i++){ x2[i]=Math.cos(ang[i])*rad[i]; y2[i]=Math.sin(ang[i])*rad[i]; }
+
+  // ---- contemporary peering and multihoming cross-links ----
+  const peerA=[], peerB=[], peerKeys=new Set();
+  const addPeer=(a,b)=>{
+    if(a===b) return false;
+    const lo=Math.min(a,b), hi=Math.max(a,b), key=lo+':'+hi;
+    if(peerKeys.has(key)||par[hi]===lo||par[lo]===hi) return false;
+    peerKeys.add(key); peerA.push(a); peerB.push(b); deg[a]++; deg[b]++; return true;
+  };
+  const transit=anchorIndexes.filter(item=>item.role==='transit');
+  const content=anchorIndexes.filter(item=>item.role==='content');
+  const regional=anchorIndexes.filter(item=>item.role==='regional'||item.role==='bridge'||item.role==='edge');
+
+  // Every link in a live scene is an adjacency directly observed in RIPE RIS.
+  // The thousands of smaller descendants are representative expansion only;
+  // they are never presented as independently observed AS relationships.
+  for(const link of topology.links||[]){
+    const source=anchorIndexByAsn.get(Number(link.source));
+    const target=anchorIndexByAsn.get(Number(link.target));
+    if(source!==undefined&&target!==undefined) addPeer(source,target);
+  }
+
+  if(!topology.isLive){
+    // Offline fallback only: preserve a plausible topology until the live RIS
+    // request arrives, without claiming those inferred links as observations.
+    for(let a=0;a<transit.length;a++) for(let b=a+1;b<transit.length;b++)
+      if(((a*11+b*7)%5)!==0) addPeer(transit[a].index,transit[b].index);
+
+    for(let c=0;c<content.length;c++){
+      if(transit.length) for(let k=0;k<6;k++) addPeer(content[c].index,transit[(c*3+k*2)%transit.length].index);
+      if(regional.length) for(let k=0;k<8;k++) addPeer(content[c].index,regional[(c*5+k*3)%regional.length].index);
+    }
+  }
+
+  // Only the offline snapshot receives inferred edge multihoming. Live scenes
+  // keep their cross-links strictly tied to the RIS observations above.
+  const targetCrossLinks=topology.isLive
+    ? peerA.length
+    : Math.max(peerA.length,Math.round(n*(0.09+S.cross*0.72)));
+  let guard=0;
+  while(peerA.length<targetCrossLinks&&guard<targetCrossLinks*20){
+    guard++;
+    const from=cursor+((rnd()*Math.max(1,n-cursor))|0);
+    const sameAnchor=membersByAnchor.get(anchorOf[from]);
+    let to;
+    if(sameAnchor&&rnd()<0.58) to=sameAnchor[(rnd()*sameAnchor.length)|0];
+    else if(rnd()<0.58) to=anchorIndexes[(rnd()*anchorIndexes.length)|0].index;
+    else to=cursor+((rnd()*Math.max(1,n-cursor))|0);
+    addPeer(from,to);
+  }
+  const cxA=Int32Array.from(peerA), cyA=Int32Array.from(peerB), nx=cxA.length;
+
+  // ---- hue per top-level branch ----
+  const bh=new Map(); let bi=0;
+  for(let i=1;i<n;i++) if(dep[i]===1) bh.set(i,bi++);
+
+  const G={
+    n,par,dep,deg,branch,role,anchorOf,ang,rad,x2,y2,cx:cxA,cy:cyA,nx,maxDep,bh,
+    nb:Math.max(1,bi),seed,analysisId:topology.id,analysisLayout:layout,anchorIndexes,anchorIndexByAsn
+  };
+  G.b3 = build3D(n,par,w,cw,rad,rnd,nx,cxA,cyA);
+  // per-edge colour bucket, precomputed for both treatments
+  G.bkF=new Int8Array(Math.max(1,n-1)); G.bkS=new Int8Array(Math.max(1,n-1));
+  for(let e=0;e<n-1;e++){
+    const i=e+1;
+    G.bkF[e]=Math.min(BUCKETS-1, Math.floor(Math.min(1,Math.log(deg[i]+1)/Math.log(14))*BUCKETS));
+    G.bkS[e]=(bh.get(branch[i])||0)%BUCKETS;
+  }
+  return G;
+}
+
+/* H3-style cone tree in the Poincare ball: each node owns a solid angle, its
+   children divide it in proportion to subtree weight. Link geodesics are
+   sampled once here, so rotating is only a matrix multiply per frame. */
+function build3D(n,par,w,cw,rad,rnd,nx,cxA,cyA){
+  const cnt=new Int32Array(n);
+  for(let i=1;i<n;i++) cnt[par[i]]++;
+  const st=new Int32Array(n+1); let acc=0;
+  for(let i=0;i<n;i++){ st[i]=acc; acc+=cnt[i]; } st[n]=acc;
+  const fill=new Int32Array(n), kid=new Int32Array(Math.max(1,n-1));
+  for(let i=1;i<n;i++){ const p=par[i]; kid[st[p]+fill[p]++]=i; }
+
+  const ax=new Float64Array(n), ay=new Float64Array(n), az=new Float64Array(n), th=new Float64Array(n);
+  ax[0]=0; ay[0]=0; az[0]=1; th[0]=Math.PI;
+  const GOLD=2.399963229728653;
+  for(let p=0;p<n;p++){
+    const m=cnt[p]; if(!m) continue;
+    const cosP=Math.cos(th[p]), Op=2*Math.PI*(1-cosP);
+    const Ax=ax[p],Ay=ay[p],Az=az[p];
+    let ux,uy,uz;
+    if(Math.abs(Az)<0.9){ ux=-Ay; uy=Ax; uz=0; } else { ux=0; uy=-Az; uz=Ay; }
+    const ul=Math.hypot(ux,uy,uz)||1; ux/=ul; uy/=ul; uz/=ul;
+    const vx=Ay*uz-Az*uy, vy=Az*ux-Ax*uz, vz=Ax*uy-Ay*ux;
+    for(let k=0;k<m;k++){
+      const c=kid[st[p]+k];
+      const frac = p===0 ? 1/m : w[c]/(cw[p]||1);   // root splits the sphere evenly
+      let Oc=Op*frac*S.gap*S.spread; if(Oc>2*Math.PI) Oc=2*Math.PI;
+      th[c]=Math.acos(clamp(1-Oc/(2*Math.PI),-1,1));
+      const t=(k+0.5)/m*(0.9+0.2*rnd());
+      const al=Math.acos(clamp(1-(1-cosP)*Math.min(1,t),-1,1));
+      const ph=k*GOLD+rnd()*S.jit*1.2;
+      const sa=Math.sin(al), ca=Math.cos(al), cp=Math.cos(ph), sp=Math.sin(ph);
+      const nx3=Ax*ca+(ux*cp+vx*sp)*sa, ny3=Ay*ca+(uy*cp+vy*sp)*sa, nz3=Az*ca+(uz*cp+vz*sp)*sa;
+      const l=Math.hypot(nx3,ny3,nz3)||1;
+      ax[c]=nx3/l; ay[c]=ny3/l; az[c]=nz3/l;
+    }
+  }
+  const px=new Float32Array(n), py=new Float32Array(n), pz=new Float32Array(n);
+  for(let i=0;i<n;i++){ px[i]=ax[i]*rad[i]; py[i]=ay[i]*rad[i]; pz[i]=az[i]*rad[i]; }
+
+  const ep=new Float32Array(Math.max(1,n-1)*(SEG+1)*3);
+  for(let i=1;i<n;i++)
+    ballGeo(px[par[i]],py[par[i]],pz[par[i]], px[i],py[i],pz[i], ep,(i-1)*(SEG+1)*3, SEG, S.bend);
+  const xp=new Float32Array(Math.max(1,nx)*(XSEG+1)*3);
+  for(let i=0;i<nx;i++){
+    const a=cxA[i], b=cyA[i];
+    ballGeo(px[a],py[a],pz[a], px[b],py[b],pz[b], xp,i*(XSEG+1)*3, XSEG, 1);
+  }
+  return {px,py,pz,ep,xp};
+}
+
+/* geodesic between two points of the Poincare ball, sampled into `out` */
+function ballGeo(x1,y1,z1,x2,y2,z2,out,off,SG,bend){
+  const r1=Math.hypot(x1,y1,z1);
+  let e1x=0,e1y=0,e1z=0,e2x=0,e2y=0,e2z=0,a1=0,b1=0,a2=0,b2=0,ok=false;
+  if(r1>1e-6){
+    e1x=x1/r1; e1y=y1/r1; e1z=z1/r1;
+    const d=x2*e1x+y2*e1y+z2*e1z;
+    const qx=x2-d*e1x, qy=y2-d*e1y, qz=z2-d*e1z, ql=Math.hypot(qx,qy,qz);
+    if(ql>1e-7){ e2x=qx/ql; e2y=qy/ql; e2z=qz/ql; a1=r1; a2=d; b2=ql; ok=true; }
+  }
+  let cxx=0,cyy=0,rr=0,t1=0,dd=0,arc=false;
+  if(ok && bend>0.02){
+    const det=2*(a1*b2-b1*a2);
+    if(Math.abs(det)>1e-9){
+      const A1=a1*a1+b1*b1+1, A2=a2*a2+b2*b2+1;
+      cxx=(A1*b2-A2*b1)/det; cyy=(A2*a1-A1*a2)/det;
+      const r2=cxx*cxx+cyy*cyy-1;
+      if(r2>1e-7 && r2<3600){
+        rr=Math.sqrt(r2); t1=Math.atan2(b1-cyy,a1-cxx);
+        let t2=Math.atan2(b2-cyy,a2-cxx);
+        dd=t2-t1; while(dd>Math.PI)dd-=2*Math.PI; while(dd<-Math.PI)dd+=2*Math.PI;
+        arc=true;
+      }
+    }
+  }
+  for(let s=0;s<=SG;s++){
+    const t=s/SG;
+    const lx=x1+(x2-x1)*t, ly=y1+(y2-y1)*t, lz=z1+(z2-z1)*t;
+    let X=lx,Y=ly,Z=lz;
+    if(arc){
+      const th=t1+dd*t, a=cxx+rr*Math.cos(th), b=cyy+rr*Math.sin(th);
+      const gx=a*e1x+b*e2x, gy=a*e1y+b*e2y, gz=a*e1z+b*e2z;
+      X=lx+(gx-lx)*bend; Y=ly+(gy-ly)*bend; Z=lz+(gz-lz)*bend;
+    }
+    out[off+s*3]=X; out[off+s*3+1]=Y; out[off+s*3+2]=Z;
+  }
+}
+
+/* geodesic in the 2D Poincare disk, straight into a canvas path */
+function geoPath(ctx,x1,y1,x2,y2,cx,cy,R,bend){
+  if(bend<0.02){ ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); return; }
+  const p1x=(x1-cx)/R,p1y=(y1-cy)/R,p2x=(x2-cx)/R,p2y=(y2-cy)/R;
+  const det=2*(p1x*p2y-p1y*p2x);
+  if(Math.abs(det)<1e-7){ ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); return; }
+  const a1=p1x*p1x+p1y*p1y+1, a2=p2x*p2x+p2y*p2y+1;
+  const ux=(a1*p2y-a2*p1y)/det, uy=(a2*p1x-a1*p2x)/det;
+  const rr2=ux*ux+uy*uy-1;
+  if(rr2<=1e-6){ ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); return; }
+  const rr=Math.sqrt(rr2);
+  if(rr>60){ ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); return; }
+  let t1=Math.atan2(p1y-uy,p1x-ux), t2=Math.atan2(p2y-uy,p2x-ux);
+  let d=t2-t1; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI;
+  const steps=Math.max(3,Math.min(20,Math.round(Math.abs(d)*13)+3));
+  ctx.moveTo(x1,y1);
+  for(let s=1;s<=steps;s++){
+    const t=s/steps, th=t1+d*t;
+    const gx=cx+(ux+rr*Math.cos(th))*R, gy=cy+(uy+rr*Math.sin(th))*R;
+    const lx=x1+(x2-x1)*t, ly=y1+(y2-y1)*t;
+    ctx.lineTo(lx+(gx-lx)*bend, ly+(gy-ly)*bend);
+  }
+}
+
+/* ====================== lifespans ======================
+   Every node gets its own moment of death inside the cycle. Before it the node
+   still belongs to the old topology, after it to the new one, and it fades out
+   and back in as it crosses. `coh` binds a whole branch to one moment, so
+   subtrees migrate as cohorts instead of 4200 unrelated specks. */
+let GA=null, GB=null, PH=null, cycT0=0, uu=0;
+function setPhases(){
+  const n=GA.n, r=mulberry32(GA.seed^0x5eed);
+  PH=new Float32Array(n);
+  const bp=new Map();
+  for(let i=0;i<n;i++){
+    const b=GA.branch[i];
+    if(!bp.has(b)) bp.set(b, r());
+    PH[i]=clamp(S.coh*bp.get(b)+(1-S.coh)*r(), 0, 1);
+  }
+}
+function lifeOf(i){                       // 0 = still old, 1 = fully reborn
+  if(!S.live) return 0;
+  const W=S.win, start=PH[i]*(1-W);
+  return smooth((uu-start)/W);
+}
+function reseed(hard){
+  if(hard || !GB){
+    ANALYSIS_SEQUENCE.index=0;
+    GA=buildGraph(S.seed,sceneAt(0));
+  }else{
+    GA=GB;
+    S.seed=GA.seed;
+    ANALYSIS_SEQUENCE.index=(ANALYSIS_SEQUENCE.index+1)%TOPOLOGY_SCENES.length;
+  }
+  GB=buildGraph(nextSeed(S.seed),sceneAt(1));
+  setPhases(); cycT0=performance.now(); uu=0;
+}
+function rebuildBoth(){
+  GA=buildGraph(S.seed,sceneAt(0));
+  GB=buildGraph(nextSeed(S.seed),sceneAt(1));
+  setPhases(); cycT0=performance.now(); uu=0;
+}
+
+function acceptLiveTopology(payload){
+  if(!payload||!Array.isArray(payload.scenes)||payload.scenes.length<3) return;
+  const scenes=payload.scenes.filter(scene=>(scene.groups?.length&&scene.anchors?.length));
+  if(scenes.length<3) return;
+  TOPOLOGY_META={
+    source:payload.source||'RIPE NCC RIS',
+    queryTime:payload.queryTime||payload.fetchedAt||new Date().toISOString(),
+    observedAsnCount:Number(payload.observedAsnCount)||0,
+    live:true
+  };
+  TOPOLOGY_SCENES=scenes.map(scene=>({...scene,isLive:true}));
+  S.seed=((Date.parse(TOPOLOGY_META.queryTime)||Date.now())/1000)>>>0;
+  reseed(true);
+}
+
+async function loadLiveTopology(){
+  try{
+    const response=await fetch('/api/internet-topology',{headers:{Accept:'application/json'}});
+    if(!response.ok) throw new Error(`topology ${response.status}`);
+    acceptLiveTopology(await response.json());
+  }catch(error){
+    // The visual remains fully functional with the labelled embedded snapshot.
+    console.warn('Using embedded topology snapshot',error);
+  }
+}
+
+const REDUCED_MOTION=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const VIEW_RADIUS={value:0,from:0,to:0,startedAt:0,duration:0,moving:false};
+const VIEW_CENTER={value:0.5,from:0.5,to:0.5,startedAt:0,duration:0,moving:false};
+const VIEW_REVEAL={value:0};
+let REVEAL_SEQUENCE_STARTED=false;
+
+function setFocusedRadius(focused,delay=0,duration=820){
+  const target=focused?1:0;
+  if(target===VIEW_RADIUS.to&&!VIEW_RADIUS.moving) return;
+  VIEW_RADIUS.from=VIEW_RADIUS.value;
+  VIEW_RADIUS.to=target;
+  VIEW_RADIUS.startedAt=performance.now()+Math.max(0,Number(delay)||0);
+  VIEW_RADIUS.duration=REDUCED_MOTION?0:Math.max(1,Number(duration)||820);
+  VIEW_RADIUS.moving=VIEW_RADIUS.duration>0;
+  if(!VIEW_RADIUS.moving) VIEW_RADIUS.value=target;
+}
+
+function updateFocusedRadius(now){
+  if(!VIEW_RADIUS.moving||now<VIEW_RADIUS.startedAt) return;
+  const p=clamp((now-VIEW_RADIUS.startedAt)/VIEW_RADIUS.duration,0,1);
+  const eased=1-Math.pow(1-p,5);
+  VIEW_RADIUS.value=VIEW_RADIUS.from+(VIEW_RADIUS.to-VIEW_RADIUS.from)*eased;
+  if(p>=1){ VIEW_RADIUS.value=VIEW_RADIUS.to; VIEW_RADIUS.moving=false; }
+}
+
+function setLowerCenter(lowered,delay=0,duration=820){
+  const target=lowered?0.7625:0.5;
+  if(target===VIEW_CENTER.to&&!VIEW_CENTER.moving) return;
+  VIEW_CENTER.from=VIEW_CENTER.value;
+  VIEW_CENTER.to=target;
+  VIEW_CENTER.startedAt=performance.now()+Math.max(0,Number(delay)||0);
+  VIEW_CENTER.duration=REDUCED_MOTION?0:Math.max(1,Number(duration)||820);
+  VIEW_CENTER.moving=VIEW_CENTER.duration>0;
+  if(!VIEW_CENTER.moving) VIEW_CENTER.value=target;
+}
+
+function updateViewCenter(now){
+  if(!VIEW_CENTER.moving||now<VIEW_CENTER.startedAt) return;
+  const p=clamp((now-VIEW_CENTER.startedAt)/VIEW_CENTER.duration,0,1);
+  const eased=1-Math.pow(1-p,4);
+  VIEW_CENTER.value=VIEW_CENTER.from+(VIEW_CENTER.to-VIEW_CENTER.from)*eased;
+  if(p>=1){ VIEW_CENTER.value=VIEW_CENTER.to; VIEW_CENTER.moving=false; }
+}
+
+/* The topology boundary is always constructed as a rounded rectangle.
+   At rest its sides are equal and its corner radius is exactly half its
+   height, which resolves to a circle without switching path primitives.
+   During focus both axes resolve against the live canvas dimensions so the
+   complete graph fills its available field without being cropped. */
+function topologyFrame(W,H){
+  const morph=smooth(VIEW_RADIUS.value);
+  const revealScale=0.16+0.84*smooth(VIEW_REVEAL.value);
+  const expanded=Math.max(W,H)*0.68*S.zoom;
+  const safeInset=clamp(Math.min(W,H)*0.035,12,24);
+  const lowerFieldHeight=H*0.475;
+  const focusedWidth=Math.max(1,W-safeInset*2)*S.zoom;
+  const focusedHeight=Math.max(1,lowerFieldHeight-safeInset*2)*S.zoom;
+  const focusedRadiusX=focusedWidth/1.916;
+  const focusedRadiusY=focusedHeight/1.916;
+  const radiusX=(expanded+(focusedRadiusX-expanded)*morph)*revealScale;
+  const radiusY=(expanded+(focusedRadiusY-expanded)*morph)*revealScale;
+  const radius=Math.min(radiusX,radiusY);
+  const width=radiusX*1.916;
+  const height=radiusY*1.916;
+  const circleCorner=expanded*0.958;
+  const rectangleCorner=clamp(Math.min(W,H)*0.065,22,38);
+  const corner=Math.min(
+    height*0.5,
+    circleCorner+(rectangleCorner-circleCorner)*morph
+  );
+  return {radius,radiusX,radiusY,width,height,corner};
+}
+
+window.addEventListener('message',event=>{
+  if(event.origin!==window.location.origin) return;
+  if(event.data?.type==='cyberatlas:set-focus'){
+    setFocusedRadius(Boolean(event.data.focused),event.data.delay,event.data.duration);
+  }
+  if(event.data?.type==='cyberatlas:set-lower-center'){
+    setLowerCenter(Boolean(event.data.lowered),event.data.delay,event.data.duration);
+  }
+  if(event.data?.type==='cyberatlas:set-reveal'){
+    const nextReveal=clamp(Number(event.data.progress)||0,0,1);
+    VIEW_REVEAL.value=nextReveal;
+    if(nextReveal>0.015&&!REVEAL_SEQUENCE_STARTED){
+      REVEAL_SEQUENCE_STARTED=true;
+      reseed(true);
+    }
+  }
+  if(event.data?.type==='cyberatlas:start-exploration'){
+    startExploration(event.data.turns);
+  }
+});
+
+/* ====================== 2D renderer ====================== */
+function drawSkitter2D(ctx,W,H,t){
+  ctx.fillStyle = S.fid==='faithful' ? '#020302' : '#241a2e';
+  ctx.fillRect(0,0,W,H);
+  const visualGraph=uu<0.5?GA:GB;
+  const cx=W/2, cy=H*VIEW_CENTER.value, frame=topologyFrame(W,H), R=frame.radius;
+  const rot=0.6+S.gyaw+AUTO_ROTATION.yaw+S.grol+AUTO_ROTATION.roll;
+  const ca=Math.cos(rot), sa=Math.sin(rot);
+  const n=GA.n, X=new Float64Array(n), Y=new Float64Array(n), L=new Float32Array(n);
+  for(let i=0;i<n;i++){
+    const s=lifeOf(i); L[i]=s;
+    const x=GA.x2[i]+(GB.x2[i]-GA.x2[i])*s, y=GA.y2[i]+(GB.y2[i]-GA.y2[i])*s;
+    X[i]=cx+(x*ca-y*sa)*frame.radiusX;
+    Y[i]=cy+(x*sa+y*ca)*frame.radiusY;
+  }
+  ctx.lineCap='round'; ctx.lineJoin='round';
+
+  const bkA=S.fid==='faithful'?GA.bkF:GA.bkS, bkB=S.fid==='faithful'?GB.bkF:GB.bkS;
+  for(let pass=0;pass<2;pass++){          // 0 = settled, 1 = mid-death (dimmer)
+    for(let b=0;b<BUCKETS;b++){
+      ctx.beginPath(); let any=false;
+      for(let i=1;i<n;i++){
+        const s=L[i], dying=(s>0.06&&s<0.94)?1:0;
+        if(dying!==pass) continue;
+        if((s<0.5?bkA[i-1]:bkB[i-1])!==b) continue;
+        const p=(s<0.5?GA:GB).par[i];
+        any=true; geoPath(ctx,X[p],Y[p],X[i],Y[i],cx,cy,R,S.bend);
+      }
+      if(!any) continue;
+      const f=b/(BUCKETS-1), a=pass? (1-S.twk*0.75):1;
+      if(S.fid==='faithful'){
+        ctx.strokeStyle=faithfulEdgeColor(visualGraph.analysisId,f,(0.30+0.35*f)*a);
+        ctx.lineWidth=0.55+f*0.5;
+      } else {
+        ctx.strokeStyle=`hsla(${(b*360/BUCKETS+12)%360},92%,58%,${0.42*a})`;
+        ctx.lineWidth=0.65;
+      }
+      ctx.stroke();
+    }
+  }
+  for(let i=0;i<n;i++){
+    const s=L[i], G0=s<0.5?GA:GB;
+    const roleBoost=G0.role[i]===3?0.22:(G0.role[i]>=2?0.14:0);
+    const d=Math.min(1,Math.log(G0.deg[i]+1)/Math.log(16)+roleBoost);
+    const life=1-S.twk*Math.sin(Math.PI*s);
+    const al=(0.5+0.45*d)*life;
+    if(al<0.02) continue;
+    ctx.fillStyle = S.fid==='faithful'
+      ? faithfulNodeColor(G0.analysisId,d,al)
+      : `hsla(${((G0.bh.get(G0.branch[i])||0)*360/G0.nb+12)%360},95%,${58+16*d}%,${al})`;
+    ctx.beginPath(); ctx.arc(X[i],Y[i],(0.5+d*2.6)*(0.35+0.65*life),0,6.2832); ctx.fill();
+  }
+}
+
+/* ====================== 3D renderer ====================== */
+let _xy=null,_lay=null,_bk=null,_tr=null,_cnt=null,_ord=null,_fast=false;
+function drawSkitter3D(ctx,W,H,t){
+  const n=GA.n, nE=n-1, A=GA.b3, B=GB.b3;
+  ctx.fillStyle = S.fid==='faithful' ? '#020302' : '#241a2e';
+  ctx.fillRect(0,0,W,H);
+  const visualGraph=uu<0.5?GA:GB;
+  const cx=W/2, cy=H*VIEW_CENTER.value, frame=topologyFrame(W,H);
+  const R=frame.radius, RX=frame.radiusX, RY=frame.radiusY;
+  const yaw=S.gyaw+AUTO_ROTATION.yaw, pit=clamp(S.gpit+AUTO_ROTATION.pitch,-1.45,1.45);
+  const rol=clamp(S.grol+AUTO_ROTATION.roll,-0.20,0.20);
+  const cA=Math.cos(yaw), sA=Math.sin(yaw), cB=Math.cos(pit), sB=Math.sin(pit);
+  const cC=Math.cos(rol), sC=Math.sin(rol);
+
+  const nP=nE*(SEG+1);
+  if(!_xy||_xy.length!==nP*2){ _xy=new Float32Array(nP*2); _lay=new Int8Array(nE);
+    _bk=new Int8Array(nE); _tr=new Int8Array(nE); _ord=new Int32Array(nE); }
+  const ea=A.ep, eb=B.ep;
+  const bkA=S.fid==='faithful'?GA.bkF:GA.bkS, bkB=S.fid==='faithful'?GB.bkF:GB.bkS;
+  for(let e=0;e<nE;e++){
+    const s=lifeOf(e+1);
+    _tr[e]=(s>0.06&&s<0.94)?1:0;
+    _bk[e]=s<0.5?bkA[e]:bkB[e];
+    let zs=0;
+    for(let k=0;k<=SEG;k++){
+      const o=(e*(SEG+1)+k)*3;
+      const x=ea[o]+(eb[o]-ea[o])*s, y=ea[o+1]+(eb[o+1]-ea[o+1])*s, z=ea[o+2]+(eb[o+2]-ea[o+2])*s;
+      const x1=x*cA+z*sA, z1=-x*sA+z*cA;
+      const y1=y*cB-z1*sB, z2=y*sB+z1*cB;
+      const x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
+      const q=(e*(SEG+1)+k)*2;
+      _xy[q]=cx+x2*RX; _xy[q+1]=cy-y2*RY; zs+=z2;
+    }
+    const z=zs/(SEG+1);
+    _lay[e]= z<-0.28?0:(z<0.28?1:2);
+  }
+
+  ctx.lineCap='round'; ctx.lineJoin='round';
+
+  if(GA.nx && !_fast){                    // peering links, behind everything
+    const xa=A.xp, xb=B.xp;
+    ctx.beginPath();
+    for(let i=0;i<GA.nx;i++){
+      const s=lifeOf(GA.cx[i]);
+      for(let k=0;k<=XSEG;k++){
+        const o=(i*(XSEG+1)+k)*3;
+        const x=xa[o]+(xb[o]-xa[o])*s, y=xa[o+1]+(xb[o+1]-xa[o+1])*s, z=xa[o+2]+(xb[o+2]-xa[o+2])*s;
+        const x1=x*cA+z*sA, z1=-x*sA+z*cA, y1=y*cB-z1*sB;
+        const x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
+        const sx=cx+x2*RX, sy=cy-y2*RY;
+        if(k===0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
+      }
+    }
+    ctx.strokeStyle = S.fid==='faithful'
+      ? (visualGraph.analysisLayout==='bridges'?'rgba(226,236,218,.16)':(visualGraph.analysisLayout==='communities'?'rgba(192,242,42,.16)':'rgba(168,242,42,.13)'))
+      : 'rgba(215,215,225,.12)';
+    ctx.lineWidth=0.5; ctx.stroke();
+  }
+
+  // counting-sort edges into (transit x depth x colour) groups: one stroke each
+  const NG=2*3*BUCKETS;
+  if(!_cnt||_cnt.length!==NG+1) _cnt=new Int32Array(NG+1);
+  if(_ord.length!==nE) _ord=new Int32Array(nE);
+  _cnt.fill(0);
+  const gid=e=>(_tr[e]*3+_lay[e])*BUCKETS+_bk[e];
+  for(let e=0;e<nE;e++) _cnt[gid(e)+1]++;
+  for(let g=0;g<NG;g++) _cnt[g+1]+=_cnt[g];
+  const put=_cnt.slice(0,NG);
+  for(let e=0;e<nE;e++) _ord[put[gid(e)]++]=e;
+  const LA=[0.45,0.78,1.0];
+  for(let g=0;g<NG;g++){
+    const s0=_cnt[g], s1=_cnt[g+1]; if(s1<=s0) continue;
+    const bk=g%BUCKETS, layer=((g/BUCKETS)|0)%3, tr=(g/(BUCKETS*3))|0;
+    ctx.beginPath();
+    for(let k=s0;k<s1;k++){
+      const e=_ord[k], base=e*(SEG+1)*2;
+      ctx.moveTo(_xy[base],_xy[base+1]);
+      for(let j=1;j<=SEG;j++) ctx.lineTo(_xy[base+j*2],_xy[base+j*2+1]);
+    }
+    const f=bk/(BUCKETS-1), a=LA[layer]*(tr? (1-S.twk*0.75):1);
+    if(S.fid==='faithful'){
+      ctx.strokeStyle=faithfulEdgeColor(visualGraph.analysisId,f,(0.26+0.34*f)*a);
+      ctx.lineWidth=(0.5+f*0.5)*(0.8+0.3*layer);
+    } else {
+      ctx.strokeStyle=`hsla(${(bk*360/BUCKETS+12)%360},92%,58%,${0.40*a})`;
+      ctx.lineWidth=0.62*(0.8+0.3*layer);
+    }
+    ctx.stroke();
+  }
+
+  const step=_fast&&n>2500?3:1;
+  for(let i=0;i<n;i+=step){
+    const s=lifeOf(i), G0=s<0.5?GA:GB;
+    const x=A.px[i]+(B.px[i]-A.px[i])*s, y=A.py[i]+(B.py[i]-A.py[i])*s, z=A.pz[i]+(B.pz[i]-A.pz[i])*s;
+    const x1=x*cA+z*sA, z1=-x*sA+z*cA;
+    const y1=y*cB-z1*sB, z2=y*sB+z1*cB;
+    const x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
+    const dep3=(z2+1)/2, roleBoost=G0.role[i]===3?0.22:(G0.role[i]>=2?0.14:0);
+    const d=Math.min(1,Math.log(G0.deg[i]+1)/Math.log(16)+roleBoost);
+    const life=1-S.twk*Math.sin(Math.PI*s);
+    const al=(0.30+0.55*d)*(0.35+0.75*dep3)*life;
+    if(al<0.02) continue;
+    ctx.fillStyle = S.fid==='faithful'
+      ? faithfulNodeColor(G0.analysisId,d,al)
+      : `hsla(${((G0.bh.get(G0.branch[i])||0)*360/G0.nb+12)%360},95%,${58+16*d}%,${al})`;
+    ctx.beginPath(); ctx.arc(cx+x2*RX, cy-y2*RY, (0.45+d*2.5)*(0.7+0.5*dep3)*(0.4+0.6*life),0,6.2832);
+    ctx.fill();
+  }
+
+  // The bridge analysis briefly exposes the actual analytical anchors as
+  // hairline boxes, echoing a machine-vision pass without turning the graph
+  // into a conventional labelled network chart.
+  if(GA.analysisLayout==='bridges'&&uu<0.72&&VIEW_REVEAL.value>0.62&&!_fast){
+    const annotationAlpha=smooth(clamp((VIEW_REVEAL.value-0.62)/0.28,0,1))*(1-smooth(uu/0.72));
+    const roots=GA.anchorIndexes.filter(anchor=>anchor.role!=='edge'&&anchor.role!=='bridge').slice(0,3);
+    const shared=GA.anchorIndexes.filter(anchor=>anchor.role==='bridge').slice(0,4);
+    ctx.save();
+    ctx.font='500 7px ui-sans-serif, -apple-system, Helvetica Neue, Arial, sans-serif';
+    ctx.textBaseline='middle';
+    for(const anchor of [...roots,...shared]){
+      const i=anchor.index, x=A.px[i], y=A.py[i], z=A.pz[i];
+      const x1=x*cA+z*sA, z1=-x*sA+z*cA;
+      const y1=y*cB-z1*sB;
+      const x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
+      const sx=cx+x2*RX, sy=cy-y2*RY;
+      const label=`AS${anchor.asn}`;
+      const width=Math.ceil(ctx.measureText(label).width)+10;
+      ctx.strokeStyle=`rgba(230,238,224,${0.34*annotationAlpha})`;
+      ctx.lineWidth=0.55;
+      ctx.strokeRect(sx-3,sy-6,width,12);
+      ctx.fillStyle=`rgba(240,245,237,${0.68*annotationAlpha})`;
+      ctx.fillText(label,sx+2,sy+0.5);
+    }
+    ctx.restore();
+  }
+}
+
+/* ============================== driver ============================== */
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const stage=document.getElementById('stage'), meta=document.getElementById('meta');
+const barFill=document.getElementById('barFill');
+const analysisHud=document.getElementById('analysisHud');
+const analysisKicker=document.getElementById('analysisKicker');
+const analysisTitle=document.getElementById('analysisTitle');
+let t0=performance.now(), tt=0, _dpr=1, _metaTxt='';
+let _hudSceneIndex=-1, _hudMetaKey='';
+
+function formatQueryTime(value){
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime())) return String(value||'SNAPSHOT').toUpperCase();
+  return `${date.getUTCFullYear()}.${String(date.getUTCMonth()+1).padStart(2,'0')}.${String(date.getUTCDate()).padStart(2,'0')} · ${String(date.getUTCHours()).padStart(2,'0')}:${String(date.getUTCMinutes()).padStart(2,'0')} UTC`;
+}
+
+function updateAnalysisHud(force=false){
+  const relativeIndex=uu>=0.52?1:0;
+  const sceneIndex=(ANALYSIS_SEQUENCE.index+relativeIndex)%TOPOLOGY_SCENES.length;
+  const scene=TOPOLOGY_SCENES[sceneIndex];
+  const metaKey=`${TOPOLOGY_META.source}:${TOPOLOGY_META.queryTime}:${TOPOLOGY_META.live}`;
+  if(!force&&sceneIndex===_hudSceneIndex&&metaKey===_hudMetaKey) return;
+  _hudSceneIndex=sceneIndex; _hudMetaKey=metaKey;
+  analysisKicker.textContent=`${TOPOLOGY_META.live?'LIVE OBSERVATION':'NETWORK SNAPSHOT'} · ${formatQueryTime(TOPOLOGY_META.queryTime)}`;
+  analysisTitle.textContent=scene.title;
+}
+
+function fit(){
+  const w=Math.max(1,stage.clientWidth), h=Math.max(1,stage.clientHeight);
+  const dpr=Math.min(2, window.devicePixelRatio||1);
+  cv.style.width=w+'px'; cv.style.height=h+'px';
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); _dpr=dpr;
+  render();
+}
+function render(){
+  ctx.setTransform(_dpr,0,0,_dpr,0,0);
+  const W=cv.width/_dpr, H=cv.height/_dpr;
+  (S.dim==='3d'?drawSkitter3D:drawSkitter2D)(ctx,W,H,tt);
+  const m=`${Number(TOPOLOGY_META.observedAsnCount||0).toLocaleString()} observed ASes · ${GA.n} representative nodes · `+
+    `${formatQueryTime(TOPOLOGY_META.queryTime)} · ${S.dim==='3d'?'Poincaré ball':'Poincaré disk'}`;
+  if(m!==_metaTxt){ _metaTxt=m; meta.textContent=m; }
+  updateAnalysisHud();
+  const hudReveal=smooth(clamp((VIEW_REVEAL.value-0.48)/0.42,0,1));
+  analysisHud.style.opacity=(hudReveal*0.88).toFixed(3);
+  analysisHud.classList.toggle('visible',hudReveal>0.02);
+  barFill.style.width=(S.live? uu*100:0).toFixed(1)+'%';
+}
+
+let raf=null;
+let lastSonificationUpdate=0;
+const AUTO_ROTATION={
+  yaw:0,pitch:0,roll:0,
+  fromYaw:0,fromPitch:0,fromRoll:0,
+  toYaw:0,toPitch:0,toRoll:0,
+  startedAt:0,duration:0,
+  nextAt:performance.now()+1400,
+  moving:false
+};
+const EXPLORATION_SEQUENCE={
+  active:false,
+  total:3,
+  completed:0,
+  nextAt:0
+};
+
+function startExploration(turns=3){
+  if(EXPLORATION_SEQUENCE.active) return;
+  absorbAutoRotation(0);
+  EXPLORATION_SEQUENCE.active=true;
+  EXPLORATION_SEQUENCE.total=clamp(Math.round(Number(turns)||3),2,3);
+  EXPLORATION_SEQUENCE.completed=0;
+  EXPLORATION_SEQUENCE.nextAt=performance.now()+120;
+  AUTO_ROTATION.nextAt=EXPLORATION_SEQUENCE.nextAt;
+
+  if(REDUCED_MOTION){
+    EXPLORATION_SEQUENCE.active=false;
+    window.parent.postMessage(
+      {type:'cyberatlas:exploration-complete',turns:EXPLORATION_SEQUENCE.total},
+      window.location.origin
+    );
+  }
+}
+
+function scheduleExplorationRotation(now){
+  const gestures=[
+    {yaw:0.88,pitch:-0.24,roll:0.07,duration:900},
+    {yaw:-1.16,pitch:0.31,roll:-0.10,duration:1040},
+    {yaw:0.96,pitch:-0.21,roll:0.06,duration:940}
+  ];
+  const gesture=gestures[EXPLORATION_SEQUENCE.completed%gestures.length];
+  AUTO_ROTATION.fromYaw=AUTO_ROTATION.yaw;
+  AUTO_ROTATION.fromPitch=AUTO_ROTATION.pitch;
+  AUTO_ROTATION.fromRoll=AUTO_ROTATION.roll;
+  AUTO_ROTATION.toYaw=AUTO_ROTATION.yaw+gesture.yaw;
+  AUTO_ROTATION.toPitch=clamp(
+    AUTO_ROTATION.pitch+gesture.pitch,
+    -1.08-S.gpit,
+    1.08-S.gpit
+  );
+  AUTO_ROTATION.toRoll=clamp(
+    AUTO_ROTATION.roll+gesture.roll,
+    -0.18-S.grol,
+    0.18-S.grol
+  );
+  AUTO_ROTATION.startedAt=now;
+  AUTO_ROTATION.duration=gesture.duration;
+  AUTO_ROTATION.moving=true;
+}
+
+function scheduleAutoRotation(now){
+  const direction=Math.random()<0.5?-1:1;
+  const broadTurn=Math.random()<0.22;
+  const yawDistance=direction*(broadTurn?0.82+Math.random()*0.58:0.20+Math.random()*0.62);
+  const pitchDistance=(Math.random()-0.5)*(0.18+Math.random()*0.50);
+  const rollDistance=(Math.random()-0.5)*(0.06+Math.random()*0.14);
+  AUTO_ROTATION.fromYaw=AUTO_ROTATION.yaw;
+  AUTO_ROTATION.fromPitch=AUTO_ROTATION.pitch;
+  AUTO_ROTATION.fromRoll=AUTO_ROTATION.roll;
+  AUTO_ROTATION.toYaw=AUTO_ROTATION.yaw+yawDistance;
+  AUTO_ROTATION.toPitch=clamp(
+    AUTO_ROTATION.pitch+pitchDistance,
+    -1.08-S.gpit,
+    1.08-S.gpit
+  );
+  AUTO_ROTATION.toRoll=clamp(
+    AUTO_ROTATION.roll+rollDistance,
+    -0.18-S.grol,
+    0.18-S.grol
+  );
+  AUTO_ROTATION.startedAt=now;
+  AUTO_ROTATION.duration=720+Math.random()*1180;
+  AUTO_ROTATION.moving=true;
+}
+
+function updateAutoRotation(now){
+  if(!S.anim||drag) return;
+  if(!AUTO_ROTATION.moving){
+    if(EXPLORATION_SEQUENCE.active){
+      if(now>=EXPLORATION_SEQUENCE.nextAt) scheduleExplorationRotation(now);
+    }else if(now>=AUTO_ROTATION.nextAt){
+      scheduleAutoRotation(now);
+    }
+    return;
+  }
+
+  const p=clamp((now-AUTO_ROTATION.startedAt)/AUTO_ROTATION.duration,0,1);
+  const eased=p*p*p*(p*(p*6-15)+10);
+  AUTO_ROTATION.yaw=AUTO_ROTATION.fromYaw+(AUTO_ROTATION.toYaw-AUTO_ROTATION.fromYaw)*eased;
+  AUTO_ROTATION.pitch=AUTO_ROTATION.fromPitch+(AUTO_ROTATION.toPitch-AUTO_ROTATION.fromPitch)*eased;
+  AUTO_ROTATION.roll=AUTO_ROTATION.fromRoll+(AUTO_ROTATION.toRoll-AUTO_ROTATION.fromRoll)*eased;
+  if(p>=1){
+    AUTO_ROTATION.moving=false;
+    if(EXPLORATION_SEQUENCE.active){
+      EXPLORATION_SEQUENCE.completed+=1;
+      if(EXPLORATION_SEQUENCE.completed>=EXPLORATION_SEQUENCE.total){
+        const completedTurns=EXPLORATION_SEQUENCE.total;
+        EXPLORATION_SEQUENCE.active=false;
+        AUTO_ROTATION.nextAt=now+2400;
+        window.parent.postMessage(
+          {type:'cyberatlas:exploration-complete',turns:completedTurns},
+          window.location.origin
+        );
+      }else{
+        EXPLORATION_SEQUENCE.nextAt=now+180;
+        AUTO_ROTATION.nextAt=EXPLORATION_SEQUENCE.nextAt;
+      }
+    }else{
+      AUTO_ROTATION.nextAt=now+1900+Math.random()*4300;
+    }
+  }
+}
+
+function absorbAutoRotation(delay=2600){
+  S.gyaw+=AUTO_ROTATION.yaw;
+  S.gpit=clamp(S.gpit+AUTO_ROTATION.pitch,-1.45,1.45);
+  S.grol=clamp(S.grol+AUTO_ROTATION.roll,-0.20,0.20);
+  AUTO_ROTATION.yaw=0;
+  AUTO_ROTATION.pitch=0;
+  AUTO_ROTATION.roll=0;
+  AUTO_ROTATION.fromYaw=0;
+  AUTO_ROTATION.fromPitch=0;
+  AUTO_ROTATION.fromRoll=0;
+  AUTO_ROTATION.toYaw=0;
+  AUTO_ROTATION.toPitch=0;
+  AUTO_ROTATION.toRoll=0;
+  AUTO_ROTATION.moving=false;
+  AUTO_ROTATION.nextAt=performance.now()+delay+Math.random()*2200;
+}
+
+function emitSonification(now){
+  if(window.parent===window || !GA || now-lastSonificationUpdate<58) return;
+  lastSonificationUpdate=now;
+  const graph=uu<0.5?GA:GB;
+  const phase=clamp(uu,0,1);
+  const pointIndex=Math.min(graph.n-1,Math.floor((((now*0.000071)+(graph.seed%997)/997)%1)*graph.n));
+  let degreeEnergy=0, radialEnergy=0, depthEnergy=0;
+  const sampleCount=12;
+  for(let j=0;j<sampleCount;j++){
+    const index=(pointIndex+j*347)%graph.n;
+    degreeEnergy+=Math.min(24,graph.deg[index]);
+    radialEnergy+=graph.rad[index];
+    depthEnergy+=graph.dep[index];
+  }
+  window.parent.postMessage({
+    type:'cyberatlas:sonify',
+    sample:{
+      seed:graph.seed,
+      nextSeed:GB.seed,
+      progress:phase,
+      nodeCount:graph.n,
+      maximumDepth:graph.maxDep,
+      pointIndex,
+      pointDepth:graph.dep[pointIndex],
+      pointDegree:graph.deg[pointIndex],
+      pointRadius:graph.rad[pointIndex],
+      degreeEnergy:degreeEnergy/sampleCount,
+      radialEnergy:radialEnergy/sampleCount,
+      depthEnergy:depthEnergy/sampleCount
+    }
+  },window.location.origin);
+}
+
+function loop(){
+  const now=performance.now();
+  tt=(now-t0)/1000;
+  if(S.live){
+    const elapsed=now-cycT0;
+    uu=elapsed<=ANALYSIS_SEQUENCE.holdMs
+      ? 0
+      : (elapsed-ANALYSIS_SEQUENCE.holdMs)/ANALYSIS_SEQUENCE.transitionMs;
+    if(uu>=1){ reseed(false); }            // the next analysis becomes the current one
+  }
+  updateFocusedRadius(now);
+  updateViewCenter(now);
+  updateAutoRotation(now);
+  render();
+  emitSonification(now);
+  raf = (S.live||S.anim) ? requestAnimationFrame(loop) : null;
+}
+function kick(){
+  if(!raf && (S.live||S.anim)) raf=requestAnimationFrame(loop);
+  else if(!S.live && !S.anim) render();
+}
+
+function seg(id,key,after){
+  document.getElementById(id).addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b));
+    S[key]=b.dataset.v; after&&after();
+  });
+}
+seg('segDim','dim',render);
+seg('segFid','fid',render);
+
+const sliders=[
+  ['sNodes','n','vNodes',v=>v|0,1],['sHub','hub','vHub',v=>+v,1],['sBias','bias','vBias',v=>+v,1],
+  ['sDecay','decay','vDecay',v=>+v,1],['sChain','chain','vChain',v=>+v,1],
+  ['sAlpha','alpha','vAlpha',v=>+v,1],['sSpread','spread','vSpread',v=>+v,1],
+  ['sCurv','curv','vCurv',v=>+v,1],['sBend','bend','vBend',v=>+v,1],['sGap','gap','vGap',v=>+v,1],
+  ['sCross','cross','vCross',v=>+v,1],['sJit','jit','vJit',v=>+v,1],
+  ['sCycle','cycle','vCycle',v=>+v,0],['sWin','win','vWin',v=>+v,0],
+  ['sTwk','twk','vTwk',v=>+v,0],['sCoh','coh','vCoh',v=>+v,2],
+];
+for(const [id,key,out,cast,mode] of sliders){
+  const el=document.getElementById(id);
+  el.addEventListener('input',()=>{
+    S[key]=cast(el.value);
+    document.getElementById(out).textContent =
+      key==='n' ? S.n : (key==='cycle' ? S.cycle.toFixed(1)+'s' : (+S[key]).toFixed(2));
+    if(mode===1) rebuildBoth();
+    else if(mode===2) setPhases();
+    if(!raf) render();
+  });
+}
+document.getElementById('cLive').addEventListener('change',e=>{
+  S.live=e.target.checked;
+  if(S.live) cycT0=performance.now()-(uu>0?ANALYSIS_SEQUENCE.holdMs+uu*ANALYSIS_SEQUENCE.transitionMs:0);
+  else uu=0;
+  kick(); if(!raf) render();
+});
+document.getElementById('cAnim').addEventListener('change',e=>{
+  S.anim=e.target.checked;
+  if(!S.anim) absorbAutoRotation();
+  t0=performance.now()-tt*1000; kick(); if(!raf) render();
+});
+document.getElementById('bSkip').addEventListener('click',()=>{ reseed(false); if(!raf) render(); });
+document.getElementById('bRegen').addEventListener('click',()=>{
+  S.seed=(Math.random()*2e9)|0; reseed(true); if(!raf) render();
+});
+document.getElementById('bPng').addEventListener('click',()=>{
+  const w=parseFloat(cv.style.width)*2;
+  const o=document.createElement('canvas'); o.width=w; o.height=w;
+  (S.dim==='3d'?drawSkitter3D:drawSkitter2D)(o.getContext('2d'),w,w,tt);
+  const a=document.createElement('a');
+  a.download=`hyperbolic-${S.dim}-${GA.seed}.png`; a.href=o.toDataURL('image/png'); a.click();
+});
+
+/* drag to rotate, scroll to zoom */
+let drag=null;
+let lastInteractionMessage=0;
+function emitInteraction(phase='activity',detail={}){
+  if(window.parent===window) return;
+  const now=performance.now();
+  if(phase==='activity'&&now-lastInteractionMessage<72) return;
+  lastInteractionMessage=now;
+  window.parent.postMessage({type:'cyberatlas:interaction',phase,...detail},window.location.origin);
+}
+cv.addEventListener('pointerdown',e=>{
+  emitInteraction('start');
+  absorbAutoRotation(3200);
+  drag={x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,a:S.gyaw,b:S.gpit};
+  cv.setPointerCapture(e.pointerId); cv.classList.add('grabbing');
+});
+cv.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  const deltaX=e.clientX-drag.lastX, deltaY=e.clientY-drag.lastY;
+  drag.lastX=e.clientX; drag.lastY=e.clientY;
+  emitInteraction('activity',{scrubDelta:-deltaY,input:'pointer',deltaX,deltaY});
+  S.gyaw=drag.a+(e.clientX-drag.x)/180;
+  S.gpit=clamp(drag.b+(e.clientY-drag.y)/180,-1.45,1.45);
+  _fast=GA.n>2200; if(!raf) render();
+});
+const stop=()=>{ if(drag){ drag=null; cv.classList.remove('grabbing'); _fast=false; emitInteraction('end'); if(!raf) render(); } };
+cv.addEventListener('pointerup',stop); cv.addEventListener('pointercancel',stop);
+cv.addEventListener('wheel',e=>{
+  e.preventDefault();
+  emitInteraction('activity',{scrubDelta:e.deltaY*0.55,input:'wheel',deltaY:e.deltaY});
+  S.zoom=clamp(S.zoom*(e.deltaY>0?0.92:1.087),0.45,4);
+  if(!raf) render();
+},{passive:false});
+window.addEventListener('keydown',e=>{
+  emitInteraction('activity');
+  if(e.key==='r'||e.key==='R'){
+    S.gyaw=0.6; S.gpit=0.28; S.grol=0; S.zoom=1;
+    AUTO_ROTATION.yaw=0; AUTO_ROTATION.pitch=0; AUTO_ROTATION.roll=0; AUTO_ROTATION.moving=false;
+    AUTO_ROTATION.nextAt=performance.now()+1800;
+    if(!raf) render();
+  }
+});
+window.addEventListener('resize',fit);
+
+reseed(true); fit(); kick(); loadLiveTopology();
+</script>
+</body>
+</html>

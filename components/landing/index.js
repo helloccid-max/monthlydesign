@@ -3,7 +3,7 @@ import styles from './styles.module.css';
 
 const cx = (...names) => names.filter(Boolean).map((n) => styles[n]).filter(Boolean).join(' ');
 
- export default function LandingScreen({ onNext } = {}) {
+export default function LandingScreen({ onNext } = {}) {
   const {
     phase,
     blurPx,
@@ -28,6 +28,26 @@ const cx = (...names) => names.filter(Boolean).map((n) => styles[n]).filter(Bool
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      <div className={styles['landing-field']} aria-hidden="true">
+        <span className={styles['landing-orb']} />
+      </div>
+
+      <header className={styles['landing-masthead']} aria-hidden="true">
+        <span className={styles['landing-issue']}>277</span>
+        <p className={styles['landing-kicker']}>
+          <span /> a generative homage to contemporary design
+        </p>
+        <h1 className={styles['landing-brand']}>
+          design <em>after</em>
+        </h1>
+        <p className={styles['landing-meta']}>Archive / Prompt / Generative Cover / 2026</p>
+      </header>
+
+      <section className={styles['landing-feature']} aria-hidden="true">
+        <small>GENERATIVE COVER LAB</small>
+        <p>월간디자인 표지를 고르고<br />당신의 언어로 다시 디자인하세요.</p>
+      </section>
+
       <div className={styles['landing-indicator']}>
         <span className={cx('landing-dot', 'active')} aria-current="true" />
         <span className={styles['landing-dot']} />
@@ -57,7 +77,7 @@ const cx = (...names) => names.filter(Boolean).map((n) => styles[n]).filter(Bool
           {phase === 0 ? (
             <>
               <span className={styles['landing-cta-line1']}>위로 스크롤 하여</span>
-              <span className={styles['landing-cta-line2']}>체험을 시작하기</span>
+              <span className={styles['landing-cta-line2']}>표지 아카이브 열기</span>
             </>
           ) : (
             <>
@@ -70,4 +90,3 @@ const cx = (...names) => names.filter(Boolean).map((n) => styles[n]).filter(Bool
     </div>
   );
 }
-

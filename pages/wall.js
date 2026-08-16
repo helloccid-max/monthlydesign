@@ -5,10 +5,9 @@ export default function Wall() {
   return (
     <>
       <Head>
-        <title>WALL | Platform L</title>
+        <title>Data Universe | Monthly Design Homage</title>
       </Head>
       <WallScreen />
     </>
   );
 }
-

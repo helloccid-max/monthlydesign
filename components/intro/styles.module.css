@@ -1,0 +1,307 @@
+@font-face {
+  font-family: 'Black Han Sans Intro';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/black-han-sans-title.woff2') format('woff2');
+  unicode-range: U+20, U+acfc, U+ad6c, U+b2e8, U+b3d9, U+b85c, U+bcf4, U+c11c, U+c544, U+c5d0, U+c758, U+c815, U+c870, U+cc98, U+d0a4, U+d14d, U+d310, U+d589;
+}
+
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-tight-latin-variable.woff2') format('woff2-variations');
+}
+
+.page {
+  position: relative;
+  width: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #020702;
+  color: var(--editorial-bone);
+  cursor: pointer;
+  isolation: isolate;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #020702;
+  will-change: transform;
+}
+
+.cyberAtlasBackground {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #020702;
+  opacity: 0;
+  transition: opacity 1100ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity;
+}
+
+.page[data-started='true'] .cyberAtlasBackground {
+  opacity: 1;
+}
+
+.coverFilm {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  width: min(100vw, 74.2778dvh);
+  height: auto;
+  aspect-ratio: 1337 / 1800;
+  place-items: center;
+  overflow: visible;
+  background: transparent;
+  translate: -50% -50%;
+  transform: translate3d(0, 120dvh, 0) scale(0.35);
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.page[data-engaged='true'][data-started='false'] .coverFilm {
+  animation: coverArrival 3600ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
+}
+
+.coverCard {
+  position: absolute;
+  inset: 0;
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.42);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.page[data-engaged='true'] .coverCard {
+  animation: coverFlip 1650ms cubic-bezier(0.65, 0, 0.35, 1) 3100ms forwards;
+}
+
+.coverFace {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #020302;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.coverFront {
+  transform: rotateY(0deg) translateZ(0.1px);
+}
+
+.coverBack {
+  background: #1f4bff;
+  transform: rotateY(180deg) translateZ(0.1px);
+}
+
+.coverImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+@keyframes coverArrival {
+  0% {
+    transform: translate3d(0, 120dvh, 0) scale(0.35);
+  }
+
+  72% {
+    transform: translate3d(0, 14dvh, 0) scale(0.637);
+  }
+
+  88% {
+    transform: translate3d(0, 1.4dvh, 0) scale(0.693);
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.7);
+  }
+}
+
+@keyframes coverFlip {
+  0% {
+    transform: perspective(1400px) rotateY(0deg) scale(1);
+  }
+
+  42% {
+    transform: perspective(1400px) rotateY(72deg) scale(0.965);
+  }
+
+  100% {
+    transform: perspective(1400px) rotateY(180deg) scale(0.88);
+  }
+}
+
+.statement {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 4;
+  box-sizing: border-box;
+  height: 52.5%;
+  overflow: hidden;
+  padding: max(126px, 17.5dvh) var(--flow-gutter-wide) clamp(20px, 3vh, 36px);
+  background: #b4fa39;
+  color: #070906;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  will-change: transform;
+}
+
+.statement h1 {
+  position: relative;
+  margin: 0;
+  padding-left: clamp(12px, 2.8vw, 18px);
+  font-family: 'Black Han Sans Intro', 'Black Han Sans', var(--editorial-sans);
+  font-size: clamp(2.236rem, 10.14vw, 3.9rem);
+  font-weight: 400;
+  line-height: 0.99;
+  letter-spacing: -0.055em;
+  word-break: keep-all;
+  will-change: transform;
+}
+
+.statement h1::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.08em;
+  bottom: 0.11em;
+  width: 2px;
+  background: currentColor;
+}
+
+.statement h1 span {
+  display: block;
+  white-space: nowrap;
+}
+
+.statement h1 span + span {
+  padding-left: clamp(7px, 1.6vw, 12px);
+}
+
+.translation {
+  position: absolute;
+  left: calc(var(--flow-gutter-wide) + clamp(22px, 4vw, 56px));
+  bottom: clamp(18px, 3.6dvh, 30px);
+  margin: 0;
+  padding-left: clamp(9px, 2.1vw, 13px);
+  font-family: Inter, 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
+  font-size: clamp(0.756rem, 3.15vw, 1.116rem);
+  font-weight: 650;
+  line-height: 1.42;
+  letter-spacing: 0.045em;
+  will-change: transform;
+}
+
+.translation::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.08em;
+  bottom: 0.11em;
+  width: 1px;
+  background: currentColor;
+}
+
+.translation span {
+  display: block;
+  white-space: nowrap;
+}
+
+.translation span + span {
+  padding-left: clamp(5px, 1.25vw, 9px);
+}
+
+.startPrompt {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.96);
+  font-family: 'Inter Tight', Inter, 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
+  font-size: 0.9757rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.startPrompt > span {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+  min-height: 48px;
+  padding: 0 clamp(12px, 4vw, 22px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-50%);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.52);
+  transition:
+    transform 480ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 160ms ease;
+}
+
+.startPrompt:active > span {
+  transform: translateX(-50%) scale(0.97);
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.startPrompt:focus-visible {
+  outline: none;
+}
+
+.startPrompt:focus-visible > span {
+  outline: 2px solid rgba(147, 174, 208, 0.9);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .startPrompt:hover > span {
+    color: #fff;
+  }
+}
+
+.page[data-engaged='true'] .startPrompt {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.page[data-engaged='true'] .startPrompt > span {
+  transform: translate(-50%, 12px);
+}
+
+@media (max-height: 680px) {
+  .statement {
+    padding-top: max(102px, 16dvh);
+  }
+
+  .statement h1 {
+    font-size: clamp(1.62rem, 7.5vw, 2.75rem);
+  }
+}

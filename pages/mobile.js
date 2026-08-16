@@ -5,10 +5,9 @@ export default function Mobile() {
   return (
     <>
       <Head>
-        <title>Mobile | Platform L</title>
+        <title>Design After Prompt | Monthly Design Homage</title>
       </Head>
       <MobileScreen />
     </>
   );
 }
-

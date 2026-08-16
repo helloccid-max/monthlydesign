@@ -564,4 +564,3 @@ export function createTreePointCloud(options, colorState) {
     leafPoints: anchoredLeafPoints,
   };
 }
-

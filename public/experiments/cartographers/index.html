@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ko" class="hide-opening-film">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#020302" />
+    <title>Cartographers of Agency</title>
+    <link rel="stylesheet" href="/experiments/cartographers/assets/index-E0odCVNX.css" />
+    <style>
+      @font-face {
+        font-family: "Inter Tight System";
+        src: url("/fonts/inter-tight-latin-variable.woff2") format("woff2-variations");
+        font-weight: 100 900;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        --bg: #020302;
+        --panel: #070b06;
+        --ink: #f1f1e9;
+        --ink2: #a5aa9f;
+        --rule: #26331d;
+        --lat: #26341e;
+        --lat2: #405234;
+        --c-blue: #8ca5a1;
+        --c-sage: #a8f22a;
+        --c-green-hi: #d2ff85;
+        --c-orange: #b9a881;
+        --c-yellow: #d1d59b;
+        --c-lavender: #aaa8b8;
+        --c-red: #d96b55;
+        --c-neutral: #aaa99f;
+        --serif: "Iowan Old Style", "Bodoni 72", Didot, "Times New Roman", serif;
+        --sans: "Inter Tight System", Inter, "Helvetica Neue", Helvetica, Arial,
+          "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      }
+
+      html,
+      body {
+        background: var(--bg);
+        font-family: var(--sans);
+        overscroll-behavior: none;
+        scrollbar-width: none;
+      }
+
+      body::-webkit-scrollbar {
+        display: none;
+      }
+
+      .meta,
+      .title-main,
+      .legend,
+      .timeline,
+      .film-play-label,
+      .hint {
+        font-family: var(--sans);
+      }
+
+      .pivot,
+      .statement,
+      .final-block {
+        color: var(--ink);
+      }
+
+      .film-play-label,
+      .hint {
+        display: none !important;
+      }
+
+      html.hide-opening-film .film-canvas,
+      html.hide-opening-film .title-block,
+      html.hide-opening-film .meta,
+      html.hide-opening-film .epigraph {
+        visibility: hidden !important;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div id="poster-root"></div>
+    <script type="module" src="/experiments/cartographers/assets/index-BhCGndn4.js"></script>
+    <script>
+      (() => {
+        const clamp = (value) => Math.min(1, Math.max(0, Number(value) || 0));
+        let programmatic = false;
+        let scheduled = 0;
+        let completionArmTimer = 0;
+        let completionArmed = false;
+        let completionSent = false;
+        let touchStartY = 0;
+        let touchStartedAtEnd = false;
+
+        const scrollRange = () => {
+          const root = document.querySelector('.scroll-root');
+          return Math.max(1, (root?.offsetHeight || document.documentElement.scrollHeight) - innerHeight);
+        };
+
+        const progress = () => clamp(scrollY / scrollRange());
+
+        const applyOpeningState = (value) => {
+          document.documentElement.classList.toggle('hide-opening-film', value < 0.24);
+        };
+
+        const report = () => {
+          if (programmatic) return;
+          const value = progress();
+          applyOpeningState(value);
+          if (value < 0.995) {
+            completionArmed = false;
+            completionSent = false;
+          }
+          parent.postMessage(
+            { type: 'cartographers:progress', progress: value },
+            location.origin
+          );
+        };
+
+        const complete = () => {
+          if (completionSent) return;
+          completionSent = true;
+          parent.postMessage({ type: 'cartographers:complete' }, location.origin);
+        };
+
+        const setProgress = (value, attempt = 0) => {
+          const root = document.querySelector('.scroll-root');
+          if (!root && attempt < 20) {
+            requestAnimationFrame(() => setProgress(value, attempt + 1));
+            return;
+          }
+          const next = clamp(value);
+          applyOpeningState(next);
+          const target = next * scrollRange();
+          if (Math.abs(scrollY - target) < 1) return;
+          programmatic = true;
+          scrollTo(0, target);
+          requestAnimationFrame(() => {
+            programmatic = false;
+          });
+        };
+
+        addEventListener('message', (event) => {
+          if (event.origin !== location.origin) return;
+          if (event.data?.type !== 'cartographers:set-progress') return;
+          setProgress(event.data.progress);
+        });
+
+        addEventListener('scroll', () => {
+          cancelAnimationFrame(scheduled);
+          scheduled = requestAnimationFrame(report);
+          clearTimeout(completionArmTimer);
+          completionArmTimer = setTimeout(() => {
+            completionArmed = progress() >= 0.995;
+          }, 140);
+        }, { passive: true });
+
+        addEventListener('wheel', (event) => {
+          if (completionArmed && event.deltaY > 0) complete();
+        }, { passive: true });
+
+        addEventListener('touchstart', (event) => {
+          touchStartY = event.touches[0]?.clientY || 0;
+          touchStartedAtEnd = completionArmed && progress() >= 0.995;
+        }, { passive: true });
+
+        addEventListener('touchmove', (event) => {
+          const currentY = event.touches[0]?.clientY || touchStartY;
+          if (touchStartedAtEnd && touchStartY - currentY > 32) complete();
+        }, { passive: true });
+
+        addEventListener('touchend', () => {
+          completionArmed = progress() >= 0.995;
+          touchStartedAtEnd = false;
+        }, { passive: true });
+
+        addEventListener('load', () => {
+          applyOpeningState(progress());
+          parent.postMessage({ type: 'cartographers:ready' }, location.origin);
+        });
+      })();
+    </script>
+  </body>
+</html>

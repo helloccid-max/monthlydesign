@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
-export function useLoadLogic({ onDone } = {}) {
+export function useLoadLogic({ onDone, paused = false } = {}) {
   const router = useRouter();
 
   const goDone = useCallback(() => {
@@ -29,10 +29,10 @@ export function useLoadLogic({ onDone } = {}) {
   }, []);
 
   useEffect(() => {
+    if (paused) return undefined;
     const t = setTimeout(() => {
       goDone();
-    }, 6000);
+    }, 8000);
     return () => clearTimeout(t);
-  }, [goDone]);
+  }, [goDone, paused]);
 }
-

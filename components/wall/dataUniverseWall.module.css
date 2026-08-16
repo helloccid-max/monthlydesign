@@ -1,0 +1,47 @@
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  min-height: 100vh;
+  overflow: hidden;
+  pointer-events: auto;
+  background: var(--editorial-black);
+}
+
+.root::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle at 50% 58%, rgba(168, 242, 42, 0.025), transparent 48%);
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  transition: background 1.2s ease, opacity 1.2s ease;
+}
+
+.root[data-mode='active']::after {
+  background:
+    radial-gradient(circle at 54% 54%, rgba(129, 228, 255, 0.11), transparent 34%),
+    radial-gradient(circle at 50% 58%, rgba(168, 242, 42, 0.06), transparent 54%);
+  opacity: 1;
+}
+
+.root[data-mode='archive']::after {
+  background:
+    radial-gradient(ellipse at 48% 54%, rgba(129, 228, 255, 0.085), transparent 48%),
+    linear-gradient(180deg, rgba(10, 27, 30, 0.1), rgba(0, 0, 0, 0.18));
+  opacity: 0.84;
+}
+
+.root canvas {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  filter: none;
+}
