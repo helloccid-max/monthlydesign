@@ -5,6 +5,8 @@ const INTRO_IDLE_MS = 1800;
 const INTRO_AUTO_ADVANCE_ENABLED = false;
 const COVER_ENTRY_DURATION_MS = 3600;
 const COVER_CENTER_HOLD_MS = 3000;
+const COVER_GLARE_DELAY_MS = COVER_ENTRY_DURATION_MS + 420;
+const COVER_GLARE_DURATION_MS = 2200;
 const COVER_FLIP_START_MS = COVER_ENTRY_DURATION_MS + COVER_CENTER_HOLD_MS;
 const COVER_FLIP_DURATION_MS = 1350;
 const COVER_BACK_HOLD_MS = 5000;
@@ -493,6 +495,8 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
               style={{
                 '--cover-flip-delay': `${COVER_FLIP_START_MS}ms`,
                 '--cover-flip-duration': `${COVER_FLIP_DURATION_MS}ms`,
+                '--cover-glare-delay': `${COVER_GLARE_DELAY_MS}ms`,
+                '--cover-glare-duration': `${COVER_GLARE_DURATION_MS}ms`,
               }}
             >
               <div className={`${styles.coverFace} ${styles.coverFront}`}>

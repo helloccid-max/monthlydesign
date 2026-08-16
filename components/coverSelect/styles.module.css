@@ -673,30 +673,32 @@
 .permissionMicIcon {
   position: relative;
   flex: none;
-  width: 18px;
-  height: 21px;
+  width: 15.84px;
+  height: 18.48px;
+  align-self: center;
   color: currentColor;
+  transform: translateY(-0.3px);
 }
 
 .permissionMicIcon::before {
   content: '';
   position: absolute;
-  left: 5.5px;
-  top: 1px;
-  width: 7px;
-  height: 11px;
-  border: 1.4px solid currentColor;
+  left: 4.84px;
+  top: 0.88px;
+  width: 6.16px;
+  height: 9.68px;
+  border: 1.23px solid currentColor;
   border-radius: 999px;
 }
 
 .permissionMicIcon::after {
   content: '';
   position: absolute;
-  left: 2px;
-  top: 7.5px;
-  width: 14px;
-  height: 8px;
-  border: 1.4px solid currentColor;
+  left: 1.76px;
+  top: 6.6px;
+  width: 12.32px;
+  height: 7.04px;
+  border: 1.23px solid currentColor;
   border-top: 0;
   border-radius: 0 0 999px 999px;
 }
@@ -705,8 +707,8 @@
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: 1.4px;
-  height: 5px;
+  width: 1.23px;
+  height: 4.4px;
   background: currentColor;
   transform: translateX(-50%);
 }
@@ -716,8 +718,8 @@
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: 8px;
-  height: 1.4px;
+  width: 7.04px;
+  height: 1.23px;
   border-radius: 999px;
   background: currentColor;
   transform: translateX(-50%);
