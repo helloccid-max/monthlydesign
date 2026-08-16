@@ -54,7 +54,8 @@
   #analysisHud.visible{transform:translate3d(0,0,0)}
   #analysisKicker{font-size:8px;font-weight:560;line-height:1.2;letter-spacing:.14em;text-transform:uppercase;
     color:#fff}
-  #analysisTitle{font-size:11px;font-weight:520;line-height:1.15;letter-spacing:.075em}
+  #analysisTitle{font-size:11px;font-weight:520;line-height:1.15;letter-spacing:.075em;
+    color:rgba(214,214,216,.88)}
   @media (max-width:820px){body{flex-direction:column;overflow:auto}
     #panel{width:100%;flex:none;height:auto;border-right:none;border-bottom:1px solid var(--line)}
     #stage{height:70vh}}
@@ -1287,7 +1288,7 @@ function coverThumbnail(src){
 }
 
 function drawCoverThumbnails(ctx,graph,W,H,cx,cy,RX,RY){
-  if(_fast||!graph.coverImageUrls?.length) return;
+  if(!graph.coverImageUrls?.length) return;
   const candidates=[];
   for(let i=0;i<graph.n;i++){
     const src=graph.coverImageUrls[i];
@@ -1469,6 +1470,26 @@ function drawSkitter3D(ctx,W,H,t){
     _nodeZ[i]=z2; _nodeP[i]=perspective; _nodeBin[i]=depthBin;
     _nodeCount[depthBin+1]++; nodeCount++;
   }
+  // Dragging keeps the heavy point cloud on a reduced sampling step, but the
+  // cover planes must remain fully projected so the archive reads as one
+  // coherent 3D object instead of disappearing during interaction.
+  if(_fast&&visualGraph.coverImageUrls?.length){
+    for(let i=0;i<n;i++){
+      if(i%step===0||!visualGraph.coverImageUrls[i]) continue;
+      const s=lifeOf(i);
+      const x=A.px[i]+(B.px[i]-A.px[i])*s;
+      const y=A.py[i]+(B.py[i]-A.py[i])*s;
+      const z=A.pz[i]+(B.pz[i]-A.pz[i])*s;
+      const x1=x*cA+z*sA, z1=-x*sA+z*cA;
+      const y1=y*cB-z1*sB, z2=y*sB+z1*cB;
+      const x2=x1*cC-y1*sC, y2=x1*sC+y1*cC;
+      const perspective=walrusPerspective(z2);
+      _nodeX[i]=cx+x2*RX*perspective;
+      _nodeY[i]=cy-y2*RY*perspective;
+      _nodeZ[i]=z2;
+      _nodeP[i]=perspective;
+    }
+  }
   for(let bin=0;bin<WALRUS_CAMERA.depthBins;bin++) _nodeCount[bin+1]+=_nodeCount[bin];
   const nodePut=_nodeCount.slice(0,WALRUS_CAMERA.depthBins);
   for(let i=0;i<n;i+=step) _nodeOrder[nodePut[_nodeBin[i]]++]=i;
@@ -1581,6 +1602,7 @@ function render(){
 
 let raf=null;
 let lastSonificationUpdate=0;
+const SONIFICATION_LEAD_MS=100;
 const AUTO_ROTATION={
   yaw:0,pitch:0,roll:0,
   fromYaw:0,fromPitch:0,fromRoll:0,
@@ -1745,9 +1767,15 @@ function absorbAutoRotation(delay=2600){
 function emitSonification(now){
   if(window.parent===window || !GA || now-lastSonificationUpdate<58) return;
   lastSonificationUpdate=now;
-  const graph=uu<0.5?GA:GB;
-  const phase=clamp(uu,0,1);
-  const pointIndex=Math.min(graph.n-1,Math.floor((((now*0.000071)+(graph.seed%997)/997)%1)*graph.n));
+  // Compensate for iframe messaging and Web Audio output latency by sampling
+  // the topology state 100ms ahead of the current rendered frame.
+  const sonicNow=now+SONIFICATION_LEAD_MS;
+  const sonicPhase=S.live
+    ? clamp((sonicNow-cycT0-ANALYSIS_SEQUENCE.holdMs)/ANALYSIS_SEQUENCE.transitionMs,0,1)
+    : clamp(uu,0,1);
+  const graph=sonicPhase<0.5?GA:GB;
+  const phase=sonicPhase;
+  const pointIndex=Math.min(graph.n-1,Math.floor((((sonicNow*0.000071)+(graph.seed%997)/997)%1)*graph.n));
   let degreeEnergy=0, radialEnergy=0, depthEnergy=0;
   const sampleCount=12;
   for(let j=0;j<sampleCount;j++){
