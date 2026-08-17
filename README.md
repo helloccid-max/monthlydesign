@@ -78,3 +78,10 @@ Vercel 프로젝트와 GitHub 저장소를 한 번 연결하면 `main` 푸시는
 OpenAI 텍스트 정규화 기능을 사용할 때만 해당 API 환경 변수를 Vercel Project
 Settings에 추가합니다. `server.js`의 Socket.IO는 로컬/상시 실행 서버용이므로,
 Vercel에서는 `/mobile`과 일반 Next.js API를 우선 배포 대상으로 봅니다.
+
+## RunPod 조건부 워밍
+
+첫 `Tap to Play`에서 RunPod를 무조건 호출하지 않고, Redis의 마지막 정상 생성
+시각과 현재 워밍 잠금을 확인한 뒤 필요한 경우에만 백그라운드 워밍을
+요청합니다. 실제 생성 성공도 같은 상태를 갱신합니다. 자세한 설정과 RunPod 워커
+계약은 [`RUNPOD_WARMUP.md`](./RUNPOD_WARMUP.md)를 참고하세요.

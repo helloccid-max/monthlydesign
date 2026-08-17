@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { startRunPodPrewarm } from '@/lib/runpod/prewarmClient';
 import styles from './styles.module.css';
 
 const INTRO_IDLE_MS = 1800;
@@ -446,6 +447,8 @@ export default function IntroScreen({
     if (!engaged) {
       if (!soundEngineRef.current) soundEngineRef.current = createCyberAtlasSoundEngine();
       soundEngineRef.current?.start({ muted: true }).catch(() => {});
+      // The call is best-effort: the intro never waits for RunPod or Redis.
+      startRunPodPrewarm();
       setEngaged(true);
       return;
     }

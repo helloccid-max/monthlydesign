@@ -1,5 +1,6 @@
 import { runpodFetch } from "@/lib/runpod/fetch";
 import { normalizeImagesFromOutput } from "@/lib/runpod/normalizeImages";
+import { recordSuccessfulRunPodGeneration } from "@/lib/runpod/warmupServer";
 
 function json(res, status, data) {
   res.setHeader("cache-control", "no-store, max-age=0");
@@ -26,6 +27,10 @@ export default async function handler(req, res) {
     const delayTime = st?.delayTime ?? st?.delay_time ?? null;
     const executionTime = st?.executionTime ?? st?.execution_time ?? null;
     const workerId = st?.workerId ?? st?.worker_id ?? null;
+
+    if (String(st?.status || "").toUpperCase() === "COMPLETED") {
+      await recordSuccessfulRunPodGeneration({ endpointId, jobId: id, workerId });
+    }
 
     return json(res, 200, {
       id,
