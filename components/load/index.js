@@ -87,36 +87,6 @@ function CoverParticleSphere({ imageUrls, seed }) {
       context.imageSmoothingQuality = 'high';
     };
 
-    const loadBitmap = (source, index) => {
-      const image = new Image();
-      image.decoding = 'async';
-      image.src = source;
-      image.onload = () => {
-        if (destroyed) return;
-        const aspect = image.naturalWidth / Math.max(1, image.naturalHeight);
-        const bitmap = document.createElement('canvas');
-        if (aspect >= 1) {
-          bitmap.width = BITMAP_MAX;
-          bitmap.height = Math.max(1, Math.round(BITMAP_MAX / aspect));
-        } else {
-          bitmap.height = BITMAP_MAX;
-          bitmap.width = Math.max(1, Math.round(BITMAP_MAX * aspect));
-        }
-        const bitmapContext = bitmap.getContext('2d');
-        if (!bitmapContext) {
-          bitmaps[index] = image;
-          return;
-        }
-        bitmapContext.imageSmoothingEnabled = true;
-        bitmapContext.imageSmoothingQuality = 'high';
-        bitmapContext.drawImage(image, 0, 0, bitmap.width, bitmap.height);
-        bitmaps[index] = bitmap;
-      };
-    };
-
-    imageUrls.forEach(loadBitmap);
-    resize();
-
     const draw = (time) => {
       if (destroyed) return;
       const delta = Math.min(0.05, Math.max(0.001, (time - previousTime) / 1000));
@@ -186,6 +156,42 @@ function CoverParticleSphere({ imageUrls, seed }) {
       if (!reduceMotion) frameId = window.requestAnimationFrame(draw);
     };
 
+    const loadBitmap = (source, index) => {
+      const image = new Image();
+      image.decoding = 'async';
+      image.onload = () => {
+        if (destroyed) return;
+        const aspect = image.naturalWidth / Math.max(1, image.naturalHeight);
+        const bitmap = document.createElement('canvas');
+        if (aspect >= 1) {
+          bitmap.width = BITMAP_MAX;
+          bitmap.height = Math.max(1, Math.round(BITMAP_MAX / aspect));
+        } else {
+          bitmap.height = BITMAP_MAX;
+          bitmap.width = Math.max(1, Math.round(BITMAP_MAX * aspect));
+        }
+        const bitmapContext = bitmap.getContext('2d');
+        if (!bitmapContext) {
+          bitmaps[index] = image;
+        } else {
+          bitmapContext.imageSmoothingEnabled = true;
+          bitmapContext.imageSmoothingQuality = 'high';
+          bitmapContext.drawImage(image, 0, 0, bitmap.width, bitmap.height);
+          bitmaps[index] = bitmap;
+        }
+
+        // Reduced-motion devices intentionally do not keep an animation loop.
+        // Redraw as each async image arrives so the static sphere is never blank.
+        if (reduceMotion) {
+          window.cancelAnimationFrame(frameId);
+          frameId = window.requestAnimationFrame(draw);
+        }
+      };
+      image.src = source;
+    };
+
+    resize();
+    imageUrls.forEach(loadBitmap);
     frameId = window.requestAnimationFrame(draw);
     window.addEventListener('resize', resize);
     return () => {
@@ -198,9 +204,18 @@ function CoverParticleSphere({ imageUrls, seed }) {
   return <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" />;
 }
 
-export default function LoadScreen({ request, onDone, debugMode = false } = {}) {
+export default function LoadScreen({
+  request,
+  onDone,
+  debugMode = false,
+  initialCovers = null,
+} = {}) {
   useLoadLogic({ request, onDone, paused: debugMode });
-  const [archiveCovers, setArchiveCovers] = useState([]);
+  const [archiveCovers, setArchiveCovers] = useState(() => (
+    Array.isArray(initialCovers) && initialCovers.length
+      ? initialCovers
+      : MONTHLY_DESIGN_COVERS
+  ));
   const [runSeed, setRunSeed] = useState(null);
 
   useEffect(() => {
@@ -210,6 +225,11 @@ export default function LoadScreen({ request, onDone, debugMode = false } = {}) 
   }, []);
 
   useEffect(() => {
+    if (Array.isArray(initialCovers) && initialCovers.length) {
+      setArchiveCovers(initialCovers);
+      return undefined;
+    }
+
     const controller = new AbortController();
     fetch('/api/monthly-design-covers', { signal: controller.signal })
       .then((response) => {
@@ -226,7 +246,7 @@ export default function LoadScreen({ request, onDone, debugMode = false } = {}) 
         if (error?.name !== 'AbortError') setArchiveCovers(MONTHLY_DESIGN_COVERS);
       });
     return () => controller.abort();
-  }, []);
+  }, [initialCovers]);
 
   const particleCount = typeof window !== 'undefined' && window.innerWidth > 768
     ? DESKTOP_PARTICLE_COUNT

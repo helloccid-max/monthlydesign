@@ -290,6 +290,7 @@ export default function MobileScreen() {
               request={generationRequest}
               onGenerated={handlers.goHomage}
               debugMode={Boolean(qaStage) || step !== STEPS.LOAD || transitioningToLoad}
+              archiveCovers={coverArchive}
             />
           </div>
         )}

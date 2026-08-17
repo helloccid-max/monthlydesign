@@ -19,6 +19,7 @@ export default function GenerationFlow({
   onGenerated,
   onArchive,
   debugMode = false,
+  archiveCovers = null,
 } = {}) {
   const normalizedRequest = {
     ...normalizeGenerationRequest(request),
@@ -34,6 +35,7 @@ export default function GenerationFlow({
       request={normalizedRequest}
       onDone={onGenerated}
       debugMode={debugMode}
+      initialCovers={archiveCovers}
     />
   );
 }
