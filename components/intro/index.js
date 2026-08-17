@@ -553,7 +553,7 @@ export default function IntroScreen({
               <div className={`${styles.coverFace} ${styles.coverFront}`}>
                 <img
                   className={styles.coverImage}
-                  src="/covers/D277-2001-07-intro.jpg"
+                  src="/covers/D277-2001-07-intro.webp"
                   alt="월간 디자인 2001년 7월호 277호 표지"
                   loading="eager"
                   decoding="async"
@@ -611,7 +611,7 @@ export default function IntroScreen({
           handleTap();
         }}
       >
-        <span>{introAssetsReady ? 'Tap to Play' : 'Preparing'}</span>
+        <span>{introAssetsReady ? 'Tap to Play' : 'Loading'}</span>
       </button>
 
     </main>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
 
 import IntroScreen from '@/components/intro';
 import CoverSelectScreen, { getInitialParticleCoverUrls } from '@/components/coverSelect';
@@ -44,16 +45,20 @@ const QA_SCENE_START = {
 };
 
 const SCENE_TRANSITION_MS = 660;
+const RESULT_TRANSITION_MS = 820;
 const DESKTOP_COVER_PRELOAD_CONCURRENCY = 4;
 const MOBILE_COVER_PRELOAD_CONCURRENCY = 2;
 const COVER_PRELOAD_RELEASE_MS = 12000;
 
 export default function MobileScreen() {
+  const router = useRouter();
   const [step, setStep] = useState(STEPS.INTRO);
   const [coverMounted, setCoverMounted] = useState(false);
   const [transitioningToCover, setTransitioningToCover] = useState(false);
   const [loadMounted, setLoadMounted] = useState(false);
   const [transitioningToLoad, setTransitioningToLoad] = useState(false);
+  const [homageMounted, setHomageMounted] = useState(false);
+  const [transitioningToHomage, setTransitioningToHomage] = useState(false);
   const [generationRequest, setGenerationRequest] = useState(null);
   const [coverArchive, setCoverArchive] = useState(null);
   const [coverPreload, setCoverPreload] = useState({
@@ -167,6 +172,21 @@ export default function MobileScreen() {
   }, [transitioningToLoad]);
 
   useEffect(() => {
+    if (!homageMounted || step !== STEPS.LOAD || transitioningToHomage) return undefined;
+    const frame = window.requestAnimationFrame(() => setTransitioningToHomage(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [homageMounted, step, transitioningToHomage]);
+
+  useEffect(() => {
+    if (!transitioningToHomage) return undefined;
+    const timer = window.setTimeout(() => {
+      setStep(STEPS.HOMAGE);
+      setTransitioningToHomage(false);
+    }, RESULT_TRANSITION_MS);
+    return () => window.clearTimeout(timer);
+  }, [transitioningToHomage]);
+
+  useEffect(() => {
     const handleQaNavigation = (event) => {
       if (event.key === 'Escape' && qaIndex != null) {
         event.preventDefault();
@@ -185,8 +205,10 @@ export default function MobileScreen() {
       setStep(nextStage.scene);
       setCoverMounted(nextStage.scene === STEPS.COVER);
       setLoadMounted(nextStage.scene === STEPS.LOAD);
+      setHomageMounted(nextStage.scene === STEPS.HOMAGE);
       setTransitioningToCover(false);
       setTransitioningToLoad(false);
+      setTransitioningToHomage(false);
 
       if (nextStage.state === 'transcript' || nextStage.scene === STEPS.LOAD || nextStage.scene === STEPS.HOMAGE) {
         setGenerationRequest(DEFAULT_GENERATION_REQUEST);
@@ -202,7 +224,9 @@ export default function MobileScreen() {
       goCover: () => {
         setCoverMounted(true);
         setLoadMounted(false);
+        setHomageMounted(false);
         setTransitioningToLoad(false);
+        setTransitioningToHomage(false);
         go(STEPS.COVER);
       },
       // GENERATION_HANDOFF_START: downstream ownership begins at this callback.
@@ -219,32 +243,46 @@ export default function MobileScreen() {
         setGenerationRequest(prev => {
           return { ...prev, generatedImageUrl: finalUrl };
         });
-        setTimeout(() => go(STEPS.HOMAGE), 50);
+        setHomageMounted(true);
       },
+      goArchive: () => router.push('/wall'),
       goEnd2: () => go(STEPS.END2),
       goIntro: () => {
         setCoverMounted(false);
         setLoadMounted(false);
+        setHomageMounted(false);
         setTransitioningToCover(false);
         setTransitioningToLoad(false);
+        setTransitioningToHomage(false);
         setGenerationRequest(null);
         go(STEPS.INTRO);
       },
     };
-  }, [go]);
+  }, [go, router]);
 
-  if (step === STEPS.INTRO || step === STEPS.COVER || step === STEPS.LOAD) {
+  if (step === STEPS.INTRO || step === STEPS.COVER || step === STEPS.LOAD || step === STEPS.HOMAGE) {
     const showCover = step === STEPS.INTRO ? coverMounted : step === STEPS.COVER;
     const showLoad = loadMounted || step === STEPS.LOAD;
+    const showHomage = homageMounted || step === STEPS.HOMAGE;
     return (
       <main
         className={styles.flowViewport}
         data-step={step}
         data-transitioning={transitioningToCover ? 'true' : 'false'}
         data-load-transitioning={transitioningToLoad ? 'true' : 'false'}
+        data-homage-transitioning={transitioningToHomage ? 'true' : 'false'}
         data-cover-preload-ready={coverPreload.ready ? 'true' : 'false'}
         data-cover-preload-loaded={coverPreload.loaded}
       >
+        {showHomage && (
+          <div className={styles.homageLayer}>
+            <GenerationFlow
+              phase={GENERATION_PHASES.RESULT}
+              request={generationRequest}
+              onArchive={handlers.goArchive}
+            />
+          </div>
+        )}
         {showLoad && (
           <div className={styles.loadLayer}>
             <GenerationFlow
@@ -278,15 +316,6 @@ export default function MobileScreen() {
           </div>
         )}
       </main>
-    );
-  }
-  if (step === STEPS.HOMAGE) {
-    return (
-      <GenerationFlow
-        phase={GENERATION_PHASES.RESULT}
-        request={generationRequest}
-        onEdit={handlers.goCover}
-      />
     );
   }
   if (step === STEPS.END2) return <End2Screen onRestart={handlers.goIntro} />;

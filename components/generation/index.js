@@ -17,7 +17,7 @@ export default function GenerationFlow({
   phase,
   request,
   onGenerated,
-  onEdit,
+  onArchive,
   debugMode = false,
 } = {}) {
   const normalizedRequest = {
@@ -26,7 +26,7 @@ export default function GenerationFlow({
   };
 
   if (phase === GENERATION_PHASES.RESULT) {
-    return <HomageScreen request={normalizedRequest} onEdit={onEdit} />;
+    return <HomageScreen request={normalizedRequest} onArchive={onArchive} />;
   }
 
   return (

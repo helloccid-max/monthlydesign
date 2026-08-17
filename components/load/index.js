@@ -6,6 +6,8 @@ import styles from './styles.module.css';
 const MOBILE_PARTICLE_COUNT = 96;
 const DESKTOP_PARTICLE_COUNT = 156;
 const BITMAP_MAX = 220;
+const STATUS_TEXT = '당신의 오마주 표지를 생성하고 있어요';
+const STATUS_CHARACTERS = Array.from(STATUS_TEXT);
 
 function createRandom(seed) {
   let state = seed >>> 0;
@@ -200,14 +202,6 @@ export default function LoadScreen({ request, onDone, debugMode = false } = {}) 
   useLoadLogic({ request, onDone, paused: debugMode });
   const [archiveCovers, setArchiveCovers] = useState([]);
   const [runSeed, setRunSeed] = useState(null);
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setElapsed((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     const values = new Uint32Array(1);
@@ -244,27 +238,24 @@ export default function LoadScreen({ request, onDone, debugMode = false } = {}) 
 
   return (
     <main className={styles.page}>
-      <div style={{
-        position: 'absolute',
-        top: '40px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        color: 'white',
-        zIndex: 100,
-        fontSize: '24px',
-        fontWeight: 'bold',
-        fontVariantNumeric: 'tabular-nums',
-        textShadow: '0 2px 8px rgba(0,0,0,0.8)'
-      }}>
-        {elapsed}s
-      </div>
       <CoverParticleSphere imageUrls={imageUrls} seed={runSeed ?? 1} />
       <div className={styles.vignette} aria-hidden="true" />
       <section className={styles.status} aria-live="polite">
-        <p>
-          <span>당신의 오마주 표지를 생성하고 있어요</span>
-          <span className={styles.statusGlare} aria-hidden="true">
-            당신의 오마주 표지를 생성하고 있어요
+        <p aria-label={STATUS_TEXT}>
+          <span className={styles.statusCharacters} aria-hidden="true">
+            {STATUS_CHARACTERS.map((character, index) => (
+              <span
+                className={styles.statusCharacter}
+                key={`${character}-${index}`}
+                style={{
+                  '--character-delay': `${STATUS_CHARACTERS
+                    .slice(0, index)
+                    .filter((value) => value !== ' ').length * 130}ms`,
+                }}
+              >
+                {character}
+              </span>
+            ))}
           </span>
         </p>
       </section>

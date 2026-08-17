@@ -409,13 +409,20 @@
 }
 
 .startPrompt:disabled {
-  color: rgba(255, 255, 255, 0.54);
+  color: #fff;
   cursor: wait;
 }
 
 .startPrompt:disabled > span {
+  color: #fff;
   letter-spacing: 0.08em;
   transform: translateX(-50%);
+  animation: loadingSine 2.4s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+@keyframes loadingSine {
+  0%, 100% { opacity: 0.32; }
+  50% { opacity: 1; }
 }
 
 .startPrompt:focus-visible {
@@ -449,5 +456,12 @@
 
   .statement h1 {
     font-size: clamp(1.62rem, 7.5vw, 2.75rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startPrompt:disabled > span {
+    animation: none;
+    opacity: 0.72;
   }
 }

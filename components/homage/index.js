@@ -3,7 +3,7 @@ import GlassSurface from '@/components/GlassSurface';
 import { createHomageCoverUrl } from '@/lib/homageCover';
 import styles from './styles.module.css';
 
-export default function HomageScreen({ request, onEdit } = {}) {
+export default function HomageScreen({ request, onArchive } = {}) {
   const [saving, setSaving] = useState(false);
   const prompt = request?.prompt || '';
   const issue = request?.issue || '277';
@@ -82,7 +82,7 @@ export default function HomageScreen({ request, onEdit } = {}) {
       </section>
 
       <footer className={styles.actions}>
-        <GlassSurface as="button" type="button" borderRadius={999} className={styles.actionButton} onClick={onEdit}>다시 생성</GlassSurface>
+        <GlassSurface as="button" type="button" borderRadius={999} className={styles.actionButton} onClick={onArchive}>아카이브 보기</GlassSurface>
         <GlassSurface as="button" type="button" borderRadius={999} className={styles.actionButton} data-busy={saving ? 'true' : 'false'} onClick={handleSave}>
           {saving ? '저장 중' : '표지 저장'}
         </GlassSurface>

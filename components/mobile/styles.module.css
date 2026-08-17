@@ -10,7 +10,8 @@
 
 .introLayer,
 .coverLayer,
-.loadLayer {
+.loadLayer,
+.homageLayer {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -32,6 +33,12 @@
 
 .loadLayer {
   z-index: 1;
+  pointer-events: none;
+  transform: translate3d(100%, 0, 0);
+}
+
+.homageLayer {
+  z-index: 0;
   pointer-events: none;
   transform: translate3d(100%, 0, 0);
 }
@@ -63,10 +70,30 @@
   pointer-events: auto;
 }
 
+.flowViewport[data-homage-transitioning='true'] .loadLayer {
+  pointer-events: none;
+  transform: translate3d(-100%, 0, 0);
+}
+
+.flowViewport[data-homage-transitioning='true'] .loadLayer,
+.flowViewport[data-homage-transitioning='true'] .homageLayer {
+  transition-duration: 820ms;
+}
+
+.flowViewport[data-homage-transitioning='true'] .homageLayer,
+.flowViewport[data-step='homage'] .homageLayer {
+  transform: translate3d(0, 0, 0);
+}
+
+.flowViewport[data-step='homage'] .homageLayer {
+  pointer-events: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .introLayer,
   .coverLayer,
-  .loadLayer {
+  .loadLayer,
+  .homageLayer {
     /* This transition communicates scene continuity, so retain a shorter
        version instead of making the intro and archive appear to hard-cut. */
     transition-duration: 420ms;
