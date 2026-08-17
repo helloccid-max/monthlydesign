@@ -1,0 +1,6 @@
+.claude/
+.next/
+.next-dev/
+.env
+.env.*
+*.log
