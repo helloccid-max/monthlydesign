@@ -82,12 +82,17 @@
 .statusCharacters {
   --character-cycle: 2.08s;
   display: inline-flex;
+  align-items: center;
   white-space: pre;
   pointer-events: none;
 }
 
 .statusCharacter {
+  display: inline-block;
   color: #080a06;
+  transform: translate3d(0, 0, 0) scaleY(1);
+  transform-origin: 50% 70%;
+  will-change: color, transform;
   animation: statusCharacterSweep var(--character-cycle) linear infinite;
   animation-delay: var(--character-delay, 0ms);
 }
@@ -98,13 +103,38 @@
 }
 
 @keyframes statusCharacterSweep {
-  0%, 100% { color: #080a06; }
-  5% { color: #292e28; }
-  10% { color: #626860; }
-  16% { color: #f8faf7; }
-  22% { color: #b7bbb5; }
-  27% { color: #686e66; }
-  32% { color: #080a06; }
+  0%, 100% {
+    color: #080a06;
+    transform: translate3d(0, 0, 0) scaleY(1);
+  }
+  12.5% {
+    color: #626860;
+    transform: translate3d(0, var(--wave-up-shoulder, -0.12em), 0) scaleY(var(--wave-scale-up-shoulder, 1.06));
+  }
+  25% {
+    color: #f8faf7;
+    transform: translate3d(0, var(--wave-up-peak, -0.22em), 0) scaleY(var(--wave-scale-up-peak, 1.14));
+  }
+  37.5% {
+    color: #747a72;
+    transform: translate3d(0, var(--wave-up-shoulder, -0.12em), 0) scaleY(var(--wave-scale-up-shoulder, 1.06));
+  }
+  50% {
+    color: #080a06;
+    transform: translate3d(0, 0, 0) scaleY(1);
+  }
+  62.5% {
+    color: #080a06;
+    transform: translate3d(0, var(--wave-down-shoulder, 0.07em), 0) scaleY(var(--wave-scale-down-shoulder, 0.98));
+  }
+  75% {
+    color: #080a06;
+    transform: translate3d(0, var(--wave-down-peak, 0.11em), 0) scaleY(var(--wave-scale-down-peak, 0.96));
+  }
+  87.5% {
+    color: #080a06;
+    transform: translate3d(0, var(--wave-down-shoulder, 0.07em), 0) scaleY(var(--wave-scale-down-shoulder, 0.98));
+  }
 }
 
 @media (min-width: 768px) {

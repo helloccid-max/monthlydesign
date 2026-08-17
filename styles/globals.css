@@ -47,6 +47,23 @@ body {
   background: var(--editorial-black);
 }
 
+/* The mobile experience is a sequence of fixed, viewport-sized scenes rather
+   than a document page. Lock both roots so iOS overscroll cannot reveal an
+   empty strip below the active scene. */
+html.mobile-flow-scroll-lock,
+body.mobile-flow-scroll-lock {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body.mobile-flow-scroll-lock {
+  position: fixed;
+  inset: 0;
+}
+
 /* 네이티브 컨트롤이 시스템 산세리프로 굳는 것 방지 */
 button,
 input,

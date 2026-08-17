@@ -537,7 +537,8 @@
   line-height: 1.42;
   letter-spacing: inherit;
   text-align: left;
-  overflow-wrap: anywhere;
+  word-break: keep-all;
+  overflow-wrap: break-word;
   white-space: normal;
   transition:
     opacity 320ms ease,

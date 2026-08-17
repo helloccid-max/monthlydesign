@@ -72,6 +72,22 @@ export default function MobileScreen() {
   const qaStage = qaIndex == null ? null : QA_STAGES[qaIndex];
   const coverTransitionReady = coverPreload.ready || coverPreload.timedOut;
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const htmlWasLocked = html.classList.contains('mobile-flow-scroll-lock');
+    const bodyWasLocked = body.classList.contains('mobile-flow-scroll-lock');
+
+    html.classList.add('mobile-flow-scroll-lock');
+    body.classList.add('mobile-flow-scroll-lock');
+    window.scrollTo(0, 0);
+
+    return () => {
+      if (!htmlWasLocked) html.classList.remove('mobile-flow-scroll-lock');
+      if (!bodyWasLocked) body.classList.remove('mobile-flow-scroll-lock');
+    };
+  }, []);
+
   const go = useCallback((next) => {
     setStep(next);
   }, []);

@@ -21,6 +21,8 @@ const FOCUS_DURATION_MS = 820;
 const POST_FOCUS_HOLD_MS = 5200;
 const AUTOPLAY_DURATION_MS = 12000;
 const AUTOPLAY_END_HOLD_MS = 5200;
+const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
+const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 const INTRO_ASSET_RELEASE_MS = 10000;
 // Mobile image decoding or iframe rendering can occasionally occupy the main
 // thread for several frames. Advancing from the wall clock would then jump
@@ -98,6 +100,7 @@ function createCyberAtlasSoundEngine() {
   }
 
   let active = false;
+  let audible = false;
   let stopped = false;
   let lastStep = -1;
   let lastSeed = null;
@@ -150,18 +153,32 @@ function createCyberAtlasSoundEngine() {
   };
 
   return {
-    async start() {
+    async start({ muted = false } = {}) {
       if (stopped) return;
       await context.resume();
       active = true;
+      if (muted) return;
+      audible = true;
       const now = context.currentTime;
       master.gain.cancelScheduledValues(now);
       master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), now);
       master.gain.exponentialRampToValueAtTime(0.18, now + 0.32);
       bedGain.gain.exponentialRampToValueAtTime(0.026, now + 0.8);
     },
+    fadeIn(duration = TOPOLOGY_SOUND_FADE_IN_SECONDS) {
+      if (!active || audible || stopped || context.state === 'closed') return;
+      audible = true;
+      const now = context.currentTime;
+      const safeDuration = Math.max(0.08, Number(duration) || TOPOLOGY_SOUND_FADE_IN_SECONDS);
+      master.gain.cancelScheduledValues(now);
+      master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), now);
+      master.gain.exponentialRampToValueAtTime(0.18, now + safeDuration);
+      bedGain.gain.cancelScheduledValues(now);
+      bedGain.gain.setValueAtTime(Math.max(bedGain.gain.value, 0.0001), now);
+      bedGain.gain.exponentialRampToValueAtTime(0.026, now + safeDuration * 1.12);
+    },
     update(sample) {
-      if (!active || stopped || !sample || context.state === 'closed') return;
+      if (!active || !audible || stopped || !sample || context.state === 'closed') return;
       const now = context.currentTime;
       const progress = clampAudio(Number(sample.progress) || 0);
       const depth = Math.max(0, Number(sample.pointDepth) || 0);
@@ -201,6 +218,7 @@ function createCyberAtlasSoundEngine() {
       if (stopped || context.state === 'closed') return;
       stopped = true;
       active = false;
+      audible = false;
       const now = context.currentTime;
       master.gain.cancelScheduledValues(now);
       master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), now);
@@ -427,7 +445,7 @@ export default function IntroScreen({
     if (debugState || !introAssetsReady) return;
     if (!engaged) {
       if (!soundEngineRef.current) soundEngineRef.current = createCyberAtlasSoundEngine();
-      soundEngineRef.current?.start().catch(() => {});
+      soundEngineRef.current?.start({ muted: true }).catch(() => {});
       setEngaged(true);
       return;
     }
@@ -441,6 +459,7 @@ export default function IntroScreen({
   const coverExitScaleProgress = easeOutQuint(segment(scrubProgress, 0, 0.085));
   const coverExitSpinProgress = easeHumanImpulse(segment(scrubProgress, 0.018, 0.18));
   const coverRise = easeHumanImpulse(segment(scrubProgress, 0.045, 0.24));
+  const topologySoundReady = started && scrubProgress >= TOPOLOGY_SOUND_START_PROGRESS;
   const topologyReveal = easeHumanImpulse(segment(scrubProgress, 0.075, 0.29));
   const finalSplit = easeOutQuint(segment(scrubProgress, 0.745, 0.825));
   const finalTitle = easeOutQuint(segment(scrubProgress, 0.765, 0.855));
@@ -448,6 +467,11 @@ export default function IntroScreen({
   const finalSplitActive = scrubProgress >= 0.745;
   const coverExitScale = 0.7 * (1 - 0.2 * coverExitScaleProgress);
   const coverTransform = `translate3d(0, ${(-132 * coverRise).toFixed(3)}dvh, 0) perspective(1400px) rotateY(${(45 * coverExitSpinProgress).toFixed(3)}deg) scale(${coverExitScale.toFixed(4)})`;
+
+  useEffect(() => {
+    if (!topologySoundReady) return;
+    soundEngineRef.current?.fadeIn(TOPOLOGY_SOUND_FADE_IN_SECONDS);
+  }, [topologySoundReady]);
 
   useEffect(() => {
     rendererRef.current?.contentWindow?.postMessage(

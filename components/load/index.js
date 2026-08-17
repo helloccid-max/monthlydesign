@@ -8,6 +8,8 @@ const DESKTOP_PARTICLE_COUNT = 156;
 const BITMAP_MAX = 220;
 const STATUS_TEXT = '당신의 오마주 표지를 생성하고 있어요';
 const STATUS_CHARACTERS = Array.from(STATUS_TEXT);
+const STATUS_VISIBLE_CHARACTER_COUNT = STATUS_CHARACTERS.filter((value) => value !== ' ').length;
+const STATUS_WAVE_CHARACTER_OFFSET_MS = 260;
 
 function createRandom(seed) {
   let state = seed >>> 0;
@@ -263,19 +265,34 @@ export default function LoadScreen({
       <section className={styles.status} aria-live="polite">
         <p aria-label={STATUS_TEXT}>
           <span className={styles.statusCharacters} aria-hidden="true">
-            {STATUS_CHARACTERS.map((character, index) => (
-              <span
-                className={styles.statusCharacter}
-                key={`${character}-${index}`}
-                style={{
-                  '--character-delay': `${STATUS_CHARACTERS
-                    .slice(0, index)
-                    .filter((value) => value !== ' ').length * 130}ms`,
-                }}
-              >
-                {character}
-              </span>
-            ))}
+            {STATUS_CHARACTERS.map((character, index) => {
+              const visibleIndex = STATUS_CHARACTERS
+                .slice(0, index)
+                .filter((value) => value !== ' ').length;
+              const envelope = character === ' '
+                ? 0
+                : Math.sin((Math.PI * visibleIndex) / (STATUS_VISIBLE_CHARACTER_COUNT - 1));
+
+              return (
+                <span
+                  className={styles.statusCharacter}
+                  key={`${character}-${index}`}
+                  style={{
+                    '--character-delay': `${-(STATUS_VISIBLE_CHARACTER_COUNT - 1 - visibleIndex) * STATUS_WAVE_CHARACTER_OFFSET_MS}ms`,
+                    '--wave-up-shoulder': `${(-0.12 * envelope).toFixed(4)}em`,
+                    '--wave-up-peak': `${(-0.22 * envelope).toFixed(4)}em`,
+                    '--wave-down-shoulder': `${(0.07 * envelope).toFixed(4)}em`,
+                    '--wave-down-peak': `${(0.11 * envelope).toFixed(4)}em`,
+                    '--wave-scale-up-shoulder': (1 + 0.06 * envelope).toFixed(4),
+                    '--wave-scale-up-peak': (1 + 0.14 * envelope).toFixed(4),
+                    '--wave-scale-down-shoulder': (1 - 0.02 * envelope).toFixed(4),
+                    '--wave-scale-down-peak': (1 - 0.04 * envelope).toFixed(4),
+                  }}
+                >
+                  {character}
+                </span>
+              );
+            })}
           </span>
         </p>
       </section>
