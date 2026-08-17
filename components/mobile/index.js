@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import IntroScreen from '@/components/intro';
-import CoverSelectScreen from '@/components/coverSelect';
+import CoverSelectScreen, { getInitialParticleCoverUrls } from '@/components/coverSelect';
 import GenerationFlow, {
   DEFAULT_GENERATION_REQUEST,
   GENERATION_PHASES,
   normalizeGenerationRequest,
 } from '@/components/generation';
 import End2Screen from '@/components/end2';
+import { MONTHLY_DESIGN_COVERS } from '@/lib/monthlyDesignCovers';
+import { preloadImageBatch } from '@/lib/preloadImages';
 import styles from './styles.module.css';
 
 const STEPS = {
@@ -42,6 +44,9 @@ const QA_SCENE_START = {
 };
 
 const SCENE_TRANSITION_MS = 660;
+const DESKTOP_COVER_PRELOAD_CONCURRENCY = 4;
+const MOBILE_COVER_PRELOAD_CONCURRENCY = 2;
+const COVER_PRELOAD_RELEASE_MS = 12000;
 
 export default function MobileScreen() {
   const [step, setStep] = useState(STEPS.INTRO);
@@ -50,8 +55,17 @@ export default function MobileScreen() {
   const [loadMounted, setLoadMounted] = useState(false);
   const [transitioningToLoad, setTransitioningToLoad] = useState(false);
   const [generationRequest, setGenerationRequest] = useState(null);
+  const [coverArchive, setCoverArchive] = useState(null);
+  const [coverPreload, setCoverPreload] = useState({
+    total: 48,
+    loaded: 0,
+    failed: 0,
+    ready: false,
+    timedOut: false,
+  });
   const [qaIndex, setQaIndex] = useState(null);
   const qaStage = qaIndex == null ? null : QA_STAGES[qaIndex];
+  const coverTransitionReady = coverPreload.ready || coverPreload.timedOut;
 
   const go = useCallback((next) => {
     setStep(next);
@@ -64,6 +78,71 @@ export default function MobileScreen() {
   const finishIntroExit = useCallback(() => {
     setStep(STEPS.COVER);
     setTransitioningToCover(false);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    const releaseTimer = window.setTimeout(() => {
+      if (active) setCoverPreload((current) => ({ ...current, timedOut: true }));
+    }, COVER_PRELOAD_RELEASE_MS);
+
+    const preloadCoverArchive = async () => {
+      let covers = MONTHLY_DESIGN_COVERS;
+      try {
+        const response = await fetch('/api/monthly-design-covers', {
+          headers: { Accept: 'application/json' },
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`cover archive ${response.status}`);
+        const payload = await response.json();
+        if (Array.isArray(payload?.covers) && payload.covers.length) covers = payload.covers;
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
+
+      if (!active) return;
+      setCoverArchive(covers);
+      const imageUrls = getInitialParticleCoverUrls(covers);
+      const mobileDecodeBudget = window.matchMedia('(pointer: coarse)').matches
+        || window.innerWidth < 768;
+      const result = await preloadImageBatch(imageUrls, {
+        concurrency: mobileDecodeBudget
+          ? MOBILE_COVER_PRELOAD_CONCURRENCY
+          : DESKTOP_COVER_PRELOAD_CONCURRENCY,
+        signal: controller.signal,
+        onProgress: (progress) => {
+          if (!active) return;
+          const completed = progress.loaded + progress.failed;
+          // Progress is not visible UI. Batch state updates so decoding dozens
+          // of thumbnails cannot force the intro to rerender dozens of times.
+          if (completed !== progress.total && completed % 4 !== 0) return;
+          setCoverPreload((current) => ({
+            ...current,
+            total: progress.total,
+            loaded: progress.loaded,
+            failed: progress.failed,
+          }));
+        },
+      });
+
+      if (!active || result.aborted) return;
+      window.clearTimeout(releaseTimer);
+      setCoverPreload((current) => ({
+        ...current,
+        total: result.total,
+        loaded: result.loaded,
+        failed: result.failed,
+        ready: true,
+      }));
+    };
+
+    preloadCoverArchive();
+    return () => {
+      active = false;
+      window.clearTimeout(releaseTimer);
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -165,6 +244,8 @@ export default function MobileScreen() {
         data-step={step}
         data-transitioning={transitioningToCover ? 'true' : 'false'}
         data-load-transitioning={transitioningToLoad ? 'true' : 'false'}
+        data-cover-preload-ready={coverPreload.ready ? 'true' : 'false'}
+        data-cover-preload-loaded={coverPreload.loaded}
       >
         {showLoad && (
           <div className={styles.loadLayer}>
@@ -184,6 +265,7 @@ export default function MobileScreen() {
             <CoverSelectScreen
               onSubmit={handlers.submitGeneration}
               debugState={qaStage?.state || null}
+              initialCovers={coverArchive}
             />
           </div>
         )}
@@ -193,6 +275,7 @@ export default function MobileScreen() {
               onExitStart={beginIntroExit}
               onDone={finishIntroExit}
               debugState={qaStage?.state || null}
+              canExit={coverTransitionReady || Boolean(qaStage)}
             />
           </div>
         )}

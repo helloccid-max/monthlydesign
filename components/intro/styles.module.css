@@ -408,6 +408,16 @@
   color: rgba(255, 255, 255, 0.68);
 }
 
+.startPrompt:disabled {
+  color: rgba(255, 255, 255, 0.54);
+  cursor: wait;
+}
+
+.startPrompt:disabled > span {
+  letter-spacing: 0.08em;
+  transform: translateX(-50%);
+}
+
 .startPrompt:focus-visible {
   outline: none;
 }

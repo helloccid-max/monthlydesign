@@ -36,6 +36,8 @@ const POINTER_SLOW_RADIUS = 168;
 const POINTER_SLOW_MINIMUM = 0.22;
 const POINTER_SLOW_IN_RESPONSE = 7.2;
 const POINTER_SLOW_OUT_RESPONSE = 2.8;
+const MAXIMUM_FRAME_DELTA_SECONDS = 0.08;
+const REDUCED_MOTION_SPEED_SCALE = 0.38;
 const DEPTH_DISTRIBUTION_INTERVAL = 24;
 const MIDDLE_DEPTH_COUNT_PER_INTERVAL = 16;
 const ULTRA_NEAR_Z_MIN = 500;
@@ -145,6 +147,10 @@ function buildParticleNodes(covers = MONTHLY_DESIGN_COVERS) {
   return Array.from({ length: PARTICLE_COUNT }, (_, index) => buildParticleNode(index, covers));
 }
 
+export function getInitialParticleCoverUrls(covers = MONTHLY_DESIGN_COVERS) {
+  return buildParticleNodes(covers).map((particle) => particle.cover.imageUrl);
+}
+
 function getNaturalZ(boid, time) {
   const depthTime = time * 0.00022;
   const primary = Math.sin(depthTime * boid.depthRate + boid.phase);
@@ -190,7 +196,14 @@ function steeringVector(desiredX, desiredY, velocityX, velocityY, maximumSpeed, 
   return limitVector(scaledX - velocityX, scaledY - velocityY, maximumForce);
 }
 
-export default function CoverSelectScreen({ onSubmit, debugState = null } = {}) {
+export default function CoverSelectScreen({
+  onSubmit,
+  debugState = null,
+  initialCovers = null,
+} = {}) {
+  const initialCoverPool = Array.isArray(initialCovers) && initialCovers.length
+    ? initialCovers
+    : MONTHLY_DESIGN_COVERS;
   const [selectedId, setSelectedId] = useState(null);
   const [selectedParticleId, setSelectedParticleId] = useState(null);
   const [promptValue, setPromptValue] = useState('');
@@ -203,15 +216,15 @@ export default function CoverSelectScreen({ onSubmit, debugState = null } = {}) 
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [voicePromptSingleLine, setVoicePromptSingleLine] = useState(false);
   const [guidanceDismissed, setGuidanceDismissed] = useState(false);
-  const [coverPool, setCoverPool] = useState(MONTHLY_DESIGN_COVERS);
-  const [particles, setParticles] = useState(() => buildParticleNodes(MONTHLY_DESIGN_COVERS));
+  const [coverPool, setCoverPool] = useState(initialCoverPool);
+  const [particles, setParticles] = useState(() => buildParticleNodes(initialCoverPool));
   const initialParticlesRef = useRef(particles);
   const particleElementsRef = useRef(new Map());
   const pageRef = useRef(null);
   const selectedDateBadgeRef = useRef(null);
   const selectedActionRef = useRef(null);
   const boidsRef = useRef([]);
-  const coverPoolRef = useRef(MONTHLY_DESIGN_COVERS);
+  const coverPoolRef = useRef(initialCoverPool);
   const selectedParticleRef = useRef(null);
   const selectionTransitionRef = useRef(null);
   const releaseTransitionsRef = useRef(new Map());
@@ -387,6 +400,7 @@ export default function CoverSelectScreen({ onSubmit, debugState = null } = {}) 
   }, [displayedPrompt, promptValue]);
 
   useEffect(() => {
+    if (Array.isArray(initialCovers) && initialCovers.length) return undefined;
     const controller = new AbortController();
 
     fetch('/api/monthly-design-covers', { signal: controller.signal })
@@ -405,7 +419,7 @@ export default function CoverSelectScreen({ onSubmit, debugState = null } = {}) 
       });
 
     return () => controller.abort();
-  }, []);
+  }, [initialCovers]);
 
   useEffect(() => {
     let frameId;
@@ -413,6 +427,7 @@ export default function CoverSelectScreen({ onSubmit, debugState = null } = {}) 
     let viewportWidth = window.innerWidth;
     let viewportHeight = window.innerHeight;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const motionSpeedScale = reduceMotion ? REDUCED_MOTION_SPEED_SCALE : 1;
 
     pageRef.current?.style.setProperty('--cover-viewport-height', `${viewportHeight}px`);
 
@@ -525,7 +540,13 @@ export default function CoverSelectScreen({ onSubmit, debugState = null } = {}) 
     };
 
     const update = (time) => {
-      const delta = Math.min((time - previousTime) / 1000, 0.034);
+      // Preserve elapsed time through ordinary mobile frame drops. The old
+      // 34ms cap discarded time, so the same choreography ran in slow motion
+      // on a busy phone while looking correct on a desktop.
+      const delta = Math.min(
+        Math.max(0, (time - previousTime) / 1000),
+        MAXIMUM_FRAME_DELTA_SECONDS
+      ) * motionSpeedScale;
       previousTime = time;
       const boids = boidsRef.current;
       const nextForces = boids.map((boid, index) => {
@@ -763,7 +784,7 @@ export default function CoverSelectScreen({ onSubmit, debugState = null } = {}) 
     createBoids();
     boidsRef.current.forEach((boid) => placeBoid(boid, previousTime));
     window.addEventListener('resize', handleResize);
-    if (!reduceMotion) frameId = window.requestAnimationFrame(update);
+    frameId = window.requestAnimationFrame(update);
 
     return () => {
       window.removeEventListener('resize', handleResize);

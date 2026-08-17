@@ -46,7 +46,7 @@ app.prepare().then(() => {
         handle(req, res);
       });
 
-      tryListen(server, defaultPort, 10)
+      tryListen(server, defaultPort)
         .then((port) => {
           const url = `http://${hostname}:${port}`;
           console.log(`> Ready on ${url}`);

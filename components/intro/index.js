@@ -21,6 +21,13 @@ const FOCUS_DURATION_MS = 820;
 const POST_FOCUS_HOLD_MS = 5200;
 const AUTOPLAY_DURATION_MS = 12000;
 const AUTOPLAY_END_HOLD_MS = 5200;
+const INTRO_ASSET_RELEASE_MS = 10000;
+// Mobile image decoding or iframe rendering can occasionally occupy the main
+// thread for several frames. Advancing from the wall clock would then jump
+// over the topology contraction and lime-panel choreography. Cap the amount
+// consumed by a single frame so a slow device stretches the sequence instead
+// of deleting its important beats.
+const INTRO_MAX_FRAME_DELTA_MS = 64;
 
 const clampAudio = (value, minimum = 0, maximum = 1) => Math.min(maximum, Math.max(minimum, value));
 const seededUnit = (value) => {
@@ -203,12 +210,21 @@ function createCyberAtlasSoundEngine() {
   };
 }
 
-export default function IntroScreen({ onExitStart, onDone, debugState = null } = {}) {
+export default function IntroScreen({
+  onExitStart,
+  onDone,
+  debugState = null,
+  canExit = true,
+} = {}) {
   const [engaged, setEngaged] = useState(false);
   const [started, setStarted] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [scrubProgress, setScrubProgress] = useState(0);
+  const [coverAssetReady, setCoverAssetReady] = useState(false);
+  const [topologyAssetReady, setTopologyAssetReady] = useState(false);
+  const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
   const completedRef = useRef(false);
+  const pendingCompleteRef = useRef(false);
   const rendererRef = useRef(null);
   const scrubProgressRef = useRef(0);
   const soundEngineRef = useRef(null);
@@ -216,16 +232,33 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
   const startedRef = useRef(false);
   const interactionActiveRef = useRef(false);
   const minimumExitAtRef = useRef(0);
+  const introAssetsReady = (coverAssetReady && topologyAssetReady) || assetReleaseExpired;
 
   const complete = useCallback(() => {
     if (completedRef.current) return;
+    if (!canExit && !debugState) {
+      pendingCompleteRef.current = true;
+      return;
+    }
+    pendingCompleteRef.current = false;
     completedRef.current = true;
     window.clearTimeout(inactivityTimerRef.current);
     soundEngineRef.current?.stop();
     onExitStart?.();
     setLeaving(true);
     setTimeout(() => onDone?.(), 720);
-  }, [onDone, onExitStart]);
+  }, [canExit, debugState, onDone, onExitStart]);
+
+  useEffect(() => {
+    if (!canExit || !pendingCompleteRef.current || completedRef.current) return;
+    complete();
+  }, [canExit, complete]);
+
+  useEffect(() => {
+    if (coverAssetReady && topologyAssetReady) return undefined;
+    const timer = window.setTimeout(() => setAssetReleaseExpired(true), INTRO_ASSET_RELEASE_MS);
+    return () => window.clearTimeout(timer);
+  }, [coverAssetReady, topologyAssetReady]);
 
   const clearIdleExit = useCallback(() => {
     window.clearTimeout(inactivityTimerRef.current);
@@ -265,6 +298,10 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
     const handleRendererMessage = (event) => {
       if (event.origin !== window.location.origin) return;
       if (event.source !== rendererRef.current?.contentWindow) return;
+      if (event.data?.type === 'cyberatlas:ready') {
+        setTopologyAssetReady(true);
+        return;
+      }
       if (event.data?.type === 'cyberatlas:sonify') {
         soundEngineRef.current?.update(event.data.sample);
         return;
@@ -294,6 +331,7 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
     if (!debugState) return;
     clearIdleExit();
     completedRef.current = false;
+    pendingCompleteRef.current = false;
     interactionActiveRef.current = false;
     soundEngineRef.current?.stop();
     soundEngineRef.current = null;
@@ -309,13 +347,21 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
     if (!started || debugState || completedRef.current) return undefined;
     const initialProgress = scrubProgressRef.current;
     const duration = Math.max(1, AUTOPLAY_DURATION_MS * (1 - initialProgress));
-    const startedAt = performance.now();
+    let previousFrameAt = performance.now();
+    let accumulatedTime = 0;
     let frame = 0;
     let holdTimer = 0;
 
     const advance = (now) => {
-      const elapsed = now - startedAt;
-      const next = clamp01(initialProgress + (elapsed / duration) * (1 - initialProgress));
+      const frameDelta = Math.min(
+        INTRO_MAX_FRAME_DELTA_MS,
+        Math.max(0, now - previousFrameAt)
+      );
+      previousFrameAt = now;
+      accumulatedTime += frameDelta;
+      const next = clamp01(
+        initialProgress + (accumulatedTime / duration) * (1 - initialProgress)
+      );
       scrubProgressRef.current = next;
       setScrubProgress(next);
       if (next < 1) {
@@ -378,7 +424,7 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
   }, [started]);
 
   const handleTap = useCallback(() => {
-    if (debugState) return;
+    if (debugState || !introAssetsReady) return;
     if (!engaged) {
       if (!soundEngineRef.current) soundEngineRef.current = createCyberAtlasSoundEngine();
       soundEngineRef.current?.start().catch(() => {});
@@ -387,7 +433,7 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
     }
 
     continueInteraction();
-  }, [continueInteraction, debugState, engaged]);
+  }, [continueInteraction, debugState, engaged, introAssetsReady]);
 
   // The exit is intentionally offset instead of driving every property from
   // one progress value. The cover contracts first, then catches rotation and
@@ -438,6 +484,7 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
       data-engaged={engaged ? 'true' : 'false'}
       data-started={started ? 'true' : 'false'}
       data-leaving={leaving ? 'true' : 'false'}
+      data-assets-ready={introAssetsReady ? 'true' : 'false'}
       onClick={handleTap}
       onPointerDown={beginInteraction}
       onPointerMove={continueInteraction}
@@ -454,6 +501,10 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
           loading="eager"
           onLoad={() => {
             const renderer = rendererRef.current?.contentWindow;
+            renderer?.postMessage(
+              { type: 'cyberatlas:request-ready' },
+              window.location.origin
+            );
             renderer?.postMessage(
               { type: 'cyberatlas:set-reveal', progress: topologyReveal },
               window.location.origin
@@ -504,6 +555,19 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
                   className={styles.coverImage}
                   src="/covers/D277-2001-07-intro.jpg"
                   alt="월간 디자인 2001년 7월호 277호 표지"
+                  loading="eager"
+                  decoding="async"
+                  fetchpriority="high"
+                  onLoad={(event) => {
+                    const image = event.currentTarget;
+                    if (typeof image.decode !== 'function') {
+                      setCoverAssetReady(true);
+                      return;
+                    }
+                    image.decode()
+                      .catch(() => {})
+                      .finally(() => setCoverAssetReady(true));
+                  }}
                 />
               </div>
               <div
@@ -538,15 +602,16 @@ export default function IntroScreen({ onExitStart, onDone, debugState = null } =
       <button
         type="button"
         className={styles.startPrompt}
-        aria-label="인트로 애니메이션 시작"
+        aria-label={introAssetsReady ? '인트로 애니메이션 시작' : '인트로 에셋 준비 중'}
         aria-hidden={engaged ? 'true' : undefined}
         tabIndex={engaged ? -1 : 0}
+        disabled={!introAssetsReady}
         onClick={(event) => {
           event.stopPropagation();
           handleTap();
         }}
       >
-        <span>Tap to Play</span>
+        <span>{introAssetsReady ? 'Tap to Play' : 'Preparing'}</span>
       </button>
 
     </main>

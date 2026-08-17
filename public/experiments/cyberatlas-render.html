@@ -999,6 +999,15 @@ function acceptCoverTopology(payload){
   return true;
 }
 
+let CYBERATLAS_READY=false;
+function notifyCyberAtlasReady(){
+  if(window.parent===window) return;
+  window.parent.postMessage(
+    {type:'cyberatlas:ready',source:GA?.source||'embedded'},
+    window.location.origin
+  );
+}
+
 async function loadLiveTopology(){
   try{
     const response=await fetch('/api/internet-topology',{headers:{Accept:'application/json'}});
@@ -1017,11 +1026,16 @@ async function loadCoverTopology(){
     if(!acceptCoverTopology(await response.json())) throw new Error('invalid cover topology');
   }catch(error){
     console.warn('Using Internet topology fallback',error);
-    loadLiveTopology();
+    await loadLiveTopology();
+  }finally{
+    CYBERATLAS_READY=true;
+    notifyCyberAtlasReady();
   }
 }
 
 const REDUCED_MOTION=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ESSENTIAL_MOTION_DURATION_SCALE=REDUCED_MOTION?0.62:1;
+const ESSENTIAL_ROTATION_SCALE=REDUCED_MOTION?0.28:1;
 const VIEW_RADIUS={value:0,from:0,to:0,startedAt:0,duration:0,moving:false};
 const VIEW_CENTER={value:0.5,from:0.5,to:0.5,startedAt:0,duration:0,moving:false};
 const VIEW_REVEAL={value:0};
@@ -1033,7 +1047,10 @@ function setFocusedRadius(focused,delay=0,duration=820){
   VIEW_RADIUS.from=VIEW_RADIUS.value;
   VIEW_RADIUS.to=target;
   VIEW_RADIUS.startedAt=performance.now()+Math.max(0,Number(delay)||0);
-  VIEW_RADIUS.duration=REDUCED_MOTION?0:Math.max(1,Number(duration)||820);
+  VIEW_RADIUS.duration=Math.max(
+    320,
+    (Math.max(1,Number(duration)||820))*ESSENTIAL_MOTION_DURATION_SCALE
+  );
   VIEW_RADIUS.moving=VIEW_RADIUS.duration>0;
   if(!VIEW_RADIUS.moving) VIEW_RADIUS.value=target;
 }
@@ -1052,7 +1069,10 @@ function setLowerCenter(lowered,delay=0,duration=820){
   VIEW_CENTER.from=VIEW_CENTER.value;
   VIEW_CENTER.to=target;
   VIEW_CENTER.startedAt=performance.now()+Math.max(0,Number(delay)||0);
-  VIEW_CENTER.duration=REDUCED_MOTION?0:Math.max(1,Number(duration)||820);
+  VIEW_CENTER.duration=Math.max(
+    320,
+    (Math.max(1,Number(duration)||820))*ESSENTIAL_MOTION_DURATION_SCALE
+  );
   VIEW_CENTER.moving=VIEW_CENTER.duration>0;
   if(!VIEW_CENTER.moving) VIEW_CENTER.value=target;
 }
@@ -1096,6 +1116,9 @@ function topologyFrame(W,H){
 
 window.addEventListener('message',event=>{
   if(event.origin!==window.location.origin) return;
+  if(event.data?.type==='cyberatlas:request-ready'&&CYBERATLAS_READY){
+    notifyCyberAtlasReady();
+  }
   if(event.data?.type==='cyberatlas:set-focus'){
     setFocusedRadius(Boolean(event.data.focused),event.data.delay,event.data.duration);
   }
@@ -1629,13 +1652,6 @@ function startExploration(turns=3){
   EXPLORATION_SEQUENCE.nextAt=performance.now()+120;
   AUTO_ROTATION.nextAt=EXPLORATION_SEQUENCE.nextAt;
 
-  if(REDUCED_MOTION){
-    EXPLORATION_SEQUENCE.active=false;
-    window.parent.postMessage(
-      {type:'cyberatlas:exploration-complete',turns:EXPLORATION_SEQUENCE.total},
-      window.location.origin
-    );
-  }
 }
 
 function scheduleExplorationRotation(now){
@@ -1648,19 +1664,19 @@ function scheduleExplorationRotation(now){
   AUTO_ROTATION.fromYaw=AUTO_ROTATION.yaw;
   AUTO_ROTATION.fromPitch=AUTO_ROTATION.pitch;
   AUTO_ROTATION.fromRoll=AUTO_ROTATION.roll;
-  AUTO_ROTATION.toYaw=AUTO_ROTATION.yaw+gesture.yaw;
+  AUTO_ROTATION.toYaw=AUTO_ROTATION.yaw+gesture.yaw*ESSENTIAL_ROTATION_SCALE;
   AUTO_ROTATION.toPitch=clamp(
-    AUTO_ROTATION.pitch+gesture.pitch,
+    AUTO_ROTATION.pitch+gesture.pitch*ESSENTIAL_ROTATION_SCALE,
     -1.08-S.gpit,
     1.08-S.gpit
   );
   AUTO_ROTATION.toRoll=clamp(
-    AUTO_ROTATION.roll+gesture.roll,
+    AUTO_ROTATION.roll+gesture.roll*ESSENTIAL_ROTATION_SCALE,
     -0.18-S.grol,
     0.18-S.grol
   );
   AUTO_ROTATION.startedAt=now;
-  AUTO_ROTATION.duration=gesture.duration;
+  AUTO_ROTATION.duration=Math.max(620,gesture.duration*ESSENTIAL_MOTION_DURATION_SCALE);
   AUTO_ROTATION.impulse=gesture.impulse;
   AUTO_ROTATION.bank=gesture.bank;
   AUTO_ROTATION.moving=true;
