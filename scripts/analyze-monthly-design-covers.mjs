@@ -5,9 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIRECTORY = path.resolve(SCRIPT_DIRECTORY, '..');
+// 픽셀 분석은 보관해 둔 PNG 원본으로 하고, 출력 imageUrl은 서빙용 webp를 가리킨다.
+// (public/covers/archive/는 webp만 배포한다 — legacy/README.md 참고)
 const ARCHIVE_DIRECTORY = process.argv[2]
   ? path.resolve(process.argv[2])
-  : path.join(PROJECT_DIRECTORY, 'public', 'covers', 'archive');
+  : path.join(PROJECT_DIRECTORY, 'legacy', 'covers-archive-png');
 const OUTPUT_FILE = process.argv[3]
   ? path.resolve(process.argv[3])
   : path.join(PROJECT_DIRECTORY, 'public', 'data', 'monthly-design-cover-topology.json');
@@ -443,7 +445,7 @@ async function main() {
       date: `${year}.${month}`,
       year: Number(year),
       month: Number(month),
-      imageUrl: `/covers/archive/${filename}`,
+      imageUrl: `/covers/archive/${filename.replace(/\.png$/u, '.webp')}`,
     });
   });
   const referenceIndex = covers.findIndex((cover) => cover.id === REFERENCE_ID);

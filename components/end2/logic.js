@@ -26,7 +26,8 @@ export function useEnd2Logic({ onRestart } = {}) {
 
   const goHome = useCallback(() => {
     if (typeof onRestart === 'function') return onRestart();
-    router.push('/landing');
+    // `/landing`은 legacy로 이동해 더 이상 라우트가 없다. 플로우 시작점으로 돌린다.
+    router.push('/mobile');
   }, [onRestart, router]);
 
   const goWall = useCallback(() => {

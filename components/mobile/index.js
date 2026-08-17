@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 
 import IntroScreen from '@/components/intro';
-import CoverSelectScreen, { getInitialParticleCoverUrls } from '@/components/coverSelect';
+import CoverSelectScreen, { getInitialParticleCoverUrls, getWarmCoverPool } from '@/components/coverSelect';
 import GenerationFlow, {
   DEFAULT_GENERATION_REQUEST,
   GENERATION_PHASES,
   normalizeGenerationRequest,
 } from '@/components/generation';
 import End2Screen from '@/components/end2';
+import { WALL_ENABLED } from '@/lib/featureFlags';
 import { MONTHLY_DESIGN_COVERS } from '@/lib/monthlyDesignCovers';
 import { preloadImageBatch } from '@/lib/preloadImages';
 import styles from './styles.module.css';
@@ -49,6 +50,9 @@ const RESULT_TRANSITION_MS = 820;
 const DESKTOP_COVER_PRELOAD_CONCURRENCY = 4;
 const MOBILE_COVER_PRELOAD_CONCURRENCY = 2;
 const COVER_PRELOAD_RELEASE_MS = 12000;
+// 로딩 구의 모바일 파티클 수(components/load MOBILE_PARTICLE_COUNT)와 맞춘 목표.
+// 1차 워밍(≈45장) + 2차 워밍으로 이 수만큼 고유 표지를 만들어 둔다.
+const SPHERE_UNIQUE_COVER_TARGET = 96;
 
 export default function MobileScreen() {
   const router = useRouter();
@@ -68,6 +72,19 @@ export default function MobileScreen() {
     ready: false,
     timedOut: false,
   });
+  // 1차 워밍 풀: 인트로에서 미리 디코딩해 둔 초기 파티클 표지(≈45장).
+  const warmCoverArchive = useMemo(
+    () => (coverArchive ? getWarmCoverPool(coverArchive) : null),
+    [coverArchive]
+  );
+  // 2차 워밍 풀: 표지 선택(플로킹) 동안 백그라운드로 추가 디코딩한 표지.
+  // 로딩 구가 뜨기 전에 1차+2차 = 96장 고유 표지를 만들어 두는 것이 목표다.
+  const [extraWarmCovers, setExtraWarmCovers] = useState(null);
+  // 구(球) 풀은 제출 시점에 동결한 스냅샷. 로딩 도중 2차 워밍 완료로 풀이
+  // 바뀌면 구가 모든 비트맵을 다시 만들며 히치가 생기므로 갱신하지 않는다.
+  const [sphereCovers, setSphereCovers] = useState(null);
+  const warmCoverArchiveRef = useRef(null);
+  const extraWarmCoversRef = useRef(null);
   const [qaIndex, setQaIndex] = useState(null);
   const qaStage = qaIndex == null ? null : QA_STAGES[qaIndex];
   const coverTransitionReady = coverPreload.ready || coverPreload.timedOut;
@@ -166,6 +183,58 @@ export default function MobileScreen() {
     };
   }, []);
 
+  // 최신 워밍 풀을 제출 핸들러(stale closure)에서도 읽을 수 있게 ref로 미러링.
+  useEffect(() => {
+    warmCoverArchiveRef.current = warmCoverArchive;
+  }, [warmCoverArchive]);
+  useEffect(() => {
+    extraWarmCoversRef.current = extraWarmCovers;
+  }, [extraWarmCovers]);
+
+  // 2차 워밍: 플로킹(표지 선택) 화면이 떠 있는 동안 추가 표지를 미리 디코딩한다.
+  // 사용자가 표지를 고르고 프롬프트를 말하는 구간이라 시간 여유가 충분하고,
+  // 로딩 구가 뜬 뒤의 콜드 페치·디코딩 폭주를 피할 수 있다. best-effort —
+  // 완료 전에 제출하면 구는 그때까지 데워진 1차 풀만 쓴다.
+  useEffect(() => {
+    if (step !== STEPS.COVER || !coverTransitionReady) return undefined;
+    if (!coverArchive || !warmCoverArchive || extraWarmCovers) return undefined;
+
+    const warmIds = new Set(warmCoverArchive.map((cover) => cover.id));
+    const candidates = coverArchive.filter((cover) => !warmIds.has(cover.id));
+    const targetCount = Math.max(0, SPHERE_UNIQUE_COVER_TARGET - warmIds.size);
+    if (!candidates.length || !targetCount) {
+      setExtraWarmCovers([]);
+      return undefined;
+    }
+
+    // 아카이브 전체에서 등간격으로 샘플링해 연대가 고르게 섞이게 한다.
+    const sampleStep = Math.max(1, Math.floor(candidates.length / targetCount));
+    const offset = Math.floor(Math.random() * sampleStep);
+    const picked = [];
+    for (let index = offset; index < candidates.length && picked.length < targetCount; index += sampleStep) {
+      picked.push(candidates[index]);
+    }
+
+    const controller = new AbortController();
+    let active = true;
+    const mobileDecodeBudget = window.matchMedia('(pointer: coarse)').matches
+      || window.innerWidth < 768;
+    preloadImageBatch(picked.map((cover) => cover.imageUrl), {
+      concurrency: mobileDecodeBudget
+        ? MOBILE_COVER_PRELOAD_CONCURRENCY
+        : DESKTOP_COVER_PRELOAD_CONCURRENCY,
+      signal: controller.signal,
+    }).then((result) => {
+      if (!active || result.aborted) return;
+      setExtraWarmCovers(picked);
+    });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [step, coverTransitionReady, coverArchive, warmCoverArchive, extraWarmCovers]);
+
   useEffect(() => {
     if (!coverMounted || step !== STEPS.INTRO || transitioningToCover) return undefined;
     const frame = window.requestAnimationFrame(() => setTransitioningToCover(true));
@@ -249,6 +318,11 @@ export default function MobileScreen() {
       // Generation implementation belongs under components/generation/.
       submitGeneration: (request) => {
         setGenerationRequest(normalizeGenerationRequest(request));
+        // 구 풀을 제출 시점에 동결한다. 이후 2차 워밍이 끝나도 로딩 중인
+        // 구가 비트맵을 다시 만들지 않도록 스냅샷만 넘긴다.
+        const stageOne = warmCoverArchiveRef.current || [];
+        const extras = extraWarmCoversRef.current || [];
+        setSphereCovers(stageOne.length ? [...stageOne, ...extras] : null);
         setLoadMounted(true);
       },
       goHomage: (generatedImageUrl) => {
@@ -271,6 +345,7 @@ export default function MobileScreen() {
         setTransitioningToLoad(false);
         setTransitioningToHomage(false);
         setGenerationRequest(null);
+        setSphereCovers(null);
         go(STEPS.INTRO);
       },
     };
@@ -295,7 +370,8 @@ export default function MobileScreen() {
             <GenerationFlow
               phase={GENERATION_PHASES.RESULT}
               request={generationRequest}
-              onArchive={handlers.goArchive}
+              onArchive={WALL_ENABLED ? handlers.goArchive : null}
+              onRestart={handlers.goIntro}
             />
           </div>
         )}
@@ -306,7 +382,7 @@ export default function MobileScreen() {
               request={generationRequest}
               onGenerated={handlers.goHomage}
               debugMode={Boolean(qaStage) || step !== STEPS.LOAD || transitioningToLoad}
-              archiveCovers={coverArchive}
+              archiveCovers={sphereCovers || warmCoverArchive}
             />
           </div>
         )}
@@ -319,6 +395,7 @@ export default function MobileScreen() {
               onSubmit={handlers.submitGeneration}
               debugState={qaStage?.state || null}
               initialCovers={coverArchive}
+              extraWarmCovers={extraWarmCovers}
             />
           </div>
         )}

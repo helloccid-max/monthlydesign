@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import GlassSurface from '@/components/GlassSurface';
 import { DEFAULT_MONTHLY_DESIGN_COVER, MONTHLY_DESIGN_COVERS } from '@/lib/monthlyDesignCovers';
 import { POSTCARD_QUOTE_MAX_CHARS } from '@/lib/postcardQuoteLimit';
@@ -156,6 +156,32 @@ export function getInitialParticleCoverUrls(covers = MONTHLY_DESIGN_COVERS) {
   return buildParticleNodes(covers).map((particle) => particle.cover.imageUrl);
 }
 
+/**
+ * 인트로에서 실제로 미리 받아 디코딩해 둔 표지들만 모은 풀.
+ *
+ * 재생성(respawn)이 578장 전체에서 표지를 고르면 화면 밖으로 나간 카드가
+ * 돌아올 때마다 새 이미지를 네트워크에서 받아야 한다. 그동안 그 파티클은
+ * 빈 칸으로 보이고, 초당 수십 장의 디코딩이 애니메이션 프레임을 잡아먹는다.
+ * 미리 데워둔 집합 안에서만 순환시키면 재생성 비용이 0이 된다.
+ */
+export function getWarmCoverPool(covers = MONTHLY_DESIGN_COVERS) {
+  const seen = new Set();
+  const warm = [];
+  buildParticleNodes(covers).forEach((particle) => {
+    if (seen.has(particle.cover.id)) return;
+    seen.add(particle.cover.id);
+    warm.push(particle.cover);
+  });
+  return warm;
+}
+
+function mergeWarmCovers(base, extras) {
+  if (!Array.isArray(extras) || !extras.length) return base;
+  const seen = new Set(base.map((cover) => cover.id));
+  const additions = extras.filter((cover) => cover?.id && cover?.imageUrl && !seen.has(cover.id));
+  return additions.length ? [...base, ...additions] : base;
+}
+
 function getNaturalZ(boid, time) {
   const depthTime = time * 0.00022;
   const primary = Math.sin(depthTime * boid.depthRate + boid.phase);
@@ -201,10 +227,70 @@ function steeringVector(desiredX, desiredY, velocityX, velocityY, maximumSpeed, 
   return limitVector(scaledX - velocityX, scaledY - velocityY, maximumForce);
 }
 
+/**
+ * 카드 한 장. memo가 없으면 파티클 하나가 재진입할 때마다 48장 전체가 다시
+ * 렌더되고, 인라인 ref 콜백이 매번 새 함수라 48개 ref가 통째로 detach/attach된다.
+ * 재진입은 초당 수차례 일어나므로 모바일에서 이 비용이 곧 끊김으로 나타난다.
+ */
+const ArchiveParticle = memo(function ArchiveParticle({
+  particle,
+  isSelected,
+  onRegisterElement,
+  onToggle,
+}) {
+  const { cover } = particle;
+
+  return (
+    <button
+      ref={(element) => onRegisterElement(particle.id, element)}
+      type="button"
+      className={styles.particle}
+      data-selected={isSelected ? 'true' : 'false'}
+      data-depth={particle.depthName}
+      data-generation={particle.generation}
+      data-particle-id={particle.id}
+      aria-label={`월간디자인 ${cover.issue}호 ${cover.date} ${isSelected ? '선택 해제' : '선택'}`}
+      aria-pressed={isSelected}
+      onPointerDown={(event) => {
+        if (typeof event.button === 'number' && event.button !== 0) return;
+        // Select at contact time. Waiting for click/touchend lets a
+        // fast flocking card move out from under the finger on mobile.
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        onToggle(particle.id, cover.id);
+      }}
+      onClick={(event) => {
+        if (event.detail === 0) onToggle(particle.id, cover.id);
+      }}
+      style={{
+        '--size': `${particle.size}vmin`,
+        '--z': particle.zIndex,
+        '--initial-x': `${particle.initialX}vw`,
+        '--initial-y': `${particle.initialY}vh`,
+        '--initial-z': `${particle.z}px`,
+      }}
+    >
+      <img
+        src={cover.imageUrl}
+        alt=""
+        onLoad={(event) => {
+          const image = event.currentTarget;
+          if (!image.naturalWidth || !image.naturalHeight) return;
+          image.parentElement?.style.setProperty(
+            '--cover-aspect-ratio',
+            `${image.naturalWidth} / ${image.naturalHeight}`
+          );
+        }}
+      />
+    </button>
+  );
+});
+
 export default function CoverSelectScreen({
   onSubmit,
   debugState = null,
   initialCovers = null,
+  extraWarmCovers = null,
 } = {}) {
   const initialCoverPool = Array.isArray(initialCovers) && initialCovers.length
     ? initialCovers
@@ -230,6 +316,8 @@ export default function CoverSelectScreen({
   const selectedActionRef = useRef(null);
   const boidsRef = useRef([]);
   const coverPoolRef = useRef(initialCoverPool);
+  const warmCoverPoolRef = useRef(getWarmCoverPool(initialCoverPool));
+  const extraWarmCoversRef = useRef(null);
   const selectedParticleRef = useRef(null);
   const selectionTransitionRef = useRef(null);
   const releaseTransitionsRef = useRef(new Map());
@@ -369,7 +457,19 @@ export default function CoverSelectScreen({
 
   useEffect(() => {
     coverPoolRef.current = coverPool;
+    warmCoverPoolRef.current = mergeWarmCovers(
+      getWarmCoverPool(coverPool),
+      extraWarmCoversRef.current
+    );
   }, [coverPool]);
+
+  // 2차 워밍이 끝난 표지를 재진입 풀에 흡수한다. 이미 디코딩된 이미지들이라
+  // 콜드 페치 없이 플로킹의 표지 순환만 다양해진다. ref만 갱신하므로
+  // 파티클 리렌더도 일어나지 않는다.
+  useEffect(() => {
+    extraWarmCoversRef.current = extraWarmCovers;
+    warmCoverPoolRef.current = mergeWarmCovers(warmCoverPoolRef.current, extraWarmCovers);
+  }, [extraWarmCovers]);
 
   useEffect(() => {
     return () => {
@@ -533,12 +633,14 @@ export default function CoverSelectScreen({
       boid.swayPhase = hash(boid.index, boid.generation * 31.1) * Math.PI * 2;
       boid.swayRate = 0.44 + hash(boid.index, boid.generation * 37.7) * 0.66;
 
+      // 재진입 표지는 프리로드된 풀 안에서만 고른다. 전체 아카이브에서 고르면
+      // 카드가 돌아올 때마다 콜드 페치가 발생해 빈 카드와 프레임 드랍이 생긴다.
       setParticles((current) => current.map((particle, index) => {
         if (particle.id !== boid.id) return particle;
         return {
           ...particle,
           generation: boid.generation,
-          cover: chooseCover(index, coverPoolRef.current, boid.generation, particle.cover.id),
+          cover: chooseCover(index, warmCoverPoolRef.current, boid.generation, particle.cover.id),
         };
       }));
       setSelectedParticleId((current) => (current === boid.id ? null : current));
@@ -1239,6 +1341,12 @@ export default function CoverSelectScreen({
     }
   }, [debugState, particles, releaseParticle, selectParticle, stopInputMeter]);
 
+  // 안정적인 identity여야 ArchiveParticle의 memo가 유지된다.
+  const registerParticleElement = useCallback((particleId, element) => {
+    if (element) particleElementsRef.current.set(particleId, element);
+    else particleElementsRef.current.delete(particleId);
+  }, []);
+
   const handleParticlePointerDown = useCallback((event) => {
     if (typeof event.button === 'number' && event.button !== 0) return;
 
@@ -1364,57 +1472,15 @@ export default function CoverSelectScreen({
         onPointerLeave={handleFieldPointerLeave}
         onPointerCancel={handleFieldPointerLeave}
       >
-        {particles.map((particle) => {
-          const isSelected = particle.id === selectedParticleId;
-          return (
-            <button
-              key={particle.id}
-              ref={(element) => {
-                if (element) particleElementsRef.current.set(particle.id, element);
-                else particleElementsRef.current.delete(particle.id);
-              }}
-              type="button"
-              className={styles.particle}
-              data-selected={isSelected ? 'true' : 'false'}
-              data-depth={particle.depthName}
-              data-generation={particle.generation}
-              data-particle-id={particle.id}
-              aria-label={`월간디자인 ${particle.cover.issue}호 ${particle.cover.date} ${isSelected ? '선택 해제' : '선택'}`}
-              aria-pressed={isSelected}
-              onPointerDown={(event) => {
-                if (typeof event.button === 'number' && event.button !== 0) return;
-                // Select at contact time. Waiting for click/touchend lets a
-                // fast flocking card move out from under the finger on mobile.
-                event.stopPropagation();
-                event.currentTarget.setPointerCapture?.(event.pointerId);
-                toggleParticle(particle.id, particle.cover.id);
-              }}
-              onClick={(event) => {
-                if (event.detail === 0) toggleParticle(particle.id, particle.cover.id);
-              }}
-              style={{
-                '--size': `${particle.size}vmin`,
-                '--z': particle.zIndex,
-                '--initial-x': `${particle.initialX}vw`,
-                '--initial-y': `${particle.initialY}vh`,
-                '--initial-z': `${particle.z}px`,
-              }}
-            >
-              <img
-                src={particle.cover.imageUrl}
-                alt=""
-                onLoad={(event) => {
-                  const image = event.currentTarget;
-                  if (!image.naturalWidth || !image.naturalHeight) return;
-                  image.parentElement?.style.setProperty(
-                    '--cover-aspect-ratio',
-                    `${image.naturalWidth} / ${image.naturalHeight}`
-                  );
-                }}
-              />
-            </button>
-          );
-        })}
+        {particles.map((particle) => (
+          <ArchiveParticle
+            key={particle.id}
+            particle={particle}
+            isSelected={particle.id === selectedParticleId}
+            onRegisterElement={registerParticleElement}
+            onToggle={toggleParticle}
+          />
+        ))}
 
         <p className={styles.fieldLabel}>ARCHIVE 1976–2026</p>
         {selected && (

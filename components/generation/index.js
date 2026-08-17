@@ -18,6 +18,7 @@ export default function GenerationFlow({
   request,
   onGenerated,
   onArchive,
+  onRestart,
   debugMode = false,
   archiveCovers = null,
 } = {}) {
@@ -27,7 +28,7 @@ export default function GenerationFlow({
   };
 
   if (phase === GENERATION_PHASES.RESULT) {
-    return <HomageScreen request={normalizedRequest} onArchive={onArchive} />;
+    return <HomageScreen request={normalizedRequest} onArchive={onArchive} onRestart={onRestart} />;
   }
 
   return (

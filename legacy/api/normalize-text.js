@@ -1,4 +1,4 @@
-import { buildNormalizeTextSystemPrompt } from '../../components/prompts/normalizeTextPrompt';
+import { buildNormalizeTextSystemPrompt } from '../components/prompts/normalizeTextPrompt';
 import { POSTCARD_QUOTE_MAX_CHARS } from '../../lib/postcardQuoteLimit';
 
 export default async function handler(req, res) {

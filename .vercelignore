@@ -1,6 +1,7 @@
 .claude/
 .next/
 .next-dev/
+legacy/
 .env
 .env.*
 *.log

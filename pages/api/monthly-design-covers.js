@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createArchiveMonthlyDesignCover } from '@/lib/monthlyDesignCovers';
 
-const FILE_PATTERN = /^(\d{4})_(\d{2})\.png$/;
+const FILE_PATTERN = /^(\d{4})_(\d{2})\.webp$/;
 let archivePromise;
 
 async function readArchive() {

@@ -6,6 +6,9 @@ import styles from './styles.module.css';
 const MOBILE_PARTICLE_COUNT = 96;
 const DESKTOP_PARTICLE_COUNT = 156;
 const BITMAP_MAX = 220;
+// 모바일은 dpr 1로 렌더하고 파티클 최대 그리기 폭이 ~170px라 220px 비트맵은
+// 과잉이다. 96장 고유 표지 기준 캔버스 메모리를 약 1/3 줄인다.
+const MOBILE_BITMAP_MAX = 176;
 const STATUS_TEXT = '당신의 오마주 표지를 생성하고 있어요';
 const STATUS_CHARACTERS = Array.from(STATUS_TEXT);
 const STATUS_VISIBLE_CHARACTER_COUNT = STATUS_CHARACTERS.filter((value) => value !== ' ').length;
@@ -158,7 +161,18 @@ function CoverParticleSphere({ imageUrls, seed }) {
       if (!reduceMotion) frameId = window.requestAnimationFrame(draw);
     };
 
-    const loadBitmap = (source, index) => {
+    // 같은 URL을 쓰는 파티클끼리 비트맵 캔버스를 공유한다. 풀보다 파티클이
+    // 많으면(특히 데스크톱 156개) 중복 URL마다 캔버스를 만들던 것이 곧
+    // 파티클 수에 비례하는 메모리였다.
+    const bitmapMax = window.innerWidth <= 768 ? MOBILE_BITMAP_MAX : BITMAP_MAX;
+    const urlIndices = new Map();
+    imageUrls.forEach((url, index) => {
+      const indices = urlIndices.get(url);
+      if (indices) indices.push(index);
+      else urlIndices.set(url, [index]);
+    });
+
+    const loadBitmap = (source, indices) => {
       const image = new Image();
       image.decoding = 'async';
       image.onload = () => {
@@ -166,21 +180,23 @@ function CoverParticleSphere({ imageUrls, seed }) {
         const aspect = image.naturalWidth / Math.max(1, image.naturalHeight);
         const bitmap = document.createElement('canvas');
         if (aspect >= 1) {
-          bitmap.width = BITMAP_MAX;
-          bitmap.height = Math.max(1, Math.round(BITMAP_MAX / aspect));
+          bitmap.width = bitmapMax;
+          bitmap.height = Math.max(1, Math.round(bitmapMax / aspect));
         } else {
-          bitmap.height = BITMAP_MAX;
-          bitmap.width = Math.max(1, Math.round(BITMAP_MAX * aspect));
+          bitmap.height = bitmapMax;
+          bitmap.width = Math.max(1, Math.round(bitmapMax * aspect));
         }
         const bitmapContext = bitmap.getContext('2d');
-        if (!bitmapContext) {
-          bitmaps[index] = image;
-        } else {
+        let shared = image;
+        if (bitmapContext) {
           bitmapContext.imageSmoothingEnabled = true;
           bitmapContext.imageSmoothingQuality = 'high';
           bitmapContext.drawImage(image, 0, 0, bitmap.width, bitmap.height);
-          bitmaps[index] = bitmap;
+          shared = bitmap;
         }
+        indices.forEach((index) => {
+          bitmaps[index] = shared;
+        });
 
         // Reduced-motion devices intentionally do not keep an animation loop.
         // Redraw as each async image arrives so the static sphere is never blank.
@@ -193,7 +209,7 @@ function CoverParticleSphere({ imageUrls, seed }) {
     };
 
     resize();
-    imageUrls.forEach(loadBitmap);
+    urlIndices.forEach((indices, url) => loadBitmap(url, indices));
     frameId = window.requestAnimationFrame(draw);
     window.addEventListener('resize', resize);
     return () => {
