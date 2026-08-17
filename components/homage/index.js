@@ -12,11 +12,9 @@ export default function HomageScreen({ request, onEdit } = {}) {
     () => {
       // request.generatedImageUrl이 있으면 그걸 최우선으로 씁니다.
       if (request?.generatedImageUrl && typeof request.generatedImageUrl === 'string') {
-        console.log('Using generatedImageUrl length:', request.generatedImageUrl.length);
         return request.generatedImageUrl;
       }
       // 없으면 fallback으로 로컬 SVG를 씁니다.
-      console.warn('Falling back to local SVG! request.generatedImageUrl is missing or invalid. Length:', request?.generatedImageUrl ? request.generatedImageUrl.length : 0);
       return createHomageCoverUrl({ prompt, issue, date });
     },
     [date, issue, prompt, request?.generatedImageUrl]

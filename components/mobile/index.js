@@ -217,9 +217,7 @@ export default function MobileScreen() {
           finalUrl = generatedImageUrl;
         }
         setGenerationRequest(prev => {
-          const next = { ...prev, generatedImageUrl: finalUrl };
-          console.log('goHomage called, updating generationRequest. generatedImageUrl length:', next.generatedImageUrl ? next.generatedImageUrl.length : 0);
-          return next;
+          return { ...prev, generatedImageUrl: finalUrl };
         });
         setTimeout(() => go(STEPS.HOMAGE), 50);
       },

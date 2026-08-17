@@ -24,7 +24,6 @@ export default function GenerationFlow({
     ...normalizeGenerationRequest(request),
     generatedImageUrl: request?.generatedImageUrl || null
   };
-  console.log('GenerationFlow render, phase:', phase, 'request.generatedImageUrl length:', request?.generatedImageUrl ? request.generatedImageUrl.length : 0);
 
   if (phase === GENERATION_PHASES.RESULT) {
     return <HomageScreen request={normalizedRequest} onEdit={onEdit} />;

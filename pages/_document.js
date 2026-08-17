@@ -4,6 +4,7 @@ export default function Document() {
   return (
     <Html lang="ko">
       <Head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link
           rel="preload"
           href="/fonts/black-han-sans-title.woff2"

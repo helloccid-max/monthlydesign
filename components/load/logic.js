@@ -100,7 +100,6 @@ export function useLoadLogic({ request, onDone, paused = false } = {}) {
           const statusRes = await fetch(`/api/runpod/status/${jobId}`);
           if (!statusRes.ok) throw new Error('Status check failed');
           const statusData = await statusRes.json();
-          console.log('RunPod status:', statusData.status);
 
           if (statusData.status === 'COMPLETED') {
             // RunPod에서 결과 이미지가 배열로 올 수도 있고 단일 문자열일 수도 있으므로 안전하게 추출
@@ -127,14 +126,11 @@ export function useLoadLogic({ request, onDone, paused = false } = {}) {
               outputUrl = statusData.image_url;
             }
             
-            console.log('Extracted outputUrl length:', outputUrl ? outputUrl.length : 0);
-            
             if (outputUrl && typeof outputUrl === 'string') {
               // base64 형식인 경우 data url로 변환
               if (!outputUrl.startsWith('http') && !outputUrl.startsWith('data:')) {
                  outputUrl = `data:image/png;base64,${outputUrl}`;
               }
-              console.log('RunPod completed with URL length:', outputUrl.length);
               goDone(outputUrl);
             } else {
               console.error('No valid output URL from RunPod:', statusData);

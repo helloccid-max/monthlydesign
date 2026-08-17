@@ -54,7 +54,12 @@ export default async function handler(req, res) {
         imageUrl: isHttpUrl ? rawImgUrl : undefined,
         imageBase64: isHttpUrl ? undefined : payloadInput.image
       });
-      if (workflow) payloadInput.workflow = workflow;
+      if (!workflow || Object.keys(workflow).length === 0) {
+        throw new Error(
+          "Comfy workflow could not be loaded. Check COMFY_WORKFLOW_FILE and the serverless file trace."
+        );
+      }
+      payloadInput.workflow = workflow;
     }
 
     const runUrl = `https://api.runpod.ai/v2/${encodeURIComponent(endpointId)}/run`;
