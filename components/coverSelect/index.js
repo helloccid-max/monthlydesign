@@ -36,8 +36,13 @@ const POINTER_SLOW_RADIUS = 168;
 const POINTER_SLOW_MINIMUM = 0.22;
 const POINTER_SLOW_IN_RESPONSE = 7.2;
 const POINTER_SLOW_OUT_RESPONSE = 2.8;
+const TOUCH_HIT_SLOP_PX = 38;
+const POINTER_HIT_SLOP_PX = 10;
 const MAXIMUM_FRAME_DELTA_SECONDS = 0.08;
-const REDUCED_MOTION_SPEED_SCALE = 0.38;
+// The archive flow is functional navigation, not only decoration. Keep it
+// unmistakably alive when the OS requests reduced motion, while lowering its
+// velocity enough to avoid an aggressive field.
+const REDUCED_MOTION_SPEED_SCALE = 0.72;
 const DEPTH_DISTRIBUTION_INTERVAL = 24;
 const MIDDLE_DEPTH_COUNT_PER_INTERVAL = 16;
 const ULTRA_NEAR_Z_MIN = 500;
@@ -1243,19 +1248,26 @@ export default function CoverSelectScreen({
       : null;
 
     if (!particle) {
+      const hitSlop = event.pointerType === 'touch'
+        ? TOUCH_HIT_SLOP_PX
+        : POINTER_HIT_SLOP_PX;
       const matches = particles
         .map((item) => {
           const element = particleElementsRef.current.get(item.id);
           if (!element) return null;
           const rect = element.getBoundingClientRect();
-          const containsPoint = event.clientX >= rect.left
-            && event.clientX <= rect.right
-            && event.clientY >= rect.top
-            && event.clientY <= rect.bottom;
-          return containsPoint ? { item, depth: Number(element.style.zIndex) || 0 } : null;
+          const outsideX = Math.max(rect.left - event.clientX, 0, event.clientX - rect.right);
+          const outsideY = Math.max(rect.top - event.clientY, 0, event.clientY - rect.bottom);
+          const distance = Math.hypot(outsideX, outsideY);
+          if (distance > hitSlop) return null;
+          return {
+            item,
+            distance,
+            depth: Number(window.getComputedStyle(element).zIndex) || 0,
+          };
         })
         .filter(Boolean)
-        .sort((a, b) => b.depth - a.depth);
+        .sort((a, b) => a.distance - b.distance || b.depth - a.depth);
 
       particle = matches[0]?.item;
     }
@@ -1369,6 +1381,14 @@ export default function CoverSelectScreen({
               data-particle-id={particle.id}
               aria-label={`월간디자인 ${particle.cover.issue}호 ${particle.cover.date} ${isSelected ? '선택 해제' : '선택'}`}
               aria-pressed={isSelected}
+              onPointerDown={(event) => {
+                if (typeof event.button === 'number' && event.button !== 0) return;
+                // Select at contact time. Waiting for click/touchend lets a
+                // fast flocking card move out from under the finger on mobile.
+                event.stopPropagation();
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+                toggleParticle(particle.id, particle.cover.id);
+              }}
               onClick={(event) => {
                 if (event.detail === 0) toggleParticle(particle.id, particle.cover.id);
               }}

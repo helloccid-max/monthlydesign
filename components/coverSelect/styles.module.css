@@ -150,6 +150,14 @@
   inset: -6px;
 }
 
+@media (pointer: coarse) {
+  .particle::after {
+    /* Preserve the visible cover size while meeting a more forgiving touch
+       target around small/far particles. */
+    inset: -11px;
+  }
+}
+
 .particle img {
   display: block;
   width: 100%;
