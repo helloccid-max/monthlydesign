@@ -394,6 +394,14 @@
   );
 }
 
+/* A live transcript is content, not a marquee. Keep every typed glyph fully
+   opaque and reserve explicit space for the top-right cancel control. */
+.continueButton[data-has-transcript='true'] .voiceButtonContent {
+  padding-inline: 4px 22px;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
 .continueButton[data-error='true'] .voiceButtonContent {
   gap: 10px;
 }
@@ -473,6 +481,17 @@
 
 .voiceControl[data-single-line='true'] .voiceCancelButton:active {
   transform: translateY(-50%) scale(0.9);
+}
+
+.continueButton[data-has-transcript='true'] + .voiceCancelButton,
+.voiceControl[data-single-line='true'] .continueButton[data-has-transcript='true'] + .voiceCancelButton {
+  top: 10px;
+  right: 10px;
+  transform: none;
+}
+
+.voiceControl[data-single-line='true'] .continueButton[data-has-transcript='true'] + .voiceCancelButton:active {
+  transform: scale(0.9);
 }
 
 .voiceCancelButton:disabled {

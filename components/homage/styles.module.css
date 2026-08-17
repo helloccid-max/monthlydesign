@@ -94,15 +94,15 @@
   border: 0.5px solid #fff;
   border-radius: 999px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.085), rgba(176, 176, 176, 0.035) 52%, rgba(255, 255, 255, 0.018)),
-    rgba(7, 8, 10, 0.2);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(192, 192, 188, 0.055) 52%, rgba(255, 255, 255, 0.026)),
+    rgba(58, 59, 56, 0.72);
   color: rgba(247, 249, 241, 0.96);
   white-space: nowrap;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.065),
     0 12px 30px rgba(0, 0, 0, 0.42),
-    0 3px 12px rgba(255, 255, 255, 0.025);
+    0 3px 12px rgba(255, 255, 255, 0.035);
   backdrop-filter: blur(18px) saturate(135%);
   -webkit-backdrop-filter: blur(18px) saturate(135%);
   cursor: pointer;
@@ -136,8 +136,8 @@
   .actionButton:hover {
     border-color: #fff;
     background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.11), rgba(180, 180, 180, 0.045) 52%, rgba(255, 255, 255, 0.022)),
-      rgba(7, 8, 10, 0.24);
+      linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(202, 202, 198, 0.07) 52%, rgba(255, 255, 255, 0.034)),
+      rgba(64, 65, 62, 0.78);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.24),
       inset 0 -1px 0 rgba(255, 255, 255, 0.065),
