@@ -1092,12 +1092,12 @@ function updateViewCenter(now){
    complete graph fills its available field without being cropped. */
 function topologyFrame(W,H){
   const morph=smooth(VIEW_RADIUS.value);
-  /* 리빌 줌이 목표에 닿아도 정지하지 않는다. 완료 후 초당 약 0.4%씩,
-     최대 +8%까지 아주 느리게 줌이 이어져 화면이 살아 있게 유지된다. */
+  /* 리빌 줌이 목표에 닿아도 정지하지 않는다. 완료 후 초당 약 0.8%씩,
+     최대 +14%까지 느리게 줌이 이어져 화면이 계속 다가오는 느낌을 준다. */
   let revealCreep=1;
   if(VIEW_REVEAL.value>=0.999){
     if(!VIEW_REVEAL.settledAt) VIEW_REVEAL.settledAt=performance.now();
-    revealCreep=1+Math.min(0.08,(performance.now()-VIEW_REVEAL.settledAt)*0.000004);
+    revealCreep=1+Math.min(0.14,(performance.now()-VIEW_REVEAL.settledAt)*0.000008);
   }else if(VIEW_REVEAL.settledAt){
     VIEW_REVEAL.settledAt=0;
   }

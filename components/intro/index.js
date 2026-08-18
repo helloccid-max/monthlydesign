@@ -516,8 +516,8 @@ export default function IntroScreen({
   const finalTitleIndent = easeOutQuint(segment(scrubProgress, 0.8, 0.89));
   const finalTranslation = easeOutQuint(segment(scrubProgress, 0.795, 0.88));
   const finalSplitActive = scrubProgress >= 0.745;
-  // 프레스 팝 안착값(0.68)에서 이어받아 수축하며 퇴장한다.
-  const coverExitScale = 0.68 * (1 - 0.2 * coverExitScaleProgress);
+  // 대기 중 슬로우 축소의 종점(0.62)에서 끊김 없이 이어받아 계속 수축한다.
+  const coverExitScale = 0.62 * (1 - 0.2 * coverExitScaleProgress);
   const coverTransform = `translate3d(0, ${(-132 * coverRise).toFixed(3)}dvh, 0) perspective(1400px) rotateY(${(45 * coverExitSpinProgress).toFixed(3)}deg) scale(${coverExitScale.toFixed(4)})`;
 
   useEffect(() => {
@@ -616,7 +616,11 @@ export default function IntroScreen({
 
         <div
           className={styles.coverFilm}
-          style={started ? { transform: coverTransform } : undefined}
+          style={{
+            '--cover-shrink-delay': `${COVER_FLIP_START_MS + COVER_FLIP_DURATION_MS}ms`,
+            '--cover-back-hold': `${COVER_BACK_HOLD_MS}ms`,
+            ...(started ? { transform: coverTransform } : null),
+          }}
         >
           <div className={styles.coverArrivalTilt}>
             <div

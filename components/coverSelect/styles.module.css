@@ -632,25 +632,10 @@
   transform: translateX(0) scale(1);
 }
 
-.continueButton[data-awaiting-speech='true'] .voiceTranscript {
-  opacity: 0;
-  filter: blur(6px);
-  transform: translateX(var(--voice-copy-shift)) scale(0.96);
-}
-
+/* 가이드 단계("프롬프트를 말해보세요")는 별도 오버레이가 아니라 트랜스크립트
+   요소 자체가 표시한다 — 컨테이너·텍스트·웨이브가 같은 요소에서 이어져
+   STT 전환에 점프가 없다. (구 voiceListeningPrompt 오버레이는 제거됨.) */
 .continueButton[data-awaiting-speech='true'] .permissionPrompt {
-  opacity: 0;
-  filter: blur(6px);
-  transform: translateX(calc(-1 * var(--voice-copy-shift))) scale(0.96);
-}
-
-.continueButton[data-awaiting-speech='true'] .voiceListeningPrompt {
-  opacity: 1;
-  filter: blur(0);
-  transform: translateX(0) scale(1);
-}
-
-.continueButton[data-has-transcript='true'] .voiceListeningPrompt {
   opacity: 0;
   filter: blur(6px);
   transform: translateX(calc(-1 * var(--voice-copy-shift))) scale(0.96);

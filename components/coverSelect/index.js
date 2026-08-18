@@ -52,6 +52,7 @@ const COVER_SELECTION_TITLE_LINES = [
   { text: '하나 선택하세요', offset: 10 },
 ];
 const VOICE_BUTTON_LABEL = '나만의 오마주 표지 만들기';
+const VOICE_GUIDE_PROMPT_TEXT = '프롬프트를 말해보세요';
 
 const SPEECH_ERROR_MESSAGES = {
   'not-allowed': '마이크 권한 허용해주세요',
@@ -319,6 +320,9 @@ export default function CoverSelectScreen({
   const [speechError, setSpeechError] = useState('');
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [voicePromptSingleLine, setVoicePromptSingleLine] = useState(false);
+  // 리스닝 시작~첫 단어 사이: 트랜스크립트 자리에 가이드 문구를 띄우는 단계.
+  // 가이드가 같은 요소에 있어야 컨테이너·텍스트·웨이브가 끊기지 않고 이어진다.
+  const [promptPlaceholder, setPromptPlaceholder] = useState(false);
   const [guidanceDismissed, setGuidanceDismissed] = useState(false);
   const [coverPool, setCoverPool] = useState(initialCoverPool);
   const [particles, setParticles] = useState(() => buildParticleNodes(initialCoverPool));
@@ -336,6 +340,7 @@ export default function CoverSelectScreen({
   const releaseTransitionsRef = useRef(new Map());
   const recognitionRef = useRef(null);
   const promptValueRef = useRef('');
+  const promptPlaceholderRef = useRef(false);
   const speechBaseRef = useRef('');
   const speechFinalRef = useRef('');
   const speechHadErrorRef = useRef(false);
@@ -382,6 +387,16 @@ export default function CoverSelectScreen({
       observer.disconnect();
     };
   }, [displayedPrompt]);
+
+  useEffect(() => {
+    promptPlaceholderRef.current = promptPlaceholder;
+  }, [promptPlaceholder]);
+
+  useEffect(() => {
+    // 첫 단어가 도착하면 가이드 단계 종료 → 아래 동기화 효과가 가이드를
+    // 한 글자씩 지운 뒤 실제 프롬프트를 타이핑한다.
+    if (promptPlaceholder && promptValue) setPromptPlaceholder(false);
+  }, [promptPlaceholder, promptValue]);
 
   const scheduleSpeechSendReady = useCallback(() => {
     window.clearTimeout(speechActivityTimerRef.current);
@@ -514,6 +529,8 @@ export default function CoverSelectScreen({
 
   useEffect(() => {
     if (displayedPrompt === promptValue) return undefined;
+    // 가이드 단계에서는 동기화하지 않는다(빈 promptValue로 지워지는 것 방지).
+    if (promptPlaceholder && !promptValue) return undefined;
 
     const timer = window.setTimeout(() => {
       setDisplayedPrompt((current) => {
@@ -524,7 +541,11 @@ export default function CoverSelectScreen({
           while (sharedLength < maximum && current[sharedLength] === promptValue[sharedLength]) {
             sharedLength += 1;
           }
-          return promptValue.slice(0, sharedLength);
+          // 한 번에 지우지 않고 타자기처럼 몇 글자씩 되감는다 — 가이드 문구가
+          // 지워지며 실제 프롬프트로 이어지는 연속성의 핵심.
+          const erasable = current.length - sharedLength;
+          const eraseStep = Math.max(1, Math.ceil(erasable / 8));
+          return current.slice(0, Math.max(sharedLength, current.length - eraseStep));
         }
         const remaining = promptValue.length - current.length;
         const step = Math.max(1, Math.ceil(remaining / 12));
@@ -533,7 +554,7 @@ export default function CoverSelectScreen({
     }, 28);
 
     return () => window.clearTimeout(timer);
-  }, [displayedPrompt, promptValue]);
+  }, [displayedPrompt, promptValue, promptPlaceholder]);
 
   useEffect(() => {
     if (Array.isArray(initialCovers) && initialCovers.length) return undefined;
@@ -994,6 +1015,14 @@ export default function CoverSelectScreen({
       setPromptValue(basePrompt);
       setDisplayedPrompt(basePrompt);
     }
+    if (!basePrompt) {
+      // 가이드 문구를 트랜스크립트 요소에 직접 띄운다. 이 시점에 컨테이너가
+      // 최종 형태로 한 번 morph하고, 이후 STT까지 컨테이너 변화가 없다.
+      setPromptPlaceholder(true);
+      setDisplayedPrompt(VOICE_GUIDE_PROMPT_TEXT);
+    } else {
+      setPromptPlaceholder(false);
+    }
     setPendingSubmit(false);
     setSpeechActive(false);
     setSpeechSendReady(false);
@@ -1052,6 +1081,10 @@ export default function CoverSelectScreen({
       stopInputMeter();
       speechHadErrorRef.current = true;
       manualStopRef.current = false;
+      if (promptPlaceholderRef.current) {
+        setPromptPlaceholder(false);
+        setDisplayedPrompt('');
+      }
       setSpeechActive(false);
       setSpeechSendReady(false);
       setSpeechStatus('error');
@@ -1062,6 +1095,10 @@ export default function CoverSelectScreen({
       if (recognitionRef.current !== recognition) return;
       recognitionRef.current = null;
       window.clearTimeout(speechActivityTimerRef.current);
+      if (promptPlaceholderRef.current && !promptValueRef.current.trim()) {
+        setPromptPlaceholder(false);
+        setDisplayedPrompt('');
+      }
       setSpeechActive(false);
       setSpeechSendReady(false);
       if (!speechHadErrorRef.current) {
@@ -1123,6 +1160,7 @@ export default function CoverSelectScreen({
     speechHadErrorRef.current = false;
     setPromptValue('');
     setDisplayedPrompt('');
+    setPromptPlaceholder(false);
     setSpeechActive(false);
     setSpeechSendReady(false);
     setSpeechError('');
@@ -1199,6 +1237,7 @@ export default function CoverSelectScreen({
     speechHadErrorRef.current = false;
     setPromptValue('');
     setDisplayedPrompt('');
+    setPromptPlaceholder(false);
     setSpeechStatus('idle');
     setSpeechActive(false);
     setSpeechSendReady(false);
@@ -1304,6 +1343,7 @@ export default function CoverSelectScreen({
     speechHadErrorRef.current = false;
     setPromptValue('');
     setDisplayedPrompt('');
+    setPromptPlaceholder(false);
     setSpeechStatus('idle');
     setSpeechActive(false);
     setSpeechSendReady(false);
@@ -1336,6 +1376,7 @@ export default function CoverSelectScreen({
       if (selectedParticleRef.current) releaseParticle(selectedParticleRef.current);
       setPromptValue('');
       setDisplayedPrompt('');
+      setPromptPlaceholder(false);
       setSpeechStatus('idle');
       setSpeechActive(false);
       setSpeechSendReady(false);
@@ -1352,22 +1393,26 @@ export default function CoverSelectScreen({
     if (debugState === 'selected') {
       setPromptValue('');
       setDisplayedPrompt('');
+      setPromptPlaceholder(false);
       setSpeechStatus('idle');
       setSpeechActive(false);
       setSpeechSendReady(false);
     } else if (debugState === 'permission') {
       setPromptValue('');
       setDisplayedPrompt('');
+      setPromptPlaceholder(false);
       setSpeechStatus('requesting-permission');
       setSpeechActive(false);
       setSpeechSendReady(false);
     } else if (debugState === 'listening') {
       setPromptValue('');
-      setDisplayedPrompt('');
+      setPromptPlaceholder(true);
+      setDisplayedPrompt(VOICE_GUIDE_PROMPT_TEXT);
       setSpeechStatus('listening');
       setSpeechActive(true);
       setSpeechSendReady(false);
     } else if (debugState === 'transcript') {
+      setPromptPlaceholder(false);
       promptValueRef.current = qaPrompt;
       setPromptValue(qaPrompt);
       setDisplayedPrompt(qaPrompt);
@@ -1434,15 +1479,19 @@ export default function CoverSelectScreen({
   const voicePermissionPrompt = voicePermissionRequesting
     || speechError === SPEECH_ERROR_MESSAGES['not-allowed'];
   const voiceRecording = speechStatus === 'starting' || speechStatus === 'listening';
-  const voiceAwaitingSpeech = voiceRecording && !displayedPrompt;
+  const voiceAwaitingSpeech = voiceRecording && promptPlaceholder;
   const voiceSendReady = Boolean(displayedPrompt)
     && ((voiceRecording && speechSendReady) || pendingSubmit);
   const voiceButtonIdle = !displayedPrompt && !speechError && !voiceRecording && !voicePermissionRequesting;
   const voiceButtonCopy = displayedPrompt || (speechError && !voicePermissionPrompt
     ? speechError
     : VOICE_BUTTON_LABEL);
-  const voiceButtonExpanded = Boolean(displayedPrompt || speechError || voicePermissionRequesting);
-  const voicePromptCancellable = Boolean(displayedPrompt);
+  // voiceRecording 포함: 가이드가 다 지워진 빈 프레임에 컨테이너가
+  // 수축했다 재확장하는 출렁임을 막는다.
+  const voiceButtonExpanded = Boolean(
+    displayedPrompt || voiceRecording || speechError || voicePermissionRequesting
+  );
+  const voicePromptCancellable = Boolean(displayedPrompt) && !promptPlaceholder;
   const voiceCopyTyping = !speechError && displayedPrompt.length < promptValue.length;
   const promptWords = displayedPrompt.trim().split(/\s+/).filter(Boolean);
   const promptLastWord = promptWords.at(-1) || '';
@@ -1562,7 +1611,7 @@ export default function CoverSelectScreen({
             data-awaiting-speech={voiceAwaitingSpeech ? 'true' : 'false'}
             data-idle={voiceButtonIdle ? 'true' : 'false'}
             data-permission={voicePermissionPrompt ? 'true' : 'false'}
-            data-has-transcript={displayedPrompt ? 'true' : 'false'}
+            data-has-transcript={displayedPrompt || voiceRecording ? 'true' : 'false'}
             data-error={speechError && !voicePermissionPrompt ? 'true' : 'false'}
             data-cancellable={voicePromptCancellable ? 'true' : 'false'}
             data-pressing="false"
@@ -1590,21 +1639,21 @@ export default function CoverSelectScreen({
               data-typing={voiceCopyTyping ? 'true' : 'false'}
               aria-live="polite"
             >
-              {(voiceRecording || pendingSubmit) && displayedPrompt ? (
-                <>
-                  {promptLeadingText ? `${promptLeadingText} ` : ''}
-                  <span className={styles.voiceTranscriptTail}>
-                    {promptLastWord}
-                    {voiceSendReady ? renderSendIcon() : renderVoiceWave()}
-                  </span>
-                </>
+              {(voiceRecording || pendingSubmit) ? (
+                displayedPrompt ? (
+                  <>
+                    {promptLeadingText ? `${promptLeadingText} ` : ''}
+                    <span className={styles.voiceTranscriptTail}>
+                      {promptLastWord}
+                      {voiceSendReady ? renderSendIcon() : renderVoiceWave()}
+                    </span>
+                  </>
+                ) : (
+                  // 가이드가 다 지워지고 실제 텍스트가 시작되기 전의 빈 프레임:
+                  // 유휴 라벨로 되돌아가지 않고 웨이브만 남겨 연속성을 지킨다.
+                  <span className={styles.voiceTranscriptTail}>{renderVoiceWave()}</span>
+                )
               ) : voiceButtonCopy}
-            </span>
-            <span className={styles.voiceListeningPrompt} aria-hidden="true">
-              <span className={styles.voiceListeningCopy}>
-                프롬프트를 말해보세요
-                {voiceAwaitingSpeech && renderVoiceWave()}
-              </span>
             </span>
             <span className={styles.permissionPrompt} aria-hidden="true">
               <span>마이크 권한 허용해주세요</span>
