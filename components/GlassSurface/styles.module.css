@@ -71,6 +71,12 @@
   overflow: hidden;
   border-radius: inherit;
   pointer-events: none;
+  /* timedGlare처럼 transform 애니메이션으로 합성 레이어가 된 자식은
+     Safari에서 overflow+border-radius 클립을 무시하고 모서리 밖으로 샌다.
+     불투명 마스크를 강제해 라운드 클리핑이 합성 단계에서도 적용되게 한다. */
+  isolation: isolate;
+  -webkit-mask-image: -webkit-radial-gradient(#fff, #000);
+  mask-image: radial-gradient(#fff, #000);
 }
 
 .filterDefinitions {

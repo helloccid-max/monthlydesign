@@ -12,7 +12,24 @@ const MOBILE_BITMAP_MAX = 176;
 const STATUS_TEXT = '당신의 오마주 표지를 생성하고 있어요';
 const STATUS_CHARACTERS = Array.from(STATUS_TEXT);
 const STATUS_VISIBLE_CHARACTER_COUNT = STATUS_CHARACTERS.filter((value) => value !== ' ').length;
-const STATUS_WAVE_CHARACTER_OFFSET_MS = 260;
+// 사이클(styles.module.css --character-cycle)과 비율을 맞춰야 파장(8글자)이
+// 유지된다. 둘을 같이 조절할 것.
+const STATUS_WAVE_CHARACTER_OFFSET_MS = 208;
+// 진폭 감쇠는 문장 양 끝의 이 비율 구간에서만 일어난다. 나머지 가운데
+// 구간은 전폭으로 움직여 웨이브가 문장 전체를 넓게 흐르는 것처럼 보인다.
+const STATUS_WAVE_EDGE_TAPER_RATIO = 0.18;
+
+// 평탄 사인 창(tapered cosine). 기존 sin(πt)는 정중앙 글자만 크게 움직여
+// 웨이브가 좁은 산처럼 보였다. 양 끝만 사인 곡선으로 부드럽게 감쇠한다.
+const statusWaveEnvelope = (progress) => {
+  if (progress < STATUS_WAVE_EDGE_TAPER_RATIO) {
+    return Math.sin((Math.PI / 2) * (progress / STATUS_WAVE_EDGE_TAPER_RATIO));
+  }
+  if (progress > 1 - STATUS_WAVE_EDGE_TAPER_RATIO) {
+    return Math.sin((Math.PI / 2) * ((1 - progress) / STATUS_WAVE_EDGE_TAPER_RATIO));
+  }
+  return 1;
+};
 
 function createRandom(seed) {
   let state = seed >>> 0;
@@ -62,7 +79,11 @@ function CoverParticleSphere({ imageUrls, seed }) {
     const context = canvas?.getContext('2d');
     if (!canvas || !context || !imageUrls.length) return undefined;
 
+    // 동작 줄이기(reduce motion)에서도 완전히 멈추지 않는다. 생성 대기 화면이
+    // 정지해 있으면 앱이 죽은 것으로 읽힌다. 플로킹 화면과 같은 방침으로
+    // 루프는 유지하고 회전 속도만 낮춘다.
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const motionScale = reduceMotion ? 0.45 : 1;
     const points = fibonacciSphere(imageUrls.length);
     const depthRandom = createRandom(seed ^ 0x9e3779b9);
     const depthOffsets = points.map(() => 0.78 + depthRandom() * 0.44);
@@ -106,8 +127,8 @@ function CoverParticleSphere({ imageUrls, seed }) {
       const rhythmProgress = Math.min(1, (time - rhythmStartedAt) / 620);
       const easedRhythm = rhythmProgress * rhythmProgress * (3 - 2 * rhythmProgress);
       currentSpeed = speedFrom + (speedTo - speedFrom) * easedRhythm;
-      angleY += currentSpeed * delta;
-      angleX += currentSpeed * 0.38 * delta;
+      angleY += currentSpeed * delta * motionScale;
+      angleX += currentSpeed * 0.38 * delta * motionScale;
 
       const centerX = width * 0.5;
       const centerY = height * 0.49;
@@ -158,7 +179,7 @@ function CoverParticleSphere({ imageUrls, seed }) {
         );
       });
 
-      if (!reduceMotion) frameId = window.requestAnimationFrame(draw);
+      frameId = window.requestAnimationFrame(draw);
     };
 
     // 같은 URL을 쓰는 파티클끼리 비트맵 캔버스를 공유한다. 풀보다 파티클이
@@ -197,13 +218,6 @@ function CoverParticleSphere({ imageUrls, seed }) {
         indices.forEach((index) => {
           bitmaps[index] = shared;
         });
-
-        // Reduced-motion devices intentionally do not keep an animation loop.
-        // Redraw as each async image arrives so the static sphere is never blank.
-        if (reduceMotion) {
-          window.cancelAnimationFrame(frameId);
-          frameId = window.requestAnimationFrame(draw);
-        }
       };
       image.src = source;
     };
@@ -287,7 +301,7 @@ export default function LoadScreen({
                 .filter((value) => value !== ' ').length;
               const envelope = character === ' '
                 ? 0
-                : Math.sin((Math.PI * visibleIndex) / (STATUS_VISIBLE_CHARACTER_COUNT - 1));
+                : statusWaveEnvelope(visibleIndex / (STATUS_VISIBLE_CHARACTER_COUNT - 1));
 
               return (
                 <span

@@ -80,7 +80,8 @@
 }
 
 .statusCharacters {
-  --character-cycle: 2.08s;
+  /* index.js STATUS_WAVE_CHARACTER_OFFSET_MS(208ms)의 8배 = 8글자 파장 유지 */
+  --character-cycle: 1.664s;
   display: inline-flex;
   align-items: center;
   white-space: pre;
@@ -143,10 +144,23 @@
   }
 }
 
+/* 동작 줄이기에서 쓰는 색 스윕 전용 웨이브. 글자 이동·스케일만 제거하고
+   생성 중이라는 리듬(밝기 흐름)은 유지한다 — 완전 정지는 앱이 멈춘 것으로
+   읽히기 때문에 플로킹 화면과 같은 '감속' 방침을 따른다. */
+@keyframes statusCharacterColorSweep {
+  0%, 50%, 100% { color: #080a06; }
+  12.5% { color: #626860; }
+  25% { color: #f8faf7; }
+  37.5% { color: #747a72; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .canvas,
-  .statusCharacter {
+  .canvas {
     animation: none;
     opacity: 1;
+  }
+
+  .statusCharacter {
+    animation-name: statusCharacterColorSweep;
   }
 }

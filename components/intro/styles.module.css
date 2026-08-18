@@ -297,7 +297,9 @@
 }
 
 .statement h1 span + span {
-  padding-left: clamp(12.6px, 2.88vw, 21.6px);
+  /* 인덴트는 처음부터 고정이 아니라 타이틀 리빌 후반(--title-indent 0→1)에
+     0에서 점점 벌어진다. 변수가 없는 정적 상태(QA 등)에서는 그대로 최대치. */
+  padding-left: calc(clamp(12.6px, 2.88vw, 21.6px) * var(--title-indent, 1));
 }
 
 .translation {

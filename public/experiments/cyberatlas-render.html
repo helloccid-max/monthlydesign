@@ -1092,7 +1092,16 @@ function updateViewCenter(now){
    complete graph fills its available field without being cropped. */
 function topologyFrame(W,H){
   const morph=smooth(VIEW_RADIUS.value);
-  const revealScale=0.16+0.84*smooth(VIEW_REVEAL.value);
+  /* 리빌 줌이 목표에 닿아도 정지하지 않는다. 완료 후 초당 약 0.4%씩,
+     최대 +8%까지 아주 느리게 줌이 이어져 화면이 살아 있게 유지된다. */
+  let revealCreep=1;
+  if(VIEW_REVEAL.value>=0.999){
+    if(!VIEW_REVEAL.settledAt) VIEW_REVEAL.settledAt=performance.now();
+    revealCreep=1+Math.min(0.08,(performance.now()-VIEW_REVEAL.settledAt)*0.000004);
+  }else if(VIEW_REVEAL.settledAt){
+    VIEW_REVEAL.settledAt=0;
+  }
+  const revealScale=(0.16+0.84*smooth(VIEW_REVEAL.value))*revealCreep;
   const expanded=Math.max(W,H)*0.68*S.zoom;
   const safeInset=clamp(Math.min(W,H)*0.035,12,24);
   const lowerFieldHeight=H*0.475;
@@ -1100,8 +1109,14 @@ function topologyFrame(W,H){
   const focusedHeight=Math.max(1,lowerFieldHeight-safeInset*2)*S.zoom;
   const focusedRadiusX=focusedWidth/1.916;
   const focusedRadiusY=focusedHeight/1.916;
-  const radiusX=(expanded+(focusedRadiusX-expanded)*morph)*revealScale;
-  const radiusY=(expanded+(focusedRadiusY-expanded)*morph)*revealScale;
+  const rawRadiusX=(expanded+(focusedRadiusX-expanded)*morph)*revealScale;
+  const rawRadiusY=(expanded+(focusedRadiusY-expanded)*morph)*revealScale;
+  /* 하이퍼볼릭 원판은 정비례를 유지해야 한다. 포커스 필드는 가로로 넓을 수
+     있지만(데스크톱 약 3.7:1) 그래프를 그 비율로 늘이면 원판 기하가 무너진다.
+     완만한 한도까지만 허용하고 나머지는 여백으로 남긴다. */
+  const CONTENT_MAX_ASPECT=1.15;
+  const radiusX=Math.min(rawRadiusX,rawRadiusY*CONTENT_MAX_ASPECT);
+  const radiusY=Math.min(rawRadiusY,rawRadiusX*CONTENT_MAX_ASPECT);
   const radius=Math.min(radiusX,radiusY);
   const width=radiusX*1.916;
   const height=radiusY*1.916;
@@ -1316,11 +1331,14 @@ function drawCoverThumbnails(ctx,graph,W,H,cx,cy,RX,RY){
   for(let i=0;i<graph.n;i++){
     const src=graph.coverImageUrls[i];
     if(!src) continue;
+    /* 루트(레퍼런스 2001_07) 노드는 회전 중심에 있어 표지를 얹으면 홀로
+       정지한 큰 카드가 되어 회전이 어색해진다. 277호는 인트로 카드가 이미
+       보여주므로 중앙 썸네일은 생략한다. */
+    if(graph.nodeKind?.[i]===3) continue;
     const x=_nodeX[i],y=_nodeY[i],z=_nodeZ[i];
     if(!Number.isFinite(x)||!Number.isFinite(y)||x<-64||x>W+64||y<-72||y>H+72) continue;
-    const reference=graph.nodeKind?.[i]===3;
-    const score=z*2.25+(graph.nodeComplexity?.[i]||0)*0.34+(reference?3.2:0);
-    candidates.push({i,src,x,y,z,score,reference});
+    const score=z*2.25+(graph.nodeComplexity?.[i]||0)*0.34;
+    candidates.push({i,src,x,y,z,score});
   }
   const limit=Math.min(candidates.length,W<640?44:60);
   candidates.sort((left,right)=>right.score-left.score||left.i-right.i);
@@ -1330,16 +1348,23 @@ function drawCoverThumbnails(ctx,graph,W,H,cx,cy,RX,RY){
     const entry=coverThumbnail(candidate.src);
     if(entry.state!=='ready'||!entry.image.naturalWidth||!entry.image.naturalHeight) continue;
     const near=clamp((candidate.z+0.48)/1.45,0,1);
-    const height=minimum*(candidate.reference?0.14:(0.036+0.052*near*near));
+    const height=minimum*(0.036+0.052*near*near);
     const width=height*(entry.image.naturalWidth/entry.image.naturalHeight);
     const horizontal=clamp((candidate.x-cx)/Math.max(1,RX),-1,1);
     const vertical=clamp((candidate.y-cy)/Math.max(1,RY),-1,1);
     const angle=horizontal*0.18-vertical*0.075;
     const face=0.66+0.34*near;
+    /* 원판 위에 놓인 카드처럼 보이게 하는 유사 원근. 림에 가까운 축으로
+       살짝 돌아앉고(포쇼트닝), 코너에서는 미세한 시어로 사다리꼴을 흉내 낸다.
+       노드가 회전을 따라 이동하면 이 값이 연속적으로 변하므로 카드의 원근이
+       회전과 함께 미묘하게 바뀌어 토폴로지와 같은 평면으로 읽힌다. */
+    const sideTurn=1-0.24*horizontal*horizontal;
+    const verticalTurn=1-0.12*vertical*vertical;
+    const cornerShear=-horizontal*vertical*0.11;
     ctx.save();
     ctx.translate(candidate.x,candidate.y);
     ctx.rotate(angle);
-    ctx.scale(face,1);
+    ctx.transform(face*sideTurn,cornerShear,0,verticalTurn,0,0);
     ctx.shadowColor='rgba(0,0,0,.15)';
     ctx.shadowBlur=7+near*7;
     ctx.shadowOffsetY=2+near*2;

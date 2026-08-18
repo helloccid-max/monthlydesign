@@ -87,7 +87,7 @@ export default function HomageScreen({ request, onArchive, onRestart } = {}) {
         {onArchive ? (
           <GlassSurface as="button" type="button" borderRadius={999} className={styles.actionButton} onClick={onArchive}>아카이브 보기</GlassSurface>
         ) : onRestart ? (
-          <GlassSurface as="button" type="button" borderRadius={999} className={styles.actionButton} onClick={onRestart}>새 표지 만들기</GlassSurface>
+          <GlassSurface as="button" type="button" borderRadius={999} className={styles.actionButton} onClick={onRestart}>다시 생성</GlassSurface>
         ) : null}
         <GlassSurface as="button" type="button" borderRadius={999} className={styles.actionButton} data-busy={saving ? 'true' : 'false'} onClick={handleSave}>
           {saving ? '저장 중' : '표지 저장'}

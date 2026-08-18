@@ -34,7 +34,8 @@ const QA_STAGES = [
   { scene: STEPS.COVER, state: 'transcript' },
   { scene: STEPS.LOAD, state: 'loading' },
   { scene: STEPS.HOMAGE, state: 'result' },
-  { scene: STEPS.END2, state: 'archive-cta' },
+  // END2(구 엔딩 씬)는 비활성 — 일반 플로우에 진입 경로가 없고, QA에서도
+  // 실수로 열리지 않게 제외한다. 코드는 components/end2/에 그대로 있다.
 ];
 
 const QA_SCENE_START = {
@@ -42,7 +43,6 @@ const QA_SCENE_START = {
   [STEPS.COVER]: 3,
   [STEPS.LOAD]: 9,
   [STEPS.HOMAGE]: 10,
-  [STEPS.END2]: 11,
 };
 
 const SCENE_TRANSITION_MS = 660;

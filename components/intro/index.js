@@ -7,7 +7,7 @@ const INTRO_AUTO_ADVANCE_ENABLED = false;
 const COVER_ENTRY_DURATION_MS = 3600;
 const COVER_CENTER_HOLD_MS = 3000;
 const COVER_GLARE_DELAY_MS = COVER_ENTRY_DURATION_MS + COVER_CENTER_HOLD_MS;
-const COVER_GLARE_DURATION_MS = 4400;
+const COVER_GLARE_DURATION_MS = 2800;
 const COVER_FLIP_START_MS = COVER_GLARE_DELAY_MS + COVER_GLARE_DURATION_MS;
 const COVER_FLIP_DURATION_MS = 1350;
 const COVER_BACK_HOLD_MS = 5000;
@@ -466,6 +466,8 @@ export default function IntroScreen({
   const topologyReveal = easeHumanImpulse(segment(scrubProgress, 0.075, 0.29));
   const finalSplit = easeOutQuint(segment(scrubProgress, 0.745, 0.825));
   const finalTitle = easeOutQuint(segment(scrubProgress, 0.765, 0.855));
+  // 둘째 줄 인덴트는 타이틀이 반쯤 올라온 뒤에야 0에서 서서히 벌어진다.
+  const finalTitleIndent = easeOutQuint(segment(scrubProgress, 0.8, 0.89));
   const finalTranslation = easeOutQuint(segment(scrubProgress, 0.795, 0.88));
   const finalSplitActive = scrubProgress >= 0.745;
   const coverExitScale = 0.7 * (1 - 0.2 * coverExitScaleProgress);
@@ -608,19 +610,24 @@ export default function IntroScreen({
 
         <section
           className={styles.statement}
-          aria-label="정보 아키텍처에서 판단과 행동의 구조로"
+          aria-label="정보 아키텍처에서 생성 시스템으로"
           style={{ transform: `translateY(${(-100 + finalSplit * 100).toFixed(3)}%)` }}
         >
-          <h1 style={{ transform: `translateY(${(-48 * (1 - finalTitle)).toFixed(2)}px)` }}>
+          <h1
+            style={{
+              transform: `translateY(${(-48 * (1 - finalTitle)).toFixed(2)}px)`,
+              '--title-indent': finalTitleIndent.toFixed(4),
+            }}
+          >
             <span>정보 아키텍처에서</span>
-            <span>판단과 행동의 구조로</span>
+            <span>생성 시스템으로</span>
           </h1>
           <p
             className={styles.translation}
             style={{ transform: `translateY(${(-58 * (1 - finalTranslation)).toFixed(2)}px)` }}
           >
             <span>FROM INFORMATION ARCHITECTURE</span>
-            <span>TO THE ARCHITECTURE OF AGENCY</span>
+            <span>TO GENERATIVE SYSTEMS</span>
           </p>
         </section>
 
