@@ -694,7 +694,19 @@ export default function IntroScreen({
           handleTap();
         }}
       >
-        <span>{startPromptText}</span>
+        <span>
+          {!introAssetsReady
+            ? Array.from(START_PROMPT_LOADING_TEXT).map((character, index) => (
+              <span
+                key={`loading-character-${index}`}
+                className={styles.loadingCharacter}
+                style={{ '--loading-character-index': index }}
+              >
+                {character}
+              </span>
+            ))
+            : startPromptText}
+        </span>
       </button>
 
     </main>

@@ -827,23 +827,18 @@
   height: 9.2px;
 }
 
-.voiceWave[data-listening='true'][data-speaking='false'] > span {
+/* 사인 웨이브는 어떤 상태에서도 멈추지 않는다 — "말해보세요"라는 신호이자
+   살아있음의 표시. 목소리는 --voice-amp 배율로 웨이브를 증폭시킬 뿐이다. */
+.voiceWave[data-listening='true'] > span {
   opacity: 0.92;
   animation: voiceSineIdle 1120ms ease-in-out infinite;
   animation-delay: calc(var(--wave-index) * -112ms);
 }
 
+/* 실제 음성 인식이 잡히는 동안만 라임 컬러로 — 인식 상태 피드백. */
 .voiceWave[data-speaking='true'] {
   color: #c3f85f;
   filter: drop-shadow(0 0 3px rgba(195, 248, 95, 0.28));
-}
-
-.voiceWave[data-speaking='true'] > span {
-  opacity: calc(0.55 + var(--voice-level, 0.08) * 0.45);
-  /* 발화 중에도 웨이브가 사라지지 않는다: 바닥 0.34를 깔고 마이크 레벨이
-     그 위로 증폭시킨다 — "기본 웨이브 + 말하면 커지는" 매핑. */
-  transform: scaleY(calc(0.34 + var(--voice-level, 0.08) * 0.66));
-  animation: none;
 }
 
 .continueButton:active {
@@ -904,11 +899,12 @@
   }
 }
 
+/* --voice-amp(0.75~1.2, 마이크 레벨)가 사인 웨이브 진폭을 실시간 배율한다. */
 @keyframes voiceSineIdle {
-  0%, 100% { transform: scaleY(0.28); }
-  25% { transform: scaleY(0.72); }
-  50% { transform: scaleY(0.42); }
-  75% { transform: scaleY(0.9); }
+  0%, 100% { transform: scaleY(calc(0.28 * var(--voice-amp, 1))); }
+  25% { transform: scaleY(calc(0.72 * var(--voice-amp, 1))); }
+  50% { transform: scaleY(calc(0.42 * var(--voice-amp, 1))); }
+  75% { transform: scaleY(calc(0.9 * var(--voice-amp, 1))); }
 }
 
 @keyframes titleCharacterFade {

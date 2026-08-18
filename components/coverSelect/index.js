@@ -408,6 +408,7 @@ export default function CoverSelectScreen({
     setVoiceSoundActive(false);
     Array.from(voiceWaveRef.current?.children || []).forEach((bar) => {
       bar.style.removeProperty('--voice-level');
+      bar.style.removeProperty('--voice-amp');
     });
   }, []);
 
@@ -457,7 +458,8 @@ export default function CoverSelectScreen({
       });
       bars.forEach((bar, barIndex) => {
         const level = smoothedLevels[barBandIndex[barIndex] ?? 3];
-        bar?.style.setProperty('--voice-level', level.toFixed(3));
+        // 사인 웨이브를 멈추지 않는다 — 목소리는 웨이브의 진폭 배율만 키운다.
+        bar?.style.setProperty('--voice-amp', (0.75 + level * 0.45).toFixed(3));
       });
 
       if (strongestEnergy > 0.045) {
@@ -1451,7 +1453,9 @@ export default function CoverSelectScreen({
         ref={voiceWaveRef}
         className={styles.voiceWave}
         data-listening="true"
-        data-speaking={speechActive || voiceSoundActive ? 'true' : 'false'}
+        // 컬러는 '실제 인식이 잡히는 중'(speechActive)일 때만. 단순 소음
+        // (voiceSoundActive)은 진폭만 키우고 색은 바꾸지 않는다.
+        data-speaking={speechActive ? 'true' : 'false'}
       >
         {/* sound_balance.svg의 7-막대 기하를 그대로 재현 — 정적 아이콘 대신
             막대로 그려 사인 웨이브·발화 증폭 애니메이션을 유지한다. */}

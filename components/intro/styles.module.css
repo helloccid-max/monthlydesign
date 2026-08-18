@@ -397,6 +397,41 @@
   pointer-events: none;
 }
 
+/* Loading 대기 문구: 색 오버레이가 아니라 글자 낱자의 투명도만으로 표현하는
+   좁은 스윕. 딥 구간이 사이클의 62.5%(1040ms) = 글자 5개 폭이라, 어느 순간이든
+   약 5글자만 간섭받고 공간 프로파일은 20/50/88/50/20(%) — 중심이 가장 깊다. */
+.loadingCharacter {
+  display: inline-block;
+  animation: loadingCharacterSweep 1.664s linear infinite;
+  animation-delay: calc(var(--loading-character-index) * -208ms);
+}
+
+@keyframes loadingCharacterSweep {
+  0%, 62.5%, 100% {
+    opacity: 1;
+  }
+
+  12.5% {
+    opacity: 0.8;
+  }
+
+  25% {
+    opacity: 0.5;
+  }
+
+  31.25% {
+    opacity: 0.12;
+  }
+
+  37.5% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+}
+
 .page[data-engaged='true'] .startPrompt > span {
   transform: translate(-50%, 12px);
 }
