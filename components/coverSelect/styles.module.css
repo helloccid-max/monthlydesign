@@ -861,12 +861,16 @@
 
   .continueButton[data-idle='true']:hover .voiceTranscript {
     opacity: 0;
-    transform: translateX(calc(-1 * var(--voice-copy-shift)));
+    filter: blur(6px);
+    transform: translateX(calc(-1 * var(--voice-copy-shift))) scale(0.96);
   }
 
+  /* 들어오는 레이어는 반드시 blur를 해제해야 한다 — 기본 상태가 blur(6px)라
+     빠뜨리면 문구가 흐린 채로 표시된다. */
   .continueButton[data-idle='true']:hover .permissionPrompt {
     opacity: 1;
-    transform: translateX(0);
+    filter: blur(0);
+    transform: translateX(0) scale(1);
   }
 
   .continueButton:hover {
