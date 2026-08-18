@@ -403,7 +403,8 @@
 .loadingCharacter {
   display: inline-block;
   animation: loadingCharacterSweep 1.664s linear infinite;
-  animation-delay: calc(var(--loading-character-index) * -208ms);
+  /* (index - 7) 형태라 왼쪽 글자가 위상이 앞서 딥이 좌→우로 흐른다. */
+  animation-delay: calc((var(--loading-character-index) - 7) * 208ms);
 }
 
 @keyframes loadingCharacterSweep {
