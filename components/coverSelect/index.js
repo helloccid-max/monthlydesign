@@ -100,21 +100,30 @@ const getDepthAtProjectedScaleRatio = (depth, ratio) => {
   return FIELD_PERSPECTIVE - FIELD_PERSPECTIVE / adjustedScale;
 };
 
-function chooseCover(index, covers, generation = 0, previousCoverId = null) {
-  const coverPool = Array.isArray(covers) && covers.length ? covers : MONTHLY_DESIGN_COVERS;
-  const cycleSalt = generation * 19.173;
-  let coverIndex = Math.floor(hash(index, cycleSalt + 13) * coverPool.length);
-  let cover = index === 0 && generation === 0 ? DEFAULT_MONTHLY_DESIGN_COVER : coverPool[coverIndex];
-
-  if (coverPool.length > 1 && cover?.id === previousCoverId) {
-    coverIndex = (coverIndex + 1 + (index % (coverPool.length - 1))) % coverPool.length;
-    cover = coverPool[coverIndex];
+/**
+ * 시드 셔플로 파티클마다 서로 다른 표지를 배정한다. 해시 단독 선택은 충돌로
+ * 같은 잡지가 화면에 여러 장 보였다. SSR과 클라이언트가 같은 결과를 내도록
+ * Math.random 대신 hash를 쓰고, 첫 파티클은 기본 표지(277호)를 유지한다.
+ */
+function buildUniqueCoverAssignment(coverPool, count) {
+  const order = coverPool.map((_, index) => index);
+  for (let i = order.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(hash(i, 71.13) * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
   }
 
-  return cover;
+  const defaultIndex = coverPool.findIndex(
+    (cover) => cover.id === DEFAULT_MONTHLY_DESIGN_COVER.id
+  );
+  if (defaultIndex >= 0) {
+    const slot = order.indexOf(defaultIndex);
+    if (slot > 0) [order[0], order[slot]] = [order[slot], order[0]];
+  }
+
+  return Array.from({ length: count }, (_, index) => coverPool[order[index % order.length]]);
 }
 
-function buildParticleNode(index, covers, generation = 0, previousCoverId = null) {
+function buildParticleNode(index, cover, generation = 0) {
   const cycleSalt = generation * 19.173;
   const tierIndex = (index + generation * 5) % DEPTH_DISTRIBUTION_INTERVAL;
   const depthTier = tierIndex === 0
@@ -134,7 +143,7 @@ function buildParticleNode(index, covers, generation = 0, previousCoverId = null
   return {
     id: `archive-particle-${index}`,
     generation,
-    cover: chooseCover(index, covers, generation, previousCoverId),
+    cover,
     depthName,
     size: COVER_BASE_SIZE,
     speed: (near ? 74 + hash(index, 14) * 28 : middle ? 55 + hash(index, 14) * 29 : 42 + hash(index, 14) * 24)
@@ -149,7 +158,11 @@ function buildParticleNode(index, covers, generation = 0, previousCoverId = null
 }
 
 function buildParticleNodes(covers = MONTHLY_DESIGN_COVERS) {
-  return Array.from({ length: PARTICLE_COUNT }, (_, index) => buildParticleNode(index, covers));
+  const coverPool = Array.isArray(covers) && covers.length ? covers : MONTHLY_DESIGN_COVERS;
+  const assignment = buildUniqueCoverAssignment(coverPool, PARTICLE_COUNT);
+  return Array.from({ length: PARTICLE_COUNT }, (_, index) => (
+    buildParticleNode(index, assignment[index])
+  ));
 }
 
 export function getInitialParticleCoverUrls(covers = MONTHLY_DESIGN_COVERS) {
@@ -387,10 +400,11 @@ export default function CoverSelectScreen({
     microphoneSourceRef.current = null;
     microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
     microphoneStreamRef.current = null;
-    if (microphoneAudioContextRef.current?.state !== 'closed') {
-      microphoneAudioContextRef.current?.close().catch(() => {});
-    }
-    microphoneAudioContextRef.current = null;
+    // AudioContext는 닫지 않고 살려둔다. iOS Safari는 컨텍스트를 세션마다
+    // 만들고 닫으면 다음 세션이 'interrupted' 상태로 시작해 두 번째
+    // 음성 입력("다시 생성" 후)이 조용히 실패하는 일이 있다. 완전한 close는
+    // 컴포넌트 언마운트에서만 수행한다.
+    microphoneAudioContextRef.current?.suspend?.().catch?.(() => {});
     setVoiceSoundActive(false);
     Array.from(voiceWaveRef.current?.children || []).forEach((bar) => {
       bar.style.removeProperty('--voice-level');
@@ -403,7 +417,12 @@ export default function CoverSelectScreen({
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
 
-    const context = new AudioContext({ latencyHint: 'interactive' });
+    // 세션 간 하나의 AudioContext를 재사용한다(위 stopInputMeter 주석 참고).
+    let context = microphoneAudioContextRef.current;
+    if (!context || context.state === 'closed') {
+      context = new AudioContext({ latencyHint: 'interactive' });
+      microphoneAudioContextRef.current = context;
+    }
     const analyser = context.createAnalyser();
     const source = context.createMediaStreamSource(stream);
     analyser.fftSize = 256;
@@ -416,8 +435,10 @@ export default function CoverSelectScreen({
     context.resume().catch(() => {});
 
     const frequencyData = new Uint8Array(analyser.frequencyBinCount);
-    const bandRanges = [[1, 4], [3, 8], [6, 14], [11, 23], [18, 38]];
-    const smoothedLevels = [0.08, 0.08, 0.08, 0.08, 0.08];
+    // 4개 대역을 계산해 7막대에 좌우 대칭으로 배분한다(중앙 = 저역).
+    const bandRanges = [[1, 5], [4, 10], [8, 18], [14, 30]];
+    const smoothedLevels = [0.08, 0.08, 0.08, 0.08];
+    const barBandIndex = [3, 2, 1, 0, 1, 2, 3];
     let soundVisible = false;
     let quietFrames = 0;
     const renderMeter = () => {
@@ -433,7 +454,10 @@ export default function CoverSelectScreen({
         const target = 0.08 + Math.min(0.92, Math.pow(gated, 0.72));
         const response = target > smoothedLevels[index] ? 0.48 : 0.2;
         smoothedLevels[index] += (target - smoothedLevels[index]) * response;
-        bars[index]?.style.setProperty('--voice-level', smoothedLevels[index].toFixed(3));
+      });
+      bars.forEach((bar, barIndex) => {
+        const level = smoothedLevels[barBandIndex[barIndex] ?? 3];
+        bar?.style.setProperty('--voice-level', level.toFixed(3));
       });
 
       if (strongestEnergy > 0.045) {
@@ -476,6 +500,11 @@ export default function CoverSelectScreen({
       recognitionRef.current?.abort();
       recognitionRef.current = null;
       stopInputMeter();
+      // 세션 간 재사용하던 AudioContext는 화면을 떠날 때만 완전히 닫는다.
+      if (microphoneAudioContextRef.current?.state !== 'closed') {
+        microphoneAudioContextRef.current?.close().catch(() => {});
+      }
+      microphoneAudioContextRef.current = null;
       window.clearTimeout(speechActivityTimerRef.current);
       window.clearTimeout(voiceLongPressTimerRef.current);
     };
@@ -633,15 +662,20 @@ export default function CoverSelectScreen({
       boid.swayPhase = hash(boid.index, boid.generation * 31.1) * Math.PI * 2;
       boid.swayRate = 0.44 + hash(boid.index, boid.generation * 37.7) * 0.66;
 
-      // 재진입 표지는 프리로드된 풀 안에서만 고른다. 전체 아카이브에서 고르면
-      // 카드가 돌아올 때마다 콜드 페치가 발생해 빈 카드와 프레임 드랍이 생긴다.
+      // 재진입 표지는 프리로드된 풀 중 "지금 화면에 없는" 표지에서 고른다.
+      // (콜드 페치 방지 + 같은 잡지가 동시에 두 장 보이는 중복 방지.)
       setParticles((current) => current.map((particle, index) => {
         if (particle.id !== boid.id) return particle;
-        return {
-          ...particle,
-          generation: boid.generation,
-          cover: chooseCover(index, warmCoverPoolRef.current, boid.generation, particle.cover.id),
-        };
+        const pool = warmCoverPoolRef.current;
+        const usedIds = new Set(
+          current.filter((item) => item.id !== boid.id).map((item) => item.cover.id)
+        );
+        const unused = pool.filter((cover) => !usedIds.has(cover.id));
+        const source = unused.length ? unused : pool;
+        const cover = source[
+          Math.floor(hash(index, boid.generation * 19.173 + 13) * source.length)
+        ] || particle.cover;
+        return { ...particle, generation: boid.generation, cover };
       }));
       setSelectedParticleId((current) => (current === boid.id ? null : current));
     };
@@ -1419,11 +1453,15 @@ export default function CoverSelectScreen({
         data-listening="true"
         data-speaking={speechActive || voiceSoundActive ? 'true' : 'false'}
       >
+        {/* sound_balance.svg의 7-막대 기하를 그대로 재현 — 정적 아이콘 대신
+            막대로 그려 사인 웨이브·발화 증폭 애니메이션을 유지한다. */}
         <span style={{ '--wave-index': 0 }} />
         <span style={{ '--wave-index': 1 }} />
         <span style={{ '--wave-index': 2 }} />
         <span style={{ '--wave-index': 3 }} />
         <span style={{ '--wave-index': 4 }} />
+        <span style={{ '--wave-index': 5 }} />
+        <span style={{ '--wave-index': 6 }} />
       </span>
     </span>
   );

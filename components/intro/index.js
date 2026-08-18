@@ -1,21 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Grainient from '@/components/Grainient';
 import { startRunPodPrewarm } from '@/lib/runpod/prewarmClient';
 import styles from './styles.module.css';
 
 const INTRO_IDLE_MS = 1800;
 const INTRO_AUTO_ADVANCE_ENABLED = false;
-const COVER_ENTRY_DURATION_MS = 3600;
-const COVER_CENTER_HOLD_MS = 3000;
-const COVER_GLARE_DELAY_MS = COVER_ENTRY_DURATION_MS + COVER_CENTER_HOLD_MS;
-const COVER_GLARE_DURATION_MS = 2800;
+// 표지는 처음부터 중앙에 놓여 있다(진입 연출 없음). 탭 후 잠깐 호흡을 두고
+// 글레어가 지나가면 카드가 뒤집혀 파란 뒷면을 보여준 뒤 틸트 퇴장한다.
+const COVER_CENTER_HOLD_MS = 1200;
+const COVER_GLARE_DELAY_MS = COVER_CENTER_HOLD_MS;
+const COVER_GLARE_DURATION_MS = 1600;
 const COVER_FLIP_START_MS = COVER_GLARE_DELAY_MS + COVER_GLARE_DURATION_MS;
 const COVER_FLIP_DURATION_MS = 1350;
 const COVER_BACK_HOLD_MS = 5000;
-const COVER_SEQUENCE_DURATION_MS = Math.max(
-  COVER_ENTRY_DURATION_MS,
-  COVER_FLIP_START_MS + COVER_FLIP_DURATION_MS
-)
-  + COVER_BACK_HOLD_MS;
+const COVER_SEQUENCE_DURATION_MS =
+  COVER_FLIP_START_MS + COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS;
 const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
 const FOCUS_DELAY_MS = 650;
 const FOCUS_DURATION_MS = 820;
@@ -25,6 +24,12 @@ const AUTOPLAY_END_HOLD_MS = 5200;
 const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
 const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 const INTRO_ASSET_RELEASE_MS = 10000;
+// Loading → Tap to Play 전환: 기본형 타자기 — Loading을 오른쪽부터 지운 뒤
+// Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
+const START_PROMPT_LOADING_TEXT = 'Loading';
+const START_PROMPT_READY_TEXT = 'Tap to Play';
+const START_PROMPT_ERASE_DURATION_MS = 233;
+const START_PROMPT_TYPE_DURATION_MS = 500;
 // Mobile image decoding or iframe rendering can occasionally occupy the main
 // thread for several frames. Advancing from the wall clock would then jump
 // over the topology contraction and lime-panel choreography. Cap the amount
@@ -239,6 +244,7 @@ export default function IntroScreen({
   const [started, setStarted] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [scrubProgress, setScrubProgress] = useState(0);
+  const [startPromptText, setStartPromptText] = useState(START_PROMPT_LOADING_TEXT);
   const [coverAssetReady, setCoverAssetReady] = useState(false);
   const [topologyAssetReady, setTopologyAssetReady] = useState(false);
   const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
@@ -278,6 +284,44 @@ export default function IntroScreen({
     const timer = window.setTimeout(() => setAssetReleaseExpired(true), INTRO_ASSET_RELEASE_MS);
     return () => window.clearTimeout(timer);
   }, [coverAssetReady, topologyAssetReady]);
+
+  useEffect(() => {
+    if (!introAssetsReady) return undefined;
+    const startedAt = performance.now();
+    // 가속 이징: 처음 몇 글자는 머뭇거리다 갈수록 빨라진다.
+    const easeInQuad = (value) => clamp01(value) ** 2;
+    let frame = 0;
+
+    const tick = (now) => {
+      const elapsed = now - startedAt;
+      if (elapsed < START_PROMPT_ERASE_DURATION_MS) {
+        const erasedCount = Math.floor(
+          easeInQuad(elapsed / START_PROMPT_ERASE_DURATION_MS)
+            * START_PROMPT_LOADING_TEXT.length
+        );
+        setStartPromptText(
+          START_PROMPT_LOADING_TEXT.slice(0, START_PROMPT_LOADING_TEXT.length - erasedCount)
+            || '\u00a0'
+        );
+        frame = window.requestAnimationFrame(tick);
+        return;
+      }
+      const typeProgress = (elapsed - START_PROMPT_ERASE_DURATION_MS)
+        / START_PROMPT_TYPE_DURATION_MS;
+      if (typeProgress >= 1) {
+        setStartPromptText(START_PROMPT_READY_TEXT);
+        return;
+      }
+      const typedCount = Math.floor(
+        easeInQuad(typeProgress) * START_PROMPT_READY_TEXT.length
+      );
+      setStartPromptText(START_PROMPT_READY_TEXT.slice(0, typedCount) || '\u00a0');
+      frame = window.requestAnimationFrame(tick);
+    };
+
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [introAssetsReady]);
 
   const clearIdleExit = useCallback(() => {
     window.clearTimeout(inactivityTimerRef.current);
@@ -456,11 +500,13 @@ export default function IntroScreen({
     continueInteraction();
   }, [continueInteraction, debugState, engaged, introAssetsReady]);
 
-  // The exit is intentionally offset instead of driving every property from
-  // one progress value. The cover contracts first, then catches rotation and
-  // finally accelerates upward, so the departure reads as one physical impulse.
-  const coverExitScaleProgress = easeOutQuint(segment(scrubProgress, 0, 0.085));
-  const coverExitSpinProgress = easeHumanImpulse(segment(scrubProgress, 0.018, 0.18));
+  // 하나로 이어진 임펄스: z-밀림이 먼저 시작되지만 멈추기 전에(밀림이 아직
+  // 진행 중인 0.045 지점) 상승과 회전이 함께 들어온다. 밀림은 완만한 cubic으로
+  // 길게 끌어(0.16까지) 상승 가속과 겹치게 하고, 상승·회전은 같은 지점에서
+  // 동시에 출발한다.
+  const easeOutCubicIntro = (value) => 1 - ((1 - clamp01(value)) ** 3);
+  const coverExitScaleProgress = easeOutCubicIntro(segment(scrubProgress, 0, 0.16));
+  const coverExitSpinProgress = easeHumanImpulse(segment(scrubProgress, 0.045, 0.2));
   const coverRise = easeHumanImpulse(segment(scrubProgress, 0.045, 0.24));
   const topologySoundReady = started && scrubProgress >= TOPOLOGY_SOUND_START_PROGRESS;
   const topologyReveal = easeHumanImpulse(segment(scrubProgress, 0.075, 0.29));
@@ -470,7 +516,8 @@ export default function IntroScreen({
   const finalTitleIndent = easeOutQuint(segment(scrubProgress, 0.8, 0.89));
   const finalTranslation = easeOutQuint(segment(scrubProgress, 0.795, 0.88));
   const finalSplitActive = scrubProgress >= 0.745;
-  const coverExitScale = 0.7 * (1 - 0.2 * coverExitScaleProgress);
+  // 프레스 팝 안착값(0.68)에서 이어받아 수축하며 퇴장한다.
+  const coverExitScale = 0.68 * (1 - 0.2 * coverExitScaleProgress);
   const coverTransform = `translate3d(0, ${(-132 * coverRise).toFixed(3)}dvh, 0) perspective(1400px) rotateY(${(45 * coverExitSpinProgress).toFixed(3)}deg) scale(${coverExitScale.toFixed(4)})`;
 
   useEffect(() => {
@@ -565,6 +612,8 @@ export default function IntroScreen({
           }}
         />
 
+        <Grainient className={styles.grainientOverlay} />
+
         <div
           className={styles.coverFilm}
           style={started ? { transform: coverTransform } : undefined}
@@ -645,7 +694,7 @@ export default function IntroScreen({
           handleTap();
         }}
       >
-        <span>{introAssetsReady ? 'Tap to Play' : 'Loading'}</span>
+        <span>{startPromptText}</span>
       </button>
 
     </main>

@@ -285,7 +285,10 @@
   padding: 0 20px;
   overflow: hidden;
   border: 0.5px solid #fff;
-  border-radius: 999px;
+  /* 999px 대신 실측 알약 반경(min-height 50px의 절반). 발화 시 절반(12.5px)으로
+     보간하려면 시작값이 실값이어야 전환이 끊기지 않는다. GlassSurface의
+     인라인 999px를 이기기 위해 !important. */
+  border-radius: 25px !important;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.085), rgba(176, 176, 176, 0.035) 52%, rgba(255, 255, 255, 0.018)),
     rgba(7, 8, 10, 0.2);
@@ -313,7 +316,13 @@
     border-color 440ms cubic-bezier(0.16, 1, 0.3, 1),
     background 440ms cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 440ms cubic-bezier(0.16, 1, 0.3, 1),
-    backdrop-filter 440ms cubic-bezier(0.16, 1, 0.3, 1);
+    backdrop-filter 440ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-radius 620ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 프롬프트 발화가 시작되면(트랜스크립트 표시) 반경을 절반으로 줄인다. */
+.continueButton[data-has-transcript='true'] {
+  border-radius: 12.5px !important;
 }
 
 .continueButton::before {
@@ -429,12 +438,11 @@
   height: 24px;
   padding: 0;
   place-items: center;
-  border: 0.5px solid rgba(255, 255, 255, 0.48);
+  /* 아웃라인(테두리 원) 없이 X 글리프만 보인다. 24px 히트 영역은 유지. */
+  border: 0;
   border-radius: 50%;
-  background: rgba(28, 29, 29, 0.78);
-  box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.14),
-    0 2px 7px rgba(0, 0, 0, 0.22);
+  background: transparent;
+  box-shadow: none;
   color: rgba(255, 255, 255, 0.92);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -499,7 +507,9 @@
 }
 
 .voiceButtonContent {
-  --voice-copy-shift: 56%;
+  /* 0 = 텍스트 레이어가 옆으로 밀려 교체되지 않고 제자리에서 morph된다
+     (블러 디졸브). 가로 이동을 되살리려면 이 값을 키우면 된다. */
+  --voice-copy-shift: 0%;
   --voice-copy-duration: 1800ms;
   position: relative;
   display: flex;
@@ -540,8 +550,10 @@
   word-break: keep-all;
   overflow-wrap: break-word;
   white-space: normal;
+  filter: blur(0);
   transition:
     opacity 320ms ease,
+    filter 360ms ease,
     transform var(--voice-copy-duration) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -549,6 +561,15 @@
   max-width: 16em;
   text-align: center;
   white-space: normal;
+}
+
+/* 프롬프트가 입력되면 트랜스크립트가 버튼 폭을 채우고 항상 좌측 정렬을
+   유지한다. (컨테이너 justify-content: center 때문에 폭을 안 채우면
+   짧은 문장이 가운데 떠 보인다.) */
+.continueButton[data-has-transcript='true'] .voiceTranscript {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
 }
 
 .voiceTranscript[data-typing='true']::after {
@@ -576,9 +597,11 @@
   letter-spacing: inherit;
   white-space: nowrap;
   opacity: 0;
-  transform: translateX(var(--voice-copy-shift));
+  filter: blur(6px);
+  transform: translateX(var(--voice-copy-shift)) scale(0.96);
   transition:
     opacity 320ms ease,
+    filter 360ms ease,
     transform var(--voice-copy-duration) cubic-bezier(0.22, 1, 0.36, 1);
   pointer-events: none;
 }
@@ -599,32 +622,38 @@
 
 .continueButton[data-permission='true'] .voiceTranscript {
   opacity: 0;
-  transform: translateX(calc(-1 * var(--voice-copy-shift)));
+  filter: blur(6px);
+  transform: translateX(calc(-1 * var(--voice-copy-shift))) scale(0.96);
 }
 
 .continueButton[data-permission='true'] .permissionPrompt {
   opacity: 1;
-  transform: translateX(0);
+  filter: blur(0);
+  transform: translateX(0) scale(1);
 }
 
 .continueButton[data-awaiting-speech='true'] .voiceTranscript {
   opacity: 0;
-  transform: translateX(var(--voice-copy-shift));
+  filter: blur(6px);
+  transform: translateX(var(--voice-copy-shift)) scale(0.96);
 }
 
 .continueButton[data-awaiting-speech='true'] .permissionPrompt {
   opacity: 0;
-  transform: translateX(calc(-1 * var(--voice-copy-shift)));
+  filter: blur(6px);
+  transform: translateX(calc(-1 * var(--voice-copy-shift))) scale(0.96);
 }
 
 .continueButton[data-awaiting-speech='true'] .voiceListeningPrompt {
   opacity: 1;
-  transform: translateX(0);
+  filter: blur(0);
+  transform: translateX(0) scale(1);
 }
 
 .continueButton[data-has-transcript='true'] .voiceListeningPrompt {
   opacity: 0;
-  transform: translateX(calc(-1 * var(--voice-copy-shift)));
+  filter: blur(6px);
+  transform: translateX(calc(-1 * var(--voice-copy-shift))) scale(0.96);
 }
 
 .voiceIconSlot {
@@ -762,26 +791,44 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2.2px;
-  color: rgba(235, 237, 232, 0.74);
+  gap: 1.4px;
+  color: rgba(235, 237, 232, 0.9);
   opacity: 1;
   transform: scale(1);
   transition: color 180ms ease, filter 180ms ease;
 }
 
+/* sound_balance.svg 기하: 막대 두께 1.6px, 높이는 중앙에서 양끝으로
+   16 → 9.2 → 5.4 → 3.5px (원본 15:8.6:5.05:3.28 비율). scaleY 애니메이션이
+   막대별 고유 높이를 곱하므로 balance 형태가 유지된 채 살아 움직인다. */
 .voiceWave > span {
   width: 1.6px;
   height: 16px;
   border-radius: 999px;
   background: currentColor;
-  opacity: 0.78;
+  opacity: 0.9;
   transform: scaleY(var(--voice-level, 0.08));
   transform-origin: center;
   transition: transform 70ms linear, opacity 90ms linear, background-color 180ms ease;
 }
 
+.voiceWave > span:nth-child(1),
+.voiceWave > span:nth-child(7) {
+  height: 3.5px;
+}
+
+.voiceWave > span:nth-child(2),
+.voiceWave > span:nth-child(6) {
+  height: 5.4px;
+}
+
+.voiceWave > span:nth-child(3),
+.voiceWave > span:nth-child(5) {
+  height: 9.2px;
+}
+
 .voiceWave[data-listening='true'][data-speaking='false'] > span {
-  opacity: 0.76;
+  opacity: 0.92;
   animation: voiceSineIdle 1120ms ease-in-out infinite;
   animation-delay: calc(var(--wave-index) * -112ms);
 }
@@ -792,8 +839,10 @@
 }
 
 .voiceWave[data-speaking='true'] > span {
-  opacity: calc(0.46 + var(--voice-level, 0.08) * 0.54);
-  transform: scaleY(var(--voice-level, 0.08));
+  opacity: calc(0.55 + var(--voice-level, 0.08) * 0.45);
+  /* 발화 중에도 웨이브가 사라지지 않는다: 바닥 0.34를 깔고 마이크 레벨이
+     그 위로 증폭시킨다 — "기본 웨이브 + 말하면 커지는" 매핑. */
+  transform: scaleY(calc(0.34 + var(--voice-level, 0.08) * 0.66));
   animation: none;
 }
 

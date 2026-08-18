@@ -4,7 +4,9 @@
   font-weight: 400;
   font-display: swap;
   src: url('/fonts/black-han-sans-title.woff2') format('woff2');
-  unicode-range: U+20, U+acfc, U+ad6c, U+b2e8, U+b3d9, U+b85c, U+bcf4, U+c11c, U+c544, U+c5d0, U+c758, U+c815, U+c870, U+cc98, U+d0a4, U+d14d, U+d310, U+d589;
+  /* 서브셋 글자: 구 타이틀 + "생성 시스템으로". 타이틀 문구를 바꾸면
+     Google Fonts css2 API의 text= 파라미터로 재서브셋해 이 범위를 갱신할 것. */
+  unicode-range: U+20, U+acfc, U+ad6c, U+b2e8, U+b3d9, U+b85c, U+bcf4, U+c0dd, U+c11c, U+c131, U+c2a4, U+c2dc, U+c544, U+c5d0, U+c73c, U+c758, U+c815, U+c870, U+cc98, U+d0a4, U+d14d, U+d15c, U+d310, U+d589;
 }
 
 @font-face {
@@ -34,6 +36,14 @@
   will-change: transform;
 }
 
+/* 토폴로지 캔버스(불투명) 위에 빛만 얹는 그라디언트 — screen 블렌드라
+   검은 영역은 그대로 두고 블롭의 발광만 더해진다. */
+.grainientOverlay {
+  z-index: 1;
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+
 .cyberAtlasBackground {
   position: absolute;
   inset: 0;
@@ -58,34 +68,36 @@
   top: 50%;
   z-index: 2;
   display: grid;
-  width: min(100vw, 74.2778dvh);
+  /* scale(1)로 시작하므로 화면에 붙지 않게 좌우 최소 0.2em씩 비운다. */
+  width: min(100vw - 0.4em, 74.2778dvh);
   height: auto;
   aspect-ratio: 1337 / 1800;
   place-items: center;
   overflow: visible;
   background: transparent;
   translate: -50% -50%;
-  transform: translate3d(0, 120dvh, 0) scale(0.35);
+  /* 표지는 처음부터 화면 중앙에, 꽉 차지 않게 0.8 크기로 놓여 있다. */
+  transform: translate3d(0, 0, 0) scale(0.8);
   transform-origin: 50% 50%;
   transform-style: preserve-3d;
   will-change: transform;
   pointer-events: none;
 }
 
+/* Tap to Play 순간, 표지를 실제로 누른 것처럼 0.8 → 0.64(눌림) → 0.68(반동)로
+   축소된다. (1→0.8→0.85 비율을 기본 크기 0.8에 맞춰 축소한 값.)
+   data-started='false' 게이트 덕분에 퇴장이 시작되면 애니메이션이 해제되어
+   JS 인라인 퇴장 트랜스폼(0.68에서 이어받음)이 그대로 적용된다. */
 .page[data-engaged='true'][data-started='false'] .coverFilm {
-  animation: coverArrival 3600ms cubic-bezier(0.72, 0, 0.22, 1) forwards;
+  animation: coverPressPop 560ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
 }
 
 .coverArrivalTilt {
   position: absolute;
   inset: 0;
-  transform: perspective(1400px) rotateY(-45deg);
+  transform: perspective(1400px) rotateY(0deg);
   transform-style: preserve-3d;
   will-change: transform;
-}
-
-.page[data-engaged='true'] .coverArrivalTilt {
-  animation: coverArrivalTilt 3600ms cubic-bezier(0.72, 0, 0.22, 1) forwards;
 }
 
 .coverCard {
@@ -109,7 +121,7 @@
 }
 
 .page[data-engaged='true'] .coverCard {
-  animation: coverFlip var(--cover-flip-duration, 1350ms) cubic-bezier(0.72, 0, 0.18, 1) var(--cover-flip-delay, 6600ms) forwards;
+  animation: coverFlip var(--cover-flip-duration, 1350ms) cubic-bezier(0.72, 0, 0.18, 1) var(--cover-flip-delay, 4000ms) forwards;
 }
 
 .page[data-engaged='true'] .coverCard::after {
@@ -129,36 +141,28 @@
   transform: rotateY(0deg) translateZ(0.1px);
 }
 
+/* react-bits GlareHover 기본형: -30° 화이트 시트가 배경 포지션으로
+   대각선 스윕한다. 색 틴트·블러·스큐 없는 담백한 글레어. */
 .coverFront::after {
+  content: '';
   position: absolute;
   z-index: 2;
-  top: -18%;
-  bottom: -18%;
-  left: 0;
-  width: 112%;
+  inset: 0;
   background: linear-gradient(
-    108deg,
-    rgba(174, 255, 72, 0) 0%,
-    rgba(174, 255, 72, 0.06) 13%,
-    rgba(174, 255, 72, 0.14) 29%,
-    rgba(255, 255, 255, 0.42) 42%,
-    rgba(255, 255, 255, 0.72) 52%,
-    rgba(255, 255, 255, 0.38) 63%,
-    rgba(174, 255, 72, 0.16) 77%,
-    rgba(174, 255, 72, 0.05) 89%,
-    rgba(174, 255, 72, 0) 100%
+    -30deg,
+    hsla(0, 0%, 100%, 0) 60%,
+    rgba(255, 255, 255, 0.3) 70%,
+    hsla(0, 0%, 100%, 0) 100%
   );
-  content: '';
-  filter: blur(2.4px);
-  mix-blend-mode: screen;
-  opacity: 0;
+  background-size: 300% 300%;
+  background-position: -100% -100%;
+  background-repeat: no-repeat;
   pointer-events: none;
-  transform: translate3d(-105%, 0, 0) skewX(-13deg);
-  will-change: transform, opacity;
+  will-change: background-position;
 }
 
 .page[data-engaged='true'] .coverFront::after {
-  animation: coverSingleGlare var(--cover-glare-duration, 4400ms) cubic-bezier(0.18, 0.7, 0.22, 1) var(--cover-glare-delay, 6600ms) both;
+  animation: coverSingleGlare var(--cover-glare-duration, 1600ms) ease var(--cover-glare-delay, 1200ms) both;
 }
 
 .coverBack {
@@ -176,23 +180,17 @@
   -webkit-user-drag: none;
 }
 
-@keyframes coverArrival {
+@keyframes coverPressPop {
   0% {
-    transform: translate3d(0, 120dvh, 0) scale(0.35);
+    transform: translate3d(0, 0, 0) scale(0.8);
+  }
+
+  55% {
+    transform: translate3d(0, 0, 0) scale(0.64);
   }
 
   100% {
-    transform: translate3d(0, 0, 0) scale(0.7);
-  }
-}
-
-@keyframes coverArrivalTilt {
-  0% {
-    transform: perspective(1400px) rotateY(-45deg);
-  }
-
-  100% {
-    transform: perspective(1400px) rotateY(0deg);
+    transform: translate3d(0, 0, 0) scale(0.68);
   }
 }
 
@@ -207,29 +205,12 @@
 }
 
 @keyframes coverSingleGlare {
-  0% {
-    opacity: 0;
-    transform: translate3d(-105%, 0, 0) skewX(-13deg);
+  from {
+    background-position: -100% -100%;
   }
 
-  8% {
-    opacity: 0.3;
-    transform: translate3d(-88%, 0, 0) skewX(-13deg);
-  }
-
-  34% {
-    opacity: 0.78;
-    transform: translate3d(-42%, 0, 0) skewX(-13deg);
-  }
-
-  76% {
-    opacity: 0.58;
-    transform: translate3d(88%, 0, 0) skewX(-13deg);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate3d(92%, 0, 0) skewX(-13deg);
+  to {
+    background-position: 100% 100%;
   }
 }
 

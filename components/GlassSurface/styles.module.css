@@ -146,7 +146,8 @@
     rgba(168, 242, 42, 0.08) 73%,
     transparent 80%
   );
-  animation: confirmGlarePair 2800ms linear 1000ms 1 both;
+  /* send 이후의 확인 글레어는 절반 속도(2800→5600ms)로 천천히 지나간다. */
+  animation: confirmGlarePair 5600ms linear 1000ms 1 both;
 }
 
 .red {

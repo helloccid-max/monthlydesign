@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import GlassSurface from '@/components/GlassSurface';
-import { createHomageCoverUrl } from '@/lib/homageCover';
+import Grainient from '@/components/Grainient';
+import Iridescence from '@/components/Iridescence';
 import styles from './styles.module.css';
 
 export default function HomageScreen({ request, onArchive, onRestart } = {}) {
@@ -8,19 +9,28 @@ export default function HomageScreen({ request, onArchive, onRestart } = {}) {
   const prompt = request?.prompt || '';
   const issue = request?.issue || '277';
   const date = request?.date || '2001.07';
+  // 실제 생성 결과가 없으면(RunPod 미연결·실패) 랜덤 SVG 대신 무지 패널을
+  // 보여준다. 가짜 결과처럼 보이는 것을 피하기 위한 의도적 공백이다.
+  const hasGeneratedImage = Boolean(
+    request?.generatedImageUrl && typeof request.generatedImageUrl === 'string'
+  );
   const generatedUrl = useMemo(
-    () => {
-      // request.generatedImageUrl이 있으면 그걸 최우선으로 씁니다.
-      if (request?.generatedImageUrl && typeof request.generatedImageUrl === 'string') {
-        return request.generatedImageUrl;
-      }
-      // 없으면 fallback으로 로컬 SVG를 씁니다.
-      return createHomageCoverUrl({ prompt, issue, date });
-    },
-    [date, issue, prompt, request?.generatedImageUrl]
+    () => (hasGeneratedImage ? request.generatedImageUrl : null),
+    [hasGeneratedImage, request?.generatedImageUrl]
   );
 
   const renderPngBlob = useCallback(async () => {
+    // 생성 결과가 없으면 화면과 동일한 무지 패널을 그대로 저장한다.
+    if (!generatedUrl) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1000;
+      canvas.height = 1360;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas is unavailable');
+      context.fillStyle = '#101208';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      return new Promise((resolve) => canvas.toBlob(resolve, 'image/png', 1));
+    }
     const response = await fetch(generatedUrl, { cache: 'force-cache' });
     if (!response.ok) throw new Error('Generated cover could not be loaded');
     const sourceBlob = await response.blob();
@@ -62,12 +72,14 @@ export default function HomageScreen({ request, onArchive, onRestart } = {}) {
       anchor.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (_) {
-      const anchor = document.createElement('a');
-      anchor.href = generatedUrl;
-      anchor.download = `monthly-design-homage-${issue}.svg`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
+      if (generatedUrl) {
+        const anchor = document.createElement('a');
+        anchor.href = generatedUrl;
+        anchor.download = `monthly-design-homage-${issue}.svg`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
     } finally {
       setSaving(false);
     }
@@ -75,9 +87,27 @@ export default function HomageScreen({ request, onArchive, onRestart } = {}) {
 
   return (
     <main className={styles.page}>
+      {/* 생성이 완료됐을 때만 이리데슨스 셰이더 배경, 실패(무지 패널)면 그레인 그라디언트. */}
+      {hasGeneratedImage ? (
+        <Iridescence
+          className={styles.pageIridescence}
+          color={[0.66, 0.95, 0.31]}
+          speed={0.7}
+          amplitude={0.1}
+        />
+      ) : (
+        <Grainient className={styles.pageGrainient} />
+      )}
       <section className={styles.stage}>
         <div className={styles.cover}>
-          <img src={generatedUrl} alt={`프롬프트 “${prompt}”로 만든 월간디자인 오마주 표지`} />
+          {hasGeneratedImage ? (
+            <img src={generatedUrl} alt={`프롬프트 “${prompt}”로 만든 월간디자인 오마주 표지`} />
+          ) : (
+            <div className={styles.plainCover} role="img" aria-label="생성 결과를 불러오지 못한 자리" />
+          )}
+        </div>
+        <div className={styles.bottomBlur} aria-hidden="true">
+          <span /><span /><span /><span /><span />
         </div>
       </section>
 

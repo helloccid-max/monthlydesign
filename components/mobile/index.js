@@ -258,8 +258,17 @@ export default function MobileScreen() {
 
   useEffect(() => {
     if (!homageMounted || step !== STEPS.LOAD || transitioningToHomage) return undefined;
-    const frame = window.requestAnimationFrame(() => setTransitioningToHomage(true));
-    return () => window.cancelAnimationFrame(frame);
+    // 이중 rAF: 결과 레이어가 오른쪽(+100%) 위치로 한 프레임 칠해진 뒤에
+    // 전환을 켜야 우측→좌측 슬라이드가 실제로 보인다. 단일 rAF는 첫
+    // 페인트를 앞질러서 결과 화면이 제자리에서 튀어나온다.
+    let innerFrame = 0;
+    const outerFrame = window.requestAnimationFrame(() => {
+      innerFrame = window.requestAnimationFrame(() => setTransitioningToHomage(true));
+    });
+    return () => {
+      window.cancelAnimationFrame(outerFrame);
+      window.cancelAnimationFrame(innerFrame);
+    };
   }, [homageMounted, step, transitioningToHomage]);
 
   useEffect(() => {
@@ -267,6 +276,10 @@ export default function MobileScreen() {
     const timer = window.setTimeout(() => {
       setStep(STEPS.HOMAGE);
       setTransitioningToHomage(false);
+      // 전환이 끝나면 로드 레이어를 내려놓는다. 남겨두면 기본 위치(+100%)로
+      // 되돌아가는 슬라이드가 결과 화면 위(z-index 1)로 지나가 꼬여 보이고,
+      // 구 캔버스 루프도 배경에서 계속 돈다.
+      setLoadMounted(false);
     }, RESULT_TRANSITION_MS);
     return () => window.clearTimeout(timer);
   }, [transitioningToHomage]);
@@ -295,8 +308,15 @@ export default function MobileScreen() {
       setTransitioningToLoad(false);
       setTransitioningToHomage(false);
 
-      if (nextStage.state === 'transcript' || nextStage.scene === STEPS.LOAD || nextStage.scene === STEPS.HOMAGE) {
+      if (nextStage.state === 'transcript' || nextStage.scene === STEPS.LOAD) {
         setGenerationRequest(DEFAULT_GENERATION_REQUEST);
+      } else if (nextStage.scene === STEPS.HOMAGE) {
+        // QA 결과 화면은 '생성 완료' 상태로 본다(Iridescence 배경 포함).
+        // 무지 패널(생성 실패) 상태는 실제 플로우로 확인한다.
+        setGenerationRequest({
+          ...DEFAULT_GENERATION_REQUEST,
+          generatedImageUrl: DEFAULT_GENERATION_REQUEST.coverImageUrl,
+        });
       }
     };
 
@@ -306,12 +326,16 @@ export default function MobileScreen() {
 
   const handlers = useMemo(() => {
     return {
+      // 결과 화면의 "다시 생성"이 여기로 돌아온다 — 인트로가 아니라 표지
+      // 선택부터 다시 시작한다.
       goCover: () => {
         setCoverMounted(true);
         setLoadMounted(false);
         setHomageMounted(false);
         setTransitioningToLoad(false);
         setTransitioningToHomage(false);
+        setGenerationRequest(null);
+        setSphereCovers(null);
         go(STEPS.COVER);
       },
       // GENERATION_HANDOFF_START: downstream ownership begins at this callback.
@@ -371,7 +395,7 @@ export default function MobileScreen() {
               phase={GENERATION_PHASES.RESULT}
               request={generationRequest}
               onArchive={WALL_ENABLED ? handlers.goArchive : null}
-              onRestart={handlers.goIntro}
+              onRestart={handlers.goCover}
             />
           </div>
         )}

@@ -144,23 +144,12 @@
   }
 }
 
-/* 동작 줄이기에서 쓰는 색 스윕 전용 웨이브. 글자 이동·스케일만 제거하고
-   생성 중이라는 리듬(밝기 흐름)은 유지한다 — 완전 정지는 앱이 멈춘 것으로
-   읽히기 때문에 플로킹 화면과 같은 '감속' 방침을 따른다. */
-@keyframes statusCharacterColorSweep {
-  0%, 50%, 100% { color: #080a06; }
-  12.5% { color: #626860; }
-  25% { color: #f8faf7; }
-  37.5% { color: #747a72; }
-}
-
+/* 생성 대기 텍스트의 웨이브(이동+스케일+색)는 동작 줄이기에서도 그대로 둔다.
+   이 화면의 유일한 '살아있음' 신호라서, 끄면 앱이 멈춘 것으로 읽힌다.
+   구 회전은 이미 감속 처리되어 있다(components/load/index.js). */
 @media (prefers-reduced-motion: reduce) {
   .canvas {
     animation: none;
     opacity: 1;
-  }
-
-  .statusCharacter {
-    animation-name: statusCharacterColorSweep;
   }
 }
