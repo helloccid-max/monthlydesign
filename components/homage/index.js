@@ -95,7 +95,7 @@ export default function HomageScreen({ request, onArchive, onRestart } = {}) {
               <div className={styles.plainCover} role="img" aria-label="생성 결과를 불러오지 못한 자리" />
             )}
           </div>
-          {prompt && <p className={styles.promptCaption}>{prompt}</p>}
+          {prompt && <p className={styles.promptCaption}>{`“${prompt}”`}</p>}
         </div>
       </section>
 
