@@ -583,6 +583,22 @@ export default function CoverSelectScreen({
     return () => window.clearTimeout(timer);
   }, [displayedPrompt, promptValue, promptPlaceholder]);
 
+  // 가이드 단계: "프롬프트를 말해보세요"가 컨테이너 morph(1초)와 같은 호흡으로
+  // 한 글자씩 입력된다. 발화가 시작되면 placeholder가 풀리며 즉시 중단된다.
+  useEffect(() => {
+    if (!promptPlaceholder || promptValue) return undefined;
+    if (displayedPrompt === VOICE_GUIDE_PROMPT_TEXT) return undefined;
+    if (!VOICE_GUIDE_PROMPT_TEXT.startsWith(displayedPrompt)) return undefined;
+    const timer = window.setTimeout(() => {
+      setDisplayedPrompt((current) => (
+        VOICE_GUIDE_PROMPT_TEXT.startsWith(current)
+          ? VOICE_GUIDE_PROMPT_TEXT.slice(0, current.length + 1)
+          : current
+      ));
+    }, Math.round(1000 / VOICE_GUIDE_PROMPT_TEXT.length));
+    return () => window.clearTimeout(timer);
+  }, [displayedPrompt, promptPlaceholder, promptValue]);
+
   useEffect(() => {
     if (Array.isArray(initialCovers) && initialCovers.length) return undefined;
     const controller = new AbortController();
@@ -1043,10 +1059,10 @@ export default function CoverSelectScreen({
       setDisplayedPrompt(basePrompt);
     }
     if (!basePrompt) {
-      // 가이드 문구를 트랜스크립트 요소에 직접 띄운다. 이 시점에 컨테이너가
-      // 최종 형태로 한 번 morph하고, 이후 STT까지 컨테이너 변화가 없다.
+      // 버튼이 입력 창으로 morph(1초)되는 동안 가이드 문구가 타자기로
+      // 입력된다 — 즉시 세팅하지 않고 아래 타이핑 이펙트가 채운다.
       setPromptPlaceholder(true);
-      setDisplayedPrompt(VOICE_GUIDE_PROMPT_TEXT);
+      setDisplayedPrompt('');
     } else {
       setPromptPlaceholder(false);
     }
@@ -1520,6 +1536,12 @@ export default function CoverSelectScreen({
   );
   const voicePromptCancellable = Boolean(displayedPrompt) && !promptPlaceholder;
   const voiceCopyTyping = !speechError && displayedPrompt.length < promptValue.length;
+  // 타자기 진행 중(가이드 입력·지우기·STT 타이핑)에만 캐럿이 깜빡인다.
+  const voiceTypewriterActive = !speechError && (
+    promptPlaceholder && !promptValue
+      ? displayedPrompt !== VOICE_GUIDE_PROMPT_TEXT
+      : displayedPrompt !== promptValue
+  );
   const promptWords = displayedPrompt.trim().split(/\s+/).filter(Boolean);
   const promptLastWord = promptWords.at(-1) || '';
   const promptLeadingText = promptWords.slice(0, -1).join(' ');
@@ -1672,6 +1694,9 @@ export default function CoverSelectScreen({
                     {promptLeadingText ? `${promptLeadingText} ` : ''}
                     <span className={styles.voiceTranscriptTail}>
                       {promptLastWord}
+                      {voiceTypewriterActive && (
+                        <span className={styles.voiceTypeCursor} aria-hidden="true" />
+                      )}
                       {voiceSendReady ? renderSendIcon() : renderVoiceWave()}
                     </span>
                   </>

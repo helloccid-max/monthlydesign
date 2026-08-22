@@ -325,16 +325,17 @@
     0 3px 12px rgba(255, 255, 255, 0.025);
   backdrop-filter: blur(18px) saturate(135%);
   -webkit-backdrop-filter: blur(18px) saturate(135%);
+  /* 버튼 → 입력 창 형태 morph는 1초 — 가이드 문구 타자기 입력과 함께 끝난다. */
   transition:
-    width 760ms cubic-bezier(0.16, 1, 0.3, 1),
-    min-height 620ms cubic-bezier(0.16, 1, 0.3, 1),
-    padding 620ms cubic-bezier(0.16, 1, 0.3, 1),
+    width 1000ms cubic-bezier(0.16, 1, 0.3, 1),
+    min-height 1000ms cubic-bezier(0.16, 1, 0.3, 1),
+    padding 1000ms cubic-bezier(0.16, 1, 0.3, 1),
     transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
     border-color 440ms cubic-bezier(0.16, 1, 0.3, 1),
     background 440ms cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 440ms cubic-bezier(0.16, 1, 0.3, 1),
     backdrop-filter 440ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-radius 620ms cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius 1000ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* 프롬프트 발화가 시작되면(트랜스크립트 표시) 반경을 절반으로 줄인다. */
@@ -721,6 +722,29 @@
   gap: 7px;
   white-space: nowrap;
   vertical-align: baseline;
+}
+
+/* 타자기 진행 중 마지막 글자 옆에서 깜빡이는 캐럿. */
+.voiceTypeCursor {
+  flex: none;
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: -3px;
+  background: currentColor;
+  animation: voiceCursorBlink 950ms step-end infinite;
+}
+
+@keyframes voiceCursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voiceTypeCursor {
+    animation: none;
+    opacity: 0.85;
+  }
 }
 
 .voiceTranscriptTail .voiceIconSlot {
