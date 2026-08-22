@@ -1,7 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import GlassSurface from '@/components/GlassSurface';
-import Grainient from '@/components/Grainient';
-import Iridescence from '@/components/Iridescence';
 import styles from './styles.module.css';
 
 export default function HomageScreen({ request, onArchive, onRestart } = {}) {
@@ -87,17 +85,6 @@ export default function HomageScreen({ request, onArchive, onRestart } = {}) {
 
   return (
     <main className={styles.page}>
-      {/* 생성이 완료됐을 때만 이리데슨스 셰이더 배경, 실패(무지 패널)면 그레인 그라디언트. */}
-      {hasGeneratedImage ? (
-        <Iridescence
-          className={styles.pageIridescence}
-          color={[0.66, 0.95, 0.31]}
-          speed={0.7}
-          amplitude={0.1}
-        />
-      ) : (
-        <Grainient className={styles.pageGrainient} />
-      )}
       <section className={styles.stage}>
         <div className={styles.cover}>
           {hasGeneratedImage ? (
@@ -105,9 +92,6 @@ export default function HomageScreen({ request, onArchive, onRestart } = {}) {
           ) : (
             <div className={styles.plainCover} role="img" aria-label="생성 결과를 불러오지 못한 자리" />
           )}
-        </div>
-        <div className={styles.bottomBlur} aria-hidden="true">
-          <span /><span /><span /><span /><span />
         </div>
       </section>
 

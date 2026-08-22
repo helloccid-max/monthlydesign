@@ -160,12 +160,29 @@
 
 .particle img {
   display: block;
-  width: 100%;
-  height: 100%;
+  /* 합성 레이어 업스케일 블러 방지: 레이아웃 크기(12vmin)가 작아 원근
+     transform 확대가 저해상 래스터를 늘리던 문제. 이미지를 3배로 래스터해
+     두고 1/3 축소해 표시하면, 필드의 최대 확대(~3.3배)에서도 선명하다.
+     absolute 필수 — 인플로우 300% 높이는 버튼의 aspect-ratio 박스를
+     밀어 늘려 선택 배치 계산을 무너뜨린다. */
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 300%;
+  height: 300%;
+  transform: scale(0.33334);
+  transform-origin: 0 0;
   object-fit: contain;
   opacity: 1;
   filter: none;
   pointer-events: none;
+}
+
+.particle[data-selected='true'] img {
+  /* 선택 확대(~6.3배)에 맞춰 더 크게 재래스터. */
+  width: 600%;
+  height: 600%;
+  transform: scale(0.16667);
 }
 
 .particle[data-selected='true'] {

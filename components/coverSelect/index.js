@@ -253,6 +253,29 @@ const ArchiveParticle = memo(function ArchiveParticle({
   onToggle,
 }) {
   const { cover } = particle;
+  // 선택 확대 시 500px 필드용 이미지는 3x 레티나 기준 해상도가 모자란다.
+  // 선택되면 800px 세트(archive-lg)를 프리로드해 완료 시에만 교체한다.
+  // lg 파일이 없는 달(손상 원본 등)은 onerror로 조용히 기본 이미지를 유지.
+  const [highResReady, setHighResReady] = useState(false);
+  const highResUrl = cover.imageUrl.replace('/covers/archive/', '/covers/archive-lg/');
+  const hasHighResVariant = highResUrl !== cover.imageUrl;
+
+  useEffect(() => {
+    setHighResReady(false);
+  }, [cover.id]);
+
+  useEffect(() => {
+    if (!isSelected || highResReady || !hasHighResVariant) return undefined;
+    let active = true;
+    const image = new Image();
+    image.onload = () => {
+      if (active) setHighResReady(true);
+    };
+    image.src = highResUrl;
+    return () => {
+      active = false;
+    };
+  }, [isSelected, highResReady, hasHighResVariant, highResUrl]);
 
   return (
     <button
@@ -285,7 +308,7 @@ const ArchiveParticle = memo(function ArchiveParticle({
       }}
     >
       <img
-        src={cover.imageUrl}
+        src={isSelected && highResReady ? highResUrl : cover.imageUrl}
         alt=""
         onLoad={(event) => {
           const image = event.currentTarget;

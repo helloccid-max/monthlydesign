@@ -34,3 +34,6 @@ yarn-error.log*
 *.swp
 *.swo
 .vercel
+
+# browser automation logs
+.playwright-mcp/
