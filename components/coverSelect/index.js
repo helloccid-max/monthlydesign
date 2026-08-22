@@ -62,7 +62,7 @@ const SPEECH_ERROR_MESSAGES = {
   'service-not-allowed': '이 브라우저에서 음성 인식을 사용할 수 없습니다.',
   'audio-capture': '사용 가능한 마이크를 찾지 못했습니다.',
   network: '음성 인식 연결이 원활하지 않습니다. 다시 시도해 주세요.',
-  'no-speech': '목소리가 들리지 않았습니다. 다시 말해 주세요.',
+  'no-speech': '목소리가 들리지 않았습니다.\n다시 말해주세요.',
 };
 
 const hash = (index, salt) => {
