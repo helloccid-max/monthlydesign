@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Grainient from '@/components/Grainient';
 import { startRunPodPrewarm } from '@/lib/runpod/prewarmClient';
+import createAtlasRenderer from './atlasRenderer';
 import styles from './styles.module.css';
 
 const INTRO_IDLE_MS = 1800;
@@ -267,7 +268,9 @@ export default function IntroScreen({
   const [preReveal, setPreReveal] = useState(0);
   const completedRef = useRef(false);
   const pendingCompleteRef = useRef(false);
-  const rendererRef = useRef(null);
+  const atlasCanvasRef = useRef(null);
+  const atlasApiRef = useRef(null);
+  const atlasHandlersRef = useRef({});
   const coverFilmRef = useRef(null);
   const scrubProgressRef = useRef(0);
   const soundEngineRef = useRef(null);
@@ -407,38 +410,41 @@ export default function IntroScreen({
     scheduleIdleExit();
   }, [scheduleIdleExit]);
 
-  useEffect(() => {
-    const handleRendererMessage = (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.source !== rendererRef.current?.contentWindow) return;
-      if (event.data?.type === 'cyberatlas:ready') {
-        setTopologyAssetReady(true);
-        return;
-      }
-      if (event.data?.type === 'cyberatlas:sonify') {
-        soundEngineRef.current?.update(event.data.sample);
-        return;
-      }
-      if (event.data?.type === 'cyberatlas:exploration-complete') {
-        // The cover choreography owns the transition timing. Renderer completion
-        // can arrive early on fast devices, but the blue back must hold for 5s.
-        return;
-      }
-      if (event.data?.type === 'cyberatlas:interaction') {
-        if (event.data.phase === 'start') beginInteraction();
-        else if (event.data.phase === 'end') endInteraction();
-        else continueInteraction();
-      }
-    };
+  // 렌더러 콜백은 ref를 거쳐 항상 최신 핸들러로 향한다 — 렌더러 자체는
+  // 마운트에 한 번만 만든다.
+  atlasHandlersRef.current = {
+    sonify: (sample) => soundEngineRef.current?.update(sample),
+    interaction: (phase) => {
+      if (phase === 'start') beginInteraction();
+      else if (phase === 'end') endInteraction();
+      else continueInteraction();
+    },
+  };
 
-    window.addEventListener('message', handleRendererMessage);
+  useEffect(() => {
+    const canvas = atlasCanvasRef.current;
+    if (!canvas) return undefined;
+    const api = createAtlasRenderer(canvas, {
+      onReady: () => setTopologyAssetReady(true),
+      onSonify: (sample) => atlasHandlersRef.current.sonify?.(sample),
+      onInteraction: (phase) => atlasHandlersRef.current.interaction?.(phase),
+      // 커버 안무가 전환 타이밍을 소유한다 — 렌더러 완주 신호는 무시(기존 동일).
+      onExplorationComplete: () => {},
+    });
+    atlasApiRef.current = api;
+    api.setLowerCenter(false, 0, FOCUS_DURATION_MS);
+    api.setFocus(false, 0, FOCUS_DURATION_MS);
     return () => {
-      window.removeEventListener('message', handleRendererMessage);
-      clearIdleExit();
-      soundEngineRef.current?.stop();
-      soundEngineRef.current = null;
+      api.destroy();
+      atlasApiRef.current = null;
     };
-  }, [beginInteraction, clearIdleExit, complete, continueInteraction, debugState, endInteraction]);
+  }, []);
+
+  useEffect(() => () => {
+    clearIdleExit();
+    soundEngineRef.current?.stop();
+    soundEngineRef.current = null;
+  }, [clearIdleExit]);
 
   useEffect(() => {
     if (!debugState) return;
@@ -507,33 +513,14 @@ export default function IntroScreen({
 
   useEffect(() => {
     if (debugState || !engaged || started) return undefined;
-    rendererRef.current?.contentWindow?.postMessage(
-      { type: 'cyberatlas:start-exploration', turns: 3 },
-      window.location.origin
-    );
+    atlasApiRef.current?.startExploration(3);
     const timer = setTimeout(() => setStarted(true), EXPLORATION_FALLBACK_MS);
     return () => clearTimeout(timer);
   }, [debugState, engaged, started]);
 
   useEffect(() => {
-    rendererRef.current?.contentWindow?.postMessage(
-      {
-        type: 'cyberatlas:set-lower-center',
-        lowered: false,
-        delay: 0,
-        duration: FOCUS_DURATION_MS,
-      },
-      window.location.origin
-    );
-    rendererRef.current?.contentWindow?.postMessage(
-      {
-        type: 'cyberatlas:set-focus',
-        focused: false,
-        delay: 0,
-        duration: FOCUS_DURATION_MS,
-      },
-      window.location.origin
-    );
+    atlasApiRef.current?.setLowerCenter(false, 0, FOCUS_DURATION_MS);
+    atlasApiRef.current?.setFocus(false, 0, FOCUS_DURATION_MS);
   }, [started]);
 
   const handleTap = useCallback(() => {
@@ -585,32 +572,12 @@ export default function IntroScreen({
   }, [topologySoundReady]);
 
   useEffect(() => {
-    rendererRef.current?.contentWindow?.postMessage(
-      { type: 'cyberatlas:set-reveal', progress: topologyReveal },
-      window.location.origin
-    );
+    atlasApiRef.current?.setReveal(topologyReveal);
   }, [topologyReveal]);
 
   useEffect(() => {
-    const renderer = rendererRef.current?.contentWindow;
-    renderer?.postMessage(
-      {
-        type: 'cyberatlas:set-lower-center',
-        lowered: finalSplitActive,
-        delay: 0,
-        duration: 1280,
-      },
-      window.location.origin
-    );
-    renderer?.postMessage(
-      {
-        type: 'cyberatlas:set-focus',
-        focused: finalSplitActive,
-        delay: 0,
-        duration: 1280,
-      },
-      window.location.origin
-    );
+    atlasApiRef.current?.setLowerCenter(finalSplitActive, 0, 1280);
+    atlasApiRef.current?.setFocus(finalSplitActive, 0, 1280);
   }, [finalSplitActive]);
 
   return (
@@ -710,49 +677,13 @@ export default function IntroScreen({
                     ? { transform: `translate(-50%, -50%) scale(${coverInnerScale.toFixed(5)})` }
                     : null}
                 >
-                  <iframe
-                    ref={rendererRef}
+                  {/* 아카이브 아틀라스를 부모 문서의 캔버스에 직접 그린다 —
+                      iframe 레이어 래스터 캐시(iOS 블러) 문제가 없다. */}
+                  <canvas
+                    ref={atlasCanvasRef}
                     className={styles.coverCanvasFrame}
-                    /* 아카이브 아틀라스(평면 지도). 하이퍼볼릭 원판으로 되돌리려면
-                       cyberatlas-render.html로 바꾸면 된다 — 메시지 계약 동일. */
-                    src="/experiments/atlas-render.html"
-                    title="살아 움직이는 하이퍼볼릭 데이터 토폴로지"
-                    loading="eager"
-                    onLoad={() => {
-                      const renderer = rendererRef.current?.contentWindow;
-                      renderer?.postMessage(
-                        { type: 'cyberatlas:request-ready' },
-                        window.location.origin
-                      );
-                      renderer?.postMessage(
-                        { type: 'cyberatlas:set-reveal', progress: topologyReveal },
-                        window.location.origin
-                      );
-                      renderer?.postMessage(
-                        {
-                          type: 'cyberatlas:set-lower-center',
-                          lowered: false,
-                          delay: 0,
-                          duration: FOCUS_DURATION_MS,
-                        },
-                        window.location.origin
-                      );
-                      renderer?.postMessage(
-                        {
-                          type: 'cyberatlas:set-focus',
-                          focused: false,
-                          delay: 0,
-                          duration: FOCUS_DURATION_MS,
-                        },
-                        window.location.origin
-                      );
-                      if (engaged && !started) {
-                        renderer?.postMessage(
-                          { type: 'cyberatlas:start-exploration', turns: 3 },
-                          window.location.origin
-                        );
-                      }
-                    }}
+                    role="img"
+                    aria-label="살아 움직이는 아카이브 아틀라스"
                   />
                   <Grainient className={styles.grainientOverlay} />
                 </div>
