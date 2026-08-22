@@ -38,8 +38,8 @@ const MARGIN_X=260, MARGIN_Y=210;
 const YEAR_MIN=1976, YEAR_MAX=2026;
 const TRAVEL_VISIBLE_W=1200;      /* 순항 고도에서 보이는 필드 폭(맵 단위) */
 const OVERVIEW_VISIBLE_W=5600;    /* 리빌 시작 시 전체 조망 폭 */
-const COVER_MAP_H=128;            /* 표지 높이(맵 단위) — 순항 시 ~47px */
-const DRIFT_LOOP_MS=92000;        /* 서→동 왕복 한 사이클 */
+const COVER_MAP_H=100;            /* 표지 높이(맵 단위) — 순항 시 ~47px */
+const DRIFT_LOOP_MS=56000;        /* 서→동 왕복 한 사이클 */
 const DOT_COUNT=2400;
 const THUMB_CACHE_LIMIT=110;
 
@@ -434,7 +434,7 @@ addEventListener('message',e=>{
     setView('reveal',clamp(Number(d.progress)||0,0,1),0,220);
   }else if(d.type==='cyberatlas:set-focus'){
     setView('focus',d.focused?1:0,Number(d.delay)||0,Number(d.duration)||1280);
-    setView('morph',d.focused?1:0,Number(d.delay)||0,d.focused?3400:900);
+    setView('morph',d.focused?1:0,Number(d.delay)||0,d.focused?1000:700);
   }else if(d.type==='cyberatlas:set-lower-center'){
     setView('lower',d.lowered?1:0,Number(d.delay)||0,Number(d.duration)||1280);
   }else if(d.type==='cyberatlas:start-exploration'){

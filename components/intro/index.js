@@ -10,9 +10,10 @@ const INTRO_AUTO_ADVANCE_ENABLED = false;
 const COVER_CENTER_HOLD_MS = 1200;
 const COVER_GLARE_DELAY_MS = COVER_CENTER_HOLD_MS;
 const COVER_GLARE_DURATION_MS = 1600;
-const COVER_FLIP_START_MS = COVER_GLARE_DELAY_MS + COVER_GLARE_DURATION_MS;
+// 글레어 시트가 피크를 지나는 순간 바로 뒤집힌다 — 광택이 회전으로 이어진다.
+const COVER_FLIP_START_MS = COVER_GLARE_DELAY_MS + 600;
 const COVER_FLIP_DURATION_MS = 1350;
-const COVER_BACK_HOLD_MS = 5000;
+const COVER_BACK_HOLD_MS = 2500;
 const COVER_SEQUENCE_DURATION_MS =
   COVER_FLIP_START_MS + COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS;
 const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
@@ -528,7 +529,8 @@ export default function IntroScreen({
   // 동시에 출발한다.
   const easeOutCubicIntro = (value) => 1 - ((1 - clamp01(value)) ** 3);
   const coverExitScaleProgress = easeOutCubicIntro(segment(scrubProgress, 0, 0.16));
-  const coverExitSpinProgress = easeHumanImpulse(segment(scrubProgress, 0.045, 0.2));
+  // 회전은 ease-out으로 즉시 시작 — 임펄스 커브는 초반이 느려 거의 안 보였다.
+  const coverExitSpinProgress = easeOutCubicIntro(segment(scrubProgress, 0.015, 0.16));
   const coverRise = easeHumanImpulse(segment(scrubProgress, 0.045, 0.24));
   const topologySoundReady = started && scrubProgress >= TOPOLOGY_SOUND_START_PROGRESS;
   const topologyReveal = easeHumanImpulse(segment(scrubProgress, 0.075, 0.29));
