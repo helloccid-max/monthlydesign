@@ -131,6 +131,18 @@ export function useLoadLogic({ request, onDone, paused = false } = {}) {
               if (!outputUrl.startsWith('http') && !outputUrl.startsWith('data:')) {
                  outputUrl = `data:image/png;base64,${outputUrl}`;
               }
+              // 생성 성공 아카이빙(드라이브 업로드 + 시트 기록) — 설정이 없거나
+              // 실패해도 관람객 플로우에는 영향을 주지 않는 best-effort 호출.
+              fetch('/api/archive-generated', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  imageUrl: outputUrl,
+                  issue: request.issue,
+                  prompt: request.prompt,
+                }),
+                keepalive: true,
+              }).catch(() => {});
               goDone(outputUrl);
             } else {
               console.error('No valid output URL from RunPod:', statusData);
