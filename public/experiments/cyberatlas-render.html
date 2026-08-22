@@ -1097,7 +1097,10 @@ function topologyFrame(W,H){
   let revealCreep=1;
   if(VIEW_REVEAL.value>=0.999){
     if(!VIEW_REVEAL.settledAt) VIEW_REVEAL.settledAt=performance.now();
-    revealCreep=1+Math.min(0.14,(performance.now()-VIEW_REVEAL.settledAt)*0.000008);
+    /* (1-morph) 감쇠: 포커스(스테이트먼트) 상태의 필드는 하단 영역에 꽉 맞게
+       계산되므로, 크립이 그대로 적용되면 경계를 넘쳐 뭉개져 보인다.
+       탐험 상태에서만 온전히 줌이 이어지고 포커스로 갈수록 0이 된다. */
+    revealCreep=1+Math.min(0.14,(performance.now()-VIEW_REVEAL.settledAt)*0.000008)*(1-morph);
   }else if(VIEW_REVEAL.settledAt){
     VIEW_REVEAL.settledAt=0;
   }
@@ -1348,7 +1351,12 @@ function drawCoverThumbnails(ctx,graph,W,H,cx,cy,RX,RY){
     const entry=coverThumbnail(candidate.src);
     if(entry.state!=='ready'||!entry.image.naturalWidth||!entry.image.naturalHeight) continue;
     const near=clamp((candidate.z+0.48)/1.45,0,1);
-    const height=minimum*(0.036+0.052*near*near);
+    /* 포커스로 원판이 ~3배 압축될 때 썸네일이 화면 기준 크기를 유지하면
+       좁은 필드에 겹겹이 쌓여 뭉개져 보인다. 필드 압축률의 제곱근만큼
+       함께 줄여 구조와 표지의 비율을 유지한다. */
+    const fieldCompression=Math.min(1,Math.max(RX,RY)/(Math.max(W,H)*0.68));
+    const thumbnailScale=Math.max(0.5,Math.sqrt(fieldCompression));
+    const height=minimum*(0.036+0.052*near*near)*thumbnailScale;
     const width=height*(entry.image.naturalWidth/entry.image.naturalHeight);
     const horizontal=clamp((candidate.x-cx)/Math.max(1,RX),-1,1);
     const vertical=clamp((candidate.y-cy)/Math.max(1,RY),-1,1);
