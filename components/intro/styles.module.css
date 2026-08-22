@@ -572,12 +572,15 @@
   }
 }
 
+/* 탭: 문구가 먼저 라임으로 바뀐 채 1초 머물렀다가 사라진다. */
 .page[data-engaged='true'] .startPrompt {
   opacity: 0;
   pointer-events: none;
+  transition-delay: 1000ms;
 }
 
 .page[data-engaged='true'] .startPrompt > span {
+  color: var(--editorial-lime);
   transform: translate(-50%, 12px);
 }
 
