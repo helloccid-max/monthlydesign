@@ -86,12 +86,16 @@ export default function HomageScreen({ request, onArchive, onRestart } = {}) {
   return (
     <main className={styles.page}>
       <section className={styles.stage}>
-        <div className={styles.cover}>
-          {hasGeneratedImage ? (
-            <img src={generatedUrl} alt={`프롬프트 “${prompt}”로 만든 월간디자인 오마주 표지`} />
-          ) : (
-            <div className={styles.plainCover} role="img" aria-label="생성 결과를 불러오지 못한 자리" />
-          )}
+        <div className={styles.coverGroup}>
+          <span className={styles.issueBadge}>{issue}호 오마주 표지</span>
+          <div className={styles.cover}>
+            {hasGeneratedImage ? (
+              <img src={generatedUrl} alt={`프롬프트 “${prompt}”로 만든 월간디자인 오마주 표지`} />
+            ) : (
+              <div className={styles.plainCover} role="img" aria-label="생성 결과를 불러오지 못한 자리" />
+            )}
+          </div>
+          {prompt && <p className={styles.promptCaption}>{prompt}</p>}
         </div>
       </section>
 
