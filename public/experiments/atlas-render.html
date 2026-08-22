@@ -41,7 +41,7 @@ const OVERVIEW_VISIBLE_W=5600;    /* 리빌 시작 시 전체 조망 폭 */
 const COVER_MAP_H=100;            /* 표지 높이(맵 단위) — 순항 시 ~47px */
 const DRIFT_LOOP_MS=56000;        /* 서→동 왕복 한 사이클 */
 const DOT_COUNT=2400;
-const THUMB_CACHE_LIMIT=110;
+const THUMB_CACHE_LIMIT=640;
 
 const canvas=document.getElementById('stage');
 const ctx=canvas.getContext('2d');
@@ -157,35 +157,71 @@ function setView(track,to,delay,duration){
   v.startedAt=now+(delay||0); v.duration=Math.max(1,duration||820);
 }
 
+/* 연대 스텝핑 스케줄: 0.5초에 슝 넘어가고 1.5초 서행을 반복하며
+   1980→1990→2000→2010을 지나, 2020에서 3초 머문 뒤 처음으로 되돌아간다. */
+const DECADES=[1980,1990,2000,2010,2020];
+const yearT=y=>((y-YEAR_MIN)*12)/((YEAR_MAX-YEAR_MIN)*12+11);
+let SCHEDULE=null;
+function buildSchedule(){
+  const drift=1500, hop=500, hold=3000, back=900, driftYears=2.2;
+  const segs=[]; let acc=0;
+  for(let i=0;i<DECADES.length;i++){
+    const year=DECADES[i], last=i===DECADES.length-1;
+    const d={t0:acc,dur:last?hold:drift,from:yearT(year),
+      to:yearT(year+(last?1.1:driftYears)),ease:'lin'};
+    segs.push(d); acc+=d.dur;
+    const next=last?DECADES[0]:DECADES[i+1];
+    const h={t0:acc,dur:last?back:hop,from:d.to,to:yearT(next),ease:'smooth'};
+    segs.push(h); acc+=h.dur;
+  }
+  SCHEDULE={segs,total:acc};
+}
+
 function cameraCenter(now){
-  /* 드리프트: 서→동 왕복. 시작 전엔 1980년대 초입에서 미세하게 숨쉰다. */
   let t;
   if(exploring){
-    const cycle=REDUCE_MOTION?DRIFT_LOOP_MS*1.8:DRIFT_LOOP_MS;
-    const p=((now-explorationStartedAt)%(cycle*2))/cycle;
-    t=p<1?p:2-p;
-    if(!explorationDone&&(now-explorationStartedAt)>cycle*explorationTurns){
+    if(!SCHEDULE) buildSchedule();
+    const scale=REDUCE_MOTION?1.7:1;
+    const elapsed=((now-explorationStartedAt)/scale)%SCHEDULE.total;
+    t=SCHEDULE.segs[0].from;
+    for(const s of SCHEDULE.segs){
+      if(elapsed>=s.t0&&elapsed<s.t0+s.dur){
+        const p=(elapsed-s.t0)/s.dur;
+        t=lerp(s.from,s.to,s.ease==='smooth'?smooth(p):p);
+        break;
+      }
+      t=s.to;
+    }
+    if(!explorationDone&&(now-explorationStartedAt)>SCHEDULE.total*explorationTurns){
       explorationDone=true;
       parent.postMessage({type:'cyberatlas:exploration-complete',turns:explorationTurns},location.origin);
     }
   }else{
-    t=0.12+Math.sin(now*0.00005)*0.012;
+    t=yearT(1980)+Math.sin(now*0.00005)*0.012;
   }
-  const x=MARGIN_X*0.4+t*(MAP_W-MARGIN_X*0.8);
+  const x=MARGIN_X+t*(MAP_W-2*MARGIN_X);
   const y=MAP_H*0.5+Math.sin(now*0.000041+1.7)*MAP_H*0.11;
   return {x:x+pan.x,y:y+pan.y,t};
 }
 
 /* ---------- 그리기 ---------- */
 const thumbCache=new Map();
+let thumbMissBudget=8;           /* 프레임당 신규 로드 상한 — 로딩 폭주 방지 */
+const THUMB_STUB={ready:false,img:null};
 function thumb(url){
   let e=thumbCache.get(url);
   const now=performance.now();
   if(e){e.usedAt=now;return e;}
+  if(thumbMissBudget<=0) return THUMB_STUB;
+  thumbMissBudget-=1;
   const img=new Image();
   img.decoding='async';
   e={img,ready:false,usedAt:now};
-  img.onload=()=>{e.ready=true;};
+  img.onload=()=>{
+    e.ready=true;
+    /* 디코딩까지 미리 끝낸다 — 첫 drawImage 순간의 디코드 스톰 방지. */
+    img.decode?.().catch(()=>{});
+  };
   img.src=url;
   thumbCache.set(url,e);
   if(thumbCache.size>THUMB_CACHE_LIMIT){
@@ -197,9 +233,11 @@ function thumb(url){
   return e;
 }
 
+let warmCursor=0;
 function draw(now){
   requestAnimationFrame(draw);
   if(!READY) return;
+  thumbMissBudget=8;
 
   const reveal=viewValue('reveal',now);
   const focus=viewValue('focus',now);
@@ -212,13 +250,12 @@ function draw(now){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle='#020702'; ctx.fillRect(0,0,W,H);
 
-  /* 뷰포트: 포커스 시 하단 밴드(둥근 사각형)로 수납 — 원형이 아니다. */
-  const inset=clamp(Math.min(W,H)*0.035,12,24);
-  const band={x:inset,y:H*0.525+inset,w:W-inset*2,h:H*0.475-inset*2};
+  /* 뷰포트: 포커스 시 하단 밴드로 수납 — 풀블리드(양옆 블랙 마진 없음). */
+  const band={x:0,y:H*0.525,w:W,h:H*0.475};
   const full={x:0,y:0,w:W,h:H};
   const vp={x:lerp(full.x,band.x,focus),y:lerp(full.y,band.y,focus),
             w:lerp(full.w,band.w,focus),h:lerp(full.h,band.h,focus)};
-  const corner=lerp(0,clamp(Math.min(W,H)*0.05,16,28),focus);
+  const corner=0;
 
   ctx.save();
   ctx.beginPath();
@@ -288,6 +325,15 @@ function draw(now){
     }
   }
 
+  /* morph 순간의 이미지 로딩 폭주 방지: 디스크 단계에서 매 프레임 몇 장씩
+     미리 데워 전환 시점엔 대부분 디코딩이 끝나 있게 한다. */
+  if(reveal>0.25&&warmCursor<covers.length){
+    for(let k=0;k<4&&warmCursor<covers.length;k++){
+      thumb(covers[warmCursor].url);
+      warmCursor+=1;
+    }
+  }
+
   /* 표지 위치: 디스크 좌표와 타임라인 좌표를 morph로 보간해 저장 */
   let visibleCovers=0, centerCover=null, centerDist=1e9;
   for(const c of covers){
@@ -342,7 +388,11 @@ function draw(now){
       ctx.fillRect(x-1.3,y-1.3,2.6,2.6);
     }
     if(imageAlpha<0.02) continue;
-    if(h<7){
+    /* 전환 중에는 점→이미지 승격 문턱을 높여(16px→7px) 한 프레임에
+       수백 장이 동시에 이미지가 되는 피크를 없앤다. 카드가 자라나며
+       이미지로 '생성'되는 서사도 유지된다. */
+    const speckThreshold=lerp(16,7,morph);
+    if(h<speckThreshold){
       ctx.fillStyle=`hsla(92,9%,72%,${0.5*imageAlpha*alpha})`;
       ctx.fillRect(x-1.2,y-1.2,2.4,2.4);
       continue;
@@ -350,9 +400,12 @@ function draw(now){
     const e=thumb(c.url);
     ctx.save();
     ctx.translate(x,y);
-    ctx.shadowColor='rgba(0,0,0,.32)';
-    ctx.shadowBlur=6+h*0.05;
-    ctx.shadowOffsetY=2;
+    /* shadowBlur는 비싸다 — 전환 중(morph 진행)이나 작은 카드에는 생략. */
+    if(h>=18&&(morph>0.98||morph<0.02)){
+      ctx.shadowColor='rgba(0,0,0,.32)';
+      ctx.shadowBlur=6+h*0.05;
+      ctx.shadowOffsetY=2;
+    }
     if(e.ready&&e.img.naturalWidth){
       const ar=e.img.naturalWidth/e.img.naturalHeight;
       ctx.globalAlpha=alpha*imageAlpha;

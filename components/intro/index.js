@@ -5,21 +5,29 @@ import styles from './styles.module.css';
 
 const INTRO_IDLE_MS = 1800;
 const INTRO_AUTO_ADVANCE_ENABLED = false;
-// 2카드 시퀀스: 첫 화면의 영문 타이틀 카드가 탭에 꿈틀(프레스 팝)한 뒤
-// 회전하며 위로 사라지고, 아래에서 277호 표지가 올라와 뒤집히면
-// 그 뒷면이 시각화 캔버스로 이어진다.
-const TITLE_EXIT_START_MS = 480;
-const TITLE_EXIT_DURATION_MS = 900;
-const COVER_ENTER_START_MS = 750;
-const COVER_ENTER_DURATION_MS = 1150;
-const COVER_GLARE_DELAY_MS = 1750;
+// 2카드 시퀀스: 탭 후 0.5초간 타이틀이 꿈틀(프레스 팝)하고, 타이틀 상승과
+// 표지 상승이 같은 커브·같은 구간으로 동시에 움직인다 — 뷰포인트가 아래층으로
+// 내려가는 카메라 팬. 표지가 뒤집히면 뒷면이 곧 시각화 캔버스(iframe)이고,
+// 카드 창이 줌인되면서 캔버스가 풀스크린을 이어받는다.
+const TITLE_EXIT_START_MS = 500;
+const TITLE_EXIT_DURATION_MS = 1800;
+const COVER_ENTER_START_MS = 500;
+const COVER_ENTER_DURATION_MS = 1800;
+const COVER_GLARE_DELAY_MS = 2150;
 const COVER_GLARE_DURATION_MS = 900;
 // 글레어 시트가 피크를 지나는 순간 바로 뒤집힌다 — 광택이 회전으로 이어진다.
-const COVER_FLIP_START_MS = 2150;
+const COVER_FLIP_START_MS = 2550;
 const COVER_FLIP_DURATION_MS = 1350;
-const COVER_BACK_HOLD_MS = 800;
+const COVER_BACK_HOLD_MS = 400;
 const COVER_SEQUENCE_DURATION_MS =
   COVER_FLIP_START_MS + COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS;
+// 플립 종점의 카드 스케일(coverFlip 키프레임과 일치해야 한다).
+const COVER_FLIP_END_CARD_SCALE = 1.1;
+// 슬로우 축소 종점의 필름 스케일(coverSlowShrink 키프레임과 일치).
+const COVER_REST_FILM_SCALE = 0.64;
+// 플립 중 뒷면(캔버스)이 새까맣지 않도록 미리 올려두는 리빌 수준 —
+// 플립이 끝나는 시점에 램프도 끝나, 뒷면이 열리는 동안 원판이 살아난다.
+const COVER_PRE_REVEAL_TARGET = 0.55;
 const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
 const FOCUS_DELAY_MS = 650;
 const FOCUS_DURATION_MS = 820;
@@ -253,9 +261,14 @@ export default function IntroScreen({
   const [coverAssetReady, setCoverAssetReady] = useState(false);
   const [topologyAssetReady, setTopologyAssetReady] = useState(false);
   const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
+  // 카드 창(줌 창)이 뷰포트를 완전히 덮는 데 필요한 카드 전체 스케일.
+  const [coverZoomTarget, setCoverZoomTarget] = useState(2);
+  // 플립이 도는 동안 뒷면 캔버스를 미리 깨워두는 리빌(0 → 0.4).
+  const [preReveal, setPreReveal] = useState(0);
   const completedRef = useRef(false);
   const pendingCompleteRef = useRef(false);
   const rendererRef = useRef(null);
+  const coverFilmRef = useRef(null);
   const scrubProgressRef = useRef(0);
   const soundEngineRef = useRef(null);
   const inactivityTimerRef = useRef(null);
@@ -289,6 +302,38 @@ export default function IntroScreen({
     const timer = window.setTimeout(() => setAssetReleaseExpired(true), INTRO_ASSET_RELEASE_MS);
     return () => window.clearTimeout(timer);
   }, [coverAssetReady, topologyAssetReady]);
+
+  // 카드 레이아웃 크기(트랜스폼 이전)를 기준으로, 창이 뷰포트를 덮는 데
+  // 필요한 스케일을 잰다. 1.02는 반올림 이음새 방지용 오버스캔.
+  useEffect(() => {
+    const measure = () => {
+      const film = coverFilmRef.current;
+      if (!film || !film.offsetWidth || !film.offsetHeight) return;
+      setCoverZoomTarget(Math.max(
+        window.innerWidth / film.offsetWidth,
+        window.innerHeight / film.offsetHeight
+      ) * 1.02);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
+  // 플립 시작~시퀀스 종점 사이에 뒷면 캔버스의 리빌을 미리 끌어올린다 —
+  // 카드가 도는 순간 뒷면에 이미 살아 있는 원판이 보인다.
+  useEffect(() => {
+    if (!engaged || started || debugState) return undefined;
+    const startedAt = performance.now();
+    const rampDuration = COVER_FLIP_DURATION_MS;
+    let frame = 0;
+    const tick = (now) => {
+      const progress = clamp01((now - startedAt - COVER_FLIP_START_MS) / rampDuration);
+      setPreReveal(COVER_PRE_REVEAL_TARGET * (1 - ((1 - progress) ** 3)));
+      if (progress < 1) frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [engaged, started, debugState]);
 
   useEffect(() => {
     if (!introAssetsReady) return undefined;
@@ -505,26 +550,30 @@ export default function IntroScreen({
     continueInteraction();
   }, [continueInteraction, debugState, engaged, introAssetsReady]);
 
-  // 하나로 이어진 임펄스: z-밀림이 먼저 시작되지만 멈추기 전에(밀림이 아직
-  // 진행 중인 0.045 지점) 상승과 회전이 함께 들어온다. 밀림은 완만한 cubic으로
-  // 길게 끌어(0.16까지) 상승 가속과 겹치게 하고, 상승·회전은 같은 지점에서
-  // 동시에 출발한다.
+  // 카드가 떠나는 대신 카드 창이 줌인된다. 창(필름×카드) 스케일은
+  // 0.704 → coverZoomTarget으로 열려 뷰포트를 덮고, 그 안의 뷰포트 레이어는
+  // 역스케일로 받쳐 캔버스의 순 스케일이 0.704 → 정확히 1에 도킹한다 —
+  // 줌이 끝나는 순간 캔버스가 픽셀 그대로 풀스크린이 된다.
   const easeOutCubicIntro = (value) => 1 - ((1 - clamp01(value)) ** 3);
-  const coverExitScaleProgress = easeOutCubicIntro(segment(scrubProgress, 0, 0.16));
-  // 회전은 ease-out으로 즉시 시작 — 임펄스 커브는 초반이 느려 거의 안 보였다.
-  const coverExitSpinProgress = easeOutCubicIntro(segment(scrubProgress, 0.015, 0.16));
-  const coverRise = easeHumanImpulse(segment(scrubProgress, 0.045, 0.24));
+  const coverZoomProgress = easeOutCubicIntro(segment(scrubProgress, 0, 0.16));
+  const coverWindowBase = COVER_REST_FILM_SCALE * COVER_FLIP_END_CARD_SCALE;
+  const coverWindowScale = coverWindowBase
+    + (coverZoomTarget - coverWindowBase) * coverZoomProgress;
+  const coverNetScale = coverWindowBase + (1 - coverWindowBase) * coverZoomProgress;
+  const coverFilmScale = coverWindowScale / COVER_FLIP_END_CARD_SCALE;
+  const coverInnerScale = coverNetScale / coverWindowScale;
   const topologySoundReady = started && scrubProgress >= TOPOLOGY_SOUND_START_PROGRESS;
-  const topologyReveal = easeHumanImpulse(segment(scrubProgress, 0.075, 0.29));
+  // 플립 중 미리 깨운 리빌(preReveal)에서 이어받아 1까지 채운다.
+  const topologyReveal = started
+    ? COVER_PRE_REVEAL_TARGET
+      + (1 - COVER_PRE_REVEAL_TARGET) * easeHumanImpulse(segment(scrubProgress, 0, 0.26))
+    : preReveal;
   const finalSplit = easeOutQuint(segment(scrubProgress, 0.745, 0.825));
   const finalTitle = easeOutQuint(segment(scrubProgress, 0.765, 0.855));
   // 둘째 줄 인덴트는 타이틀이 반쯤 올라온 뒤에야 0에서 서서히 벌어진다.
   const finalTitleIndent = easeOutQuint(segment(scrubProgress, 0.8, 0.89));
   const finalTranslation = easeOutQuint(segment(scrubProgress, 0.795, 0.88));
   const finalSplitActive = scrubProgress >= 0.745;
-  // 슬로우 축소의 종점(0.64)에서 끊김 없이 이어받아 계속 수축한다.
-  const coverExitScale = 0.64 * (1 - 0.2 * coverExitScaleProgress);
-  const coverTransform = `translate3d(0, ${(-132 * coverRise).toFixed(3)}dvh, 0) perspective(1400px) rotateY(${(45 * coverExitSpinProgress).toFixed(3)}deg) scale(${coverExitScale.toFixed(4)})`;
 
   useEffect(() => {
     if (!topologySoundReady) return;
@@ -567,6 +616,7 @@ export default function IntroScreen({
       data-started={started ? 'true' : 'false'}
       data-leaving={leaving ? 'true' : 'false'}
       data-assets-ready={introAssetsReady ? 'true' : 'false'}
+      data-debug={debugState ? 'true' : 'false'}
       onClick={handleTap}
       onPointerDown={beginInteraction}
       onPointerMove={continueInteraction}
@@ -575,51 +625,6 @@ export default function IntroScreen({
       onKeyDown={continueInteraction}
     >
       <div className={styles.scene}>
-        <iframe
-          ref={rendererRef}
-          className={styles.cyberAtlasBackground}
-          /* 아카이브 아틀라스(평면 지도). 하이퍼볼릭 원판으로 되돌리려면
-             cyberatlas-render.html로 바꾸면 된다 — 메시지 계약 동일. */
-          src="/experiments/atlas-render.html"
-          title="살아 움직이는 하이퍼볼릭 데이터 토폴로지"
-          loading="eager"
-          onLoad={() => {
-            const renderer = rendererRef.current?.contentWindow;
-            renderer?.postMessage(
-              { type: 'cyberatlas:request-ready' },
-              window.location.origin
-            );
-            renderer?.postMessage(
-              { type: 'cyberatlas:set-reveal', progress: topologyReveal },
-              window.location.origin
-            );
-            renderer?.postMessage(
-              {
-                type: 'cyberatlas:set-lower-center',
-                lowered: false,
-                delay: 0,
-                duration: FOCUS_DURATION_MS,
-              },
-              window.location.origin
-            );
-            renderer?.postMessage(
-              {
-                type: 'cyberatlas:set-focus',
-                focused: false,
-                delay: 0,
-                duration: FOCUS_DURATION_MS,
-              },
-              window.location.origin
-            );
-            if (engaged && !started) {
-              renderer?.postMessage(
-                { type: 'cyberatlas:start-exploration', turns: 3 },
-                window.location.origin
-              );
-            }
-          }}
-        />
-
         <Grainient className={styles.grainientOverlay} />
 
         {/* 첫 화면: 영문 타이틀 카드. 탭하면 꿈틀했다가 회전하며 위로 사라진다. */}
@@ -645,16 +650,20 @@ export default function IntroScreen({
           </div>
         </div>
 
-        {/* 타이틀이 떠난 뒤 아래에서 올라오는 277호 표지 — 뒤집히면 뒷면이
-            시각화 캔버스로 이어진다. */}
+        {/* 타이틀과 함께 아래에서 올라오는 277호 표지 — 뒤집히면 뒷면이 곧
+            시각화 캔버스(iframe)이고, started 이후 카드 창이 줌인되면서
+            캔버스가 순 스케일 1로 풀스크린을 이어받는다. */}
         <div
+          ref={coverFilmRef}
           className={styles.coverFilm}
           style={{
             '--cover-enter-start': `${COVER_ENTER_START_MS}ms`,
             '--cover-enter-duration': `${COVER_ENTER_DURATION_MS}ms`,
             '--cover-shrink-delay': `${COVER_FLIP_START_MS}ms`,
             '--cover-shrink-duration': `${COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS}ms`,
-            ...(started ? { transform: coverTransform } : null),
+            ...(started
+              ? { transform: `translate3d(0, 0, 0) scale(${coverFilmScale.toFixed(5)})` }
+              : null),
           }}
         >
           <div className={styles.coverArrivalTilt}>
@@ -687,11 +696,62 @@ export default function IntroScreen({
                   }}
                 />
               </div>
-              <div
-                className={`${styles.coverFace} ${styles.coverBack}`}
-                role="img"
-                aria-label="시각화 캔버스로 이어지는 파란색 뒷면"
-              />
+              <div className={`${styles.coverFace} ${styles.coverBack}`}>
+                {/* 카드 창 안에 항상 뷰포트 크기로 사는 캔버스 층 — 창이
+                    줌인될 때 역스케일로 받쳐 캔버스 해상도가 끝까지 1:1이다. */}
+                <div
+                  className={styles.coverBackViewport}
+                  style={started
+                    ? { transform: `translate(-50%, -50%) scale(${coverInnerScale.toFixed(5)})` }
+                    : null}
+                >
+                  <iframe
+                    ref={rendererRef}
+                    className={styles.coverCanvasFrame}
+                    /* 아카이브 아틀라스(평면 지도). 하이퍼볼릭 원판으로 되돌리려면
+                       cyberatlas-render.html로 바꾸면 된다 — 메시지 계약 동일. */
+                    src="/experiments/atlas-render.html"
+                    title="살아 움직이는 하이퍼볼릭 데이터 토폴로지"
+                    loading="eager"
+                    onLoad={() => {
+                      const renderer = rendererRef.current?.contentWindow;
+                      renderer?.postMessage(
+                        { type: 'cyberatlas:request-ready' },
+                        window.location.origin
+                      );
+                      renderer?.postMessage(
+                        { type: 'cyberatlas:set-reveal', progress: topologyReveal },
+                        window.location.origin
+                      );
+                      renderer?.postMessage(
+                        {
+                          type: 'cyberatlas:set-lower-center',
+                          lowered: false,
+                          delay: 0,
+                          duration: FOCUS_DURATION_MS,
+                        },
+                        window.location.origin
+                      );
+                      renderer?.postMessage(
+                        {
+                          type: 'cyberatlas:set-focus',
+                          focused: false,
+                          delay: 0,
+                          duration: FOCUS_DURATION_MS,
+                        },
+                        window.location.origin
+                      );
+                      if (engaged && !started) {
+                        renderer?.postMessage(
+                          { type: 'cyberatlas:start-exploration', turns: 3 },
+                          window.location.origin
+                        );
+                      }
+                    }}
+                  />
+                  <Grainient className={styles.grainientOverlay} />
+                </div>
+              </div>
             </div>
           </div>
         </div>

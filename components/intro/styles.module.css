@@ -47,6 +47,13 @@
   will-change: transform;
 }
 
+/* 레이어를 세로로 훨씬 크게 잡아(총 ~144dvh), 최대 상승(-19dvh) 후에도
+   하단에 검은 여백이 절대 생기지 않는다 — 항상 풀스크린을 덮는다. */
+.page .grainientOverlay {
+  top: -10dvh;
+  bottom: -34dvh;
+}
+
 .page[data-engaged='true'] .grainientOverlay {
   transform: translate3d(0, -8dvh, 0);
 }
@@ -55,22 +62,29 @@
   transform: translate3d(0, -19dvh, 0);
 }
 
-.cyberAtlasBackground {
+/* 카드 뒷면 속에 사는 캔버스 층: 항상 뷰포트 크기(100vw×100dvh)로
+   중앙 정렬되어 카드 창에 클리핑된다. 창이 줌인될 때 JS가 역스케일을
+   걸어 캔버스의 순 스케일이 정확히 1로 도킹한다. */
+.coverBackViewport {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100vw;
+  height: 100dvh;
+  background: #020702;
+  transform: translate(-50%, -50%);
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.coverCanvasFrame {
   position: absolute;
   inset: 0;
-  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
   border: 0;
   background: #020702;
-  opacity: 0;
-  transition: opacity 1100ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity;
-}
-
-.page[data-started='true'] .cyberAtlasBackground {
-  opacity: 1;
 }
 
 .coverFilm {
@@ -87,8 +101,8 @@
   overflow: visible;
   background: transparent;
   translate: -50% -50%;
-  /* 표지는 화면 아래에서 대기 — 타이틀 카드가 떠난 뒤 올라온다. */
-  transform: translate3d(0, 120dvh, 0) scale(0.68);
+  /* 표지는 화면 아래에서 대기 — 타이틀과 105dvh 간격(한 층)으로 같이 올라온다. */
+  transform: translate3d(0, 105dvh, 0) scale(0.68);
   transform-origin: 50% 50%;
   transform-style: preserve-3d;
   will-change: transform;
@@ -112,11 +126,12 @@
   pointer-events: none;
 }
 
-/* 탭: 타이틀이 표지처럼 꿈틀(프레스 팝)했다가 회전하며 위로 사라진다. */
+/* 탭: 타이틀이 표지처럼 꿈틀(프레스 팝)했다가 — 탭에서 상승 시작까지 0.5초 —
+   회전하며 위로 사라진다. 상승은 표지 상승과 같은 커브·같은 구간. */
 .page[data-engaged='true'][data-started='false'] .titleFilm {
   animation:
-    coverPressPop 560ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards,
-    titleExit var(--title-exit-duration, 900ms) cubic-bezier(0.55, 0, 0.3, 1) var(--title-exit-start, 480ms) forwards;
+    coverPressPop 500ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards,
+    titleExit var(--title-exit-duration, 1800ms) cubic-bezier(0.55, 0, 0.3, 1) var(--title-exit-start, 500ms) forwards;
 }
 
 .page[data-started='true'] .titleFilm {
@@ -124,13 +139,31 @@
   visibility: hidden;
 }
 
-/* 탭 이후: 표지가 아래에서 올라와 안착하고, 플립이 시작되면 그때부터
-   0.68 → 0.64로 아주 느리게 계속 축소된다(coverSlowShrink). 퇴장이
-   시작되면(data-started) 해제되고 JS 퇴장 트랜스폼이 0.64를 이어받는다. */
+/* 탭 이후: 표지가 타이틀 상승과 같은 커브로 동시에 올라온다(카메라 팬).
+   플립이 시작되면 0.68 → 0.64로 아주 느리게 계속 축소된다(coverSlowShrink).
+   줌이 시작되면(data-started) 해제되고 JS 줌 트랜스폼이 0.64를 이어받는다. */
 .page[data-engaged='true'][data-started='false'] .coverFilm {
   animation:
-    coverEnter var(--cover-enter-duration, 1150ms) cubic-bezier(0.16, 1, 0.3, 1) var(--cover-enter-start, 750ms) forwards,
-    coverSlowShrink var(--cover-shrink-duration, 2150ms) linear var(--cover-shrink-delay, 2150ms) forwards;
+    coverEnter var(--cover-enter-duration, 1800ms) cubic-bezier(0.55, 0, 0.3, 1) var(--cover-enter-start, 500ms) forwards,
+    coverSlowShrink var(--cover-shrink-duration, 1750ms) linear var(--cover-shrink-delay, 2550ms) forwards;
+}
+
+/* 줌 완료 후 캔버스가 화면 전체를 차지하므로 탐험 인터랙션이 iframe에
+   직접 닿아야 한다 — 이전 풀스크린 배경 iframe과 동일한 동작. */
+.page[data-started='true'] .coverFilm {
+  pointer-events: auto;
+}
+
+/* QA 점프: 디버그 상태에서는 지연 애니메이션을 기다리지 않고 카드가
+   즉시 플립 종점(뒷면 = 캔버스)에 가 있는다. */
+.page[data-debug='true'] .titleFilm,
+.page[data-debug='true'] .coverFilm {
+  animation: none;
+}
+
+.page[data-debug='true'][data-started='true'] .coverCard {
+  animation: none;
+  transform: perspective(1400px) rotateY(180deg) scale(1.1);
 }
 
 /* 영문 타이틀 — 프레임·캡션 없이 메인 타이틀만 중앙 정렬. */
@@ -234,8 +267,11 @@
 }
 
 .coverBack {
-  background: #1f4bff;
+  background: #020702;
   transform: rotateY(180deg) translateZ(0.1px);
+  /* iOS에서 3D 변환된 조상 아래 iframe이 overflow 클리핑을 벗어나는
+     사례가 있어 clip-path로 한 번 더 잘라 둔다. */
+  clip-path: inset(0);
 }
 
 .coverImage {
@@ -274,7 +310,7 @@
 
 @keyframes coverEnter {
   from {
-    transform: translate3d(0, 120dvh, 0) scale(0.68);
+    transform: translate3d(0, 105dvh, 0) scale(0.68);
   }
 
   to {
@@ -283,13 +319,19 @@
 }
 
 @keyframes titleExit {
-  from {
+  0% {
     transform: translate3d(0, 0, 0) perspective(1400px) rotateY(0deg) scale(0.68);
     opacity: 1;
   }
 
-  to {
-    transform: translate3d(0, -118dvh, 0) perspective(1400px) rotateY(44deg) scale(0.52);
+  /* 팬 후반까지 또렷하게 남아 있어야 표지와 '같이 이동'하는 층으로 읽힌다. */
+  55% {
+    opacity: 0.94;
+  }
+
+  100% {
+    /* 표지와 같은 105dvh 이동 — 같은 거리·같은 커브라야 한 팬으로 읽힌다. */
+    transform: translate3d(0, -105dvh, 0) perspective(1400px) rotateY(44deg) scale(0.52);
     opacity: 0;
   }
 }
