@@ -594,7 +594,9 @@ export default function IntroScreen({
         <iframe
           ref={rendererRef}
           className={styles.cyberAtlasBackground}
-          src="/experiments/cyberatlas-render.html"
+          /* 아카이브 아틀라스(평면 지도). 하이퍼볼릭 원판으로 되돌리려면
+             cyberatlas-render.html로 바꾸면 된다 — 메시지 계약 동일. */
+          src="/experiments/atlas-render.html"
           title="살아 움직이는 하이퍼볼릭 데이터 토폴로지"
           loading="eager"
           onLoad={() => {

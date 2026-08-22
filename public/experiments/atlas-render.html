@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Monthly Design — Archive Atlas</title>
+<style>
+  html,body{margin:0;height:100%;background:#020702;overflow:hidden}
+  canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+  canvas:active{cursor:grabbing}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script>
+/* ============================================================
+   Archive Atlas — 하이퍼볼릭 원판을 대체하는 평면 이미지 지도.
+
+   578장의 표지를 데이터 좌표(X=연도, Y=명도·채도)로 프레임보다 큰
+   필드에 펼치고, 카메라가 50년의 지형을 천천히 드리프트한다.
+   중심도 원형 테두리도 없다 — 프레임은 항상 필드의 일부만 자른다.
+
+   기존 cyberatlas-render.html의 postMessage 계약을 그대로 구현하므로
+   인트로 쪽 코드는 iframe src 교체만으로 동작한다:
+     수신: request-ready / set-reveal / set-lower-center / set-focus /
+           start-exploration
+     발신: ready / sonify / interaction / exploration-complete
+   ============================================================ */
+
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const mulberry32=s=>()=>{s|=0;s=(s+0x6D2B79F5)|0;let t=Math.imul(s^(s>>>15),1|s);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};
+
+/* ---------- 필드(지도) 좌표계 ---------- */
+const MAP_W=6200, MAP_H=1500;
+const MARGIN_X=260, MARGIN_Y=210;
+const YEAR_MIN=1976, YEAR_MAX=2026;
+const TRAVEL_VISIBLE_W=1200;      /* 순항 고도에서 보이는 필드 폭(맵 단위) */
+const OVERVIEW_VISIBLE_W=5600;    /* 리빌 시작 시 전체 조망 폭 */
+const COVER_MAP_H=128;            /* 표지 높이(맵 단위) — 순항 시 ~47px */
+const DRIFT_LOOP_MS=92000;        /* 서→동 왕복 한 사이클 */
+const DOT_COUNT=2400;
+const THUMB_CACHE_LIMIT=110;
+
+const canvas=document.getElementById('stage');
+const ctx=canvas.getContext('2d');
+let W=innerWidth,H=innerHeight,DPR=1;
+
+/* ---------- 상태 ---------- */
+const VIEW={reveal:{value:0,from:0,to:0,startedAt:0,duration:1},
+            focus:{value:0,from:0,to:0,startedAt:0,duration:1},
+            lower:{value:0,from:0,to:0,startedAt:0,duration:1}};
+let READY=false, READY_REQUESTED=false;
+let exploring=false, explorationStartedAt=0, explorationTurns=1, explorationDone=false;
+let covers=[], dots=[], links=[];
+const pan={x:0,y:0,tx:0,ty:0};
+let lastSonifyAt=0;
+const REDUCE_MOTION=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- 데이터 → 지도 배치 ---------- */
+function buildAtlas(payload){
+  const list=(payload.covers||[]).filter(c=>c&&c.imageUrl&&/^(\d{4})_(\d{2})$/.test(c.id));
+  /* 축 정규화를 위한 범위 스캔 */
+  let lumMin=1e9,lumMax=-1e9,satMin=1e9,satMax=-1e9;
+  for(const c of list){
+    const f=c.features||{};
+    lumMin=Math.min(lumMin,f.luminance??0.5); lumMax=Math.max(lumMax,f.luminance??0.5);
+    satMin=Math.min(satMin,f.saturation??0.5); satMax=Math.max(satMax,f.saturation??0.5);
+  }
+  const rnd=mulberry32(payload.seed||20260822);
+  covers=list.map((c,i)=>{
+    const [,ys,ms]=/^(\d{4})_(\d{2})$/.exec(c.id);
+    const year=+ys, month=+ms;
+    const f=c.features||{};
+    const lum=(f.luminance-lumMin)/Math.max(1e-6,lumMax-lumMin);
+    const sat=(f.saturation-satMin)/Math.max(1e-6,satMax-satMin);
+    const t=((year-YEAR_MIN)*12+(month-1))/((YEAR_MAX-YEAR_MIN)*12+11);
+    /* Y: 밝고 채도 높은 표지가 위, 어둡고 무거운 표지가 아래 */
+    const clusterSpread=((c.visualCluster??0)/11-0.5)*0.34;
+    const v=clamp(1-clamp(lum*0.62+sat*0.38,0,1)+clusterSpread,0,1);
+    return {
+      id:c.id, url:c.imageUrl, year, month,
+      cluster:c.visualCluster??0,
+      complexity:clamp(f.complexity??0.4,0,1),
+      entropy:clamp(f.entropy??0.4,0,1),
+      regions:f.regionCount??4,
+      x:MARGIN_X+t*(MAP_W-2*MARGIN_X)+(rnd()-0.5)*54,
+      y:MARGIN_Y+v*(MAP_H-2*MARGIN_Y)+(rnd()-0.5)*220,
+      h:COVER_MAP_H*(0.82+0.36*(f.complexity??0.4)),
+      aspect:0.74,
+    };
+  });
+
+  /* 성긴 별점: 70%는 표지 주변 가우시안, 30%는 균등 산포. 4%만 라임. */
+  dots=[];
+  for(let i=0;i<DOT_COUNT;i++){
+    let x,y;
+    if(rnd()<0.7&&covers.length){
+      const c=covers[(rnd()*covers.length)|0];
+      const a=rnd()*Math.PI*2, r=Math.abs(rnd()+rnd()-1)*180;
+      x=c.x+Math.cos(a)*r; y=c.y+Math.sin(a)*r*0.8;
+    }else{
+      x=rnd()*MAP_W; y=rnd()*MAP_H;
+    }
+    dots.push({x,y,size:0.6+rnd()*1.5,phase:rnd()*Math.PI*2,
+      lime:rnd()<0.04,light:40+rnd()*38});
+  }
+
+  /* 연결선: 같은 시각 군집의 시간순 이웃만, 가까울 때만 잇는다. */
+  links=[];
+  const byCluster=new Map();
+  for(const c of covers){
+    if(!byCluster.has(c.cluster)) byCluster.set(c.cluster,[]);
+    byCluster.get(c.cluster).push(c);
+  }
+  byCluster.forEach(group=>{
+    group.sort((a,b)=>a.x-b.x);
+    for(let i=1;i<group.length;i++){
+      const a=group[i-1],b=group[i];
+      const d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d<430) links.push({a,b,alpha:0.05+0.07*(1-d/430)});
+    }
+  });
+}
+
+/* ---------- 카메라 ---------- */
+function viewValue(track,now){
+  const v=VIEW[track];
+  if(now>=v.startedAt+v.duration||v.duration<=0){v.value=v.to;return v.value;}
+  if(now<v.startedAt) return v.value;
+  const p=smooth((now-v.startedAt)/v.duration);
+  v.value=v.from+(v.to-v.from)*p;
+  return v.value;
+}
+function setView(track,to,delay,duration){
+  const v=VIEW[track], now=performance.now();
+  v.from=v.value; v.to=to;
+  v.startedAt=now+(delay||0); v.duration=Math.max(1,duration||820);
+}
+
+function cameraCenter(now){
+  /* 드리프트: 서→동 왕복. 시작 전엔 1980년대 초입에서 미세하게 숨쉰다. */
+  let t;
+  if(exploring){
+    const cycle=REDUCE_MOTION?DRIFT_LOOP_MS*1.8:DRIFT_LOOP_MS;
+    const p=((now-explorationStartedAt)%(cycle*2))/cycle;
+    t=p<1?p:2-p;
+    if(!explorationDone&&(now-explorationStartedAt)>cycle*explorationTurns){
+      explorationDone=true;
+      parent.postMessage({type:'cyberatlas:exploration-complete',turns:explorationTurns},location.origin);
+    }
+  }else{
+    t=0.12+Math.sin(now*0.00005)*0.012;
+  }
+  const x=MARGIN_X*0.4+t*(MAP_W-MARGIN_X*0.8);
+  const y=MAP_H*0.5+Math.sin(now*0.000041+1.7)*MAP_H*0.11;
+  return {x:x+pan.x,y:y+pan.y,t};
+}
+
+/* ---------- 그리기 ---------- */
+const thumbCache=new Map();
+function thumb(url){
+  let e=thumbCache.get(url);
+  const now=performance.now();
+  if(e){e.usedAt=now;return e;}
+  const img=new Image();
+  img.decoding='async';
+  e={img,ready:false,usedAt:now};
+  img.onload=()=>{e.ready=true;};
+  img.src=url;
+  thumbCache.set(url,e);
+  if(thumbCache.size>THUMB_CACHE_LIMIT){
+    [...thumbCache.entries()].filter(([,x])=>x.ready)
+      .sort((a,b)=>a[1].usedAt-b[1].usedAt)
+      .slice(0,thumbCache.size-THUMB_CACHE_LIMIT)
+      .forEach(([k])=>thumbCache.delete(k));
+  }
+  return e;
+}
+
+function draw(now){
+  requestAnimationFrame(draw);
+  if(!READY) return;
+
+  const reveal=viewValue('reveal',now);
+  const focus=viewValue('focus',now);
+  viewValue('lower',now);
+  if(reveal<=0.001){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#020702';ctx.fillRect(0,0,W,H);return;}
+
+  pan.x+=(pan.tx-pan.x)*0.06; pan.y+=(pan.ty-pan.y)*0.06;
+  if(!pointerActive){pan.tx*=0.995;pan.ty*=0.995;}
+
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle='#020702'; ctx.fillRect(0,0,W,H);
+
+  /* 뷰포트: 포커스 시 하단 밴드(둥근 사각형)로 수납 — 원형이 아니다. */
+  const inset=clamp(Math.min(W,H)*0.035,12,24);
+  const band={x:inset,y:H*0.525+inset,w:W-inset*2,h:H*0.475-inset*2};
+  const full={x:0,y:0,w:W,h:H};
+  const vp={x:lerp(full.x,band.x,focus),y:lerp(full.y,band.y,focus),
+            w:lerp(full.w,band.w,focus),h:lerp(full.h,band.h,focus)};
+  const corner=lerp(0,clamp(Math.min(W,H)*0.05,16,28),focus);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(vp.x,vp.y,vp.w,vp.h,corner);
+  ctx.clip();
+
+  /* 순항 고도 ↔ 전체 조망 사이를 리빌이 보간. 완주 후에도 아주 느린
+     줌 크립이 이어진다(포커스에서는 감쇠). */
+  let creep=1;
+  if(reveal>=0.999){
+    if(!draw.settledAt) draw.settledAt=now;
+    creep=1+Math.min(0.14,(now-draw.settledAt)*0.000008)*(1-focus);
+  }else draw.settledAt=0;
+  const visibleW=lerp(OVERVIEW_VISIBLE_W,TRAVEL_VISIBLE_W,smooth(reveal))/creep;
+  const zoom=(vp.w/visibleW)*lerp(1,band.h/full.h*2.05,focus*0.4);
+  const cam=cameraCenter(now);
+  const cx=vp.x+vp.w/2, cy=vp.y+vp.h/2;
+  const toX=x=>cx+(x-cam.x)*zoom, toY=y=>cy+(y-cam.y)*zoom;
+  const alpha=smooth(clamp(reveal*1.35,0,1));
+
+  /* 연대 눈금 — 지도임을 말해주는 카토그래피 신호 */
+  ctx.strokeStyle=`rgba(214,220,210,${0.05*alpha})`;
+  ctx.fillStyle=`rgba(214,220,210,${0.34*alpha})`;
+  ctx.lineWidth=1;
+  ctx.font='600 9px Inter, sans-serif';
+  ctx.textAlign='center';
+  for(let year=1980;year<=2020;year+=10){
+    const t=((year-YEAR_MIN)*12)/((YEAR_MAX-YEAR_MIN)*12+11);
+    const gx=toX(MARGIN_X+t*(MAP_W-2*MARGIN_X));
+    if(gx<vp.x-40||gx>vp.x+vp.w+40) continue;
+    ctx.beginPath();ctx.moveTo(gx,vp.y);ctx.lineTo(gx,vp.y+vp.h);ctx.stroke();
+    if(zoom>0.12) ctx.fillText(String(year),gx,vp.y+18);
+  }
+
+  /* 연결선 */
+  ctx.lineWidth=0.6;
+  for(const l of links){
+    const x1=toX(l.a.x),y1=toY(l.a.y),x2=toX(l.b.x),y2=toY(l.b.y);
+    if(Math.max(x1,x2)<vp.x-30||Math.min(x1,x2)>vp.x+vp.w+30) continue;
+    ctx.strokeStyle=`rgba(200,206,196,${l.alpha*alpha})`;
+    ctx.beginPath();ctx.moveTo(x1,y1);
+    ctx.quadraticCurveTo((x1+x2)/2,(y1+y2)/2-12*zoom,x2,y2);
+    ctx.stroke();
+  }
+
+  /* 별점 */
+  for(const d of dots){
+    const x=toX(d.x),y=toY(d.y);
+    if(x<vp.x-8||x>vp.x+vp.w+8||y<vp.y-8||y>vp.y+vp.h+8) continue;
+    const tw=0.62+0.38*Math.sin(now*0.0009+d.phase);
+    const size=clamp(d.size*zoom*3.4,0.5,2.3);
+    ctx.fillStyle=d.lime
+      ?`hsla(84,64%,56%,${0.5*tw*alpha})`
+      :`hsla(92,7%,${d.light}%,${0.42*tw*alpha})`;
+    ctx.fillRect(x-size/2,y-size/2,size,size);
+  }
+
+  /* 표지 — 프레임 안의 것만, 지도 위 물체로서 줌에 비례해 커진다 */
+  let visibleCovers=0, centerCover=null, centerDist=1e9;
+  for(const c of covers){
+    const x=toX(c.x),y=toY(c.y);
+    const h=c.h*zoom, w=h*c.aspect;
+    if(x<vp.x-w||x>vp.x+vp.w+w||y<vp.y-h||y>vp.y+vp.h+h) continue;
+    visibleCovers++;
+    const dc=Math.hypot(x-cx,y-cy);
+    if(dc<centerDist){centerDist=dc;centerCover=c;}
+    if(h<7){ /* 조망 고도에서는 표지를 점으로 축약 */
+      ctx.fillStyle=`hsla(92,9%,72%,${0.5*alpha})`;
+      ctx.fillRect(x-1.2,y-1.2,2.4,2.4);
+      continue;
+    }
+    const e=thumb(c.url);
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.shadowColor='rgba(0,0,0,.32)';
+    ctx.shadowBlur=6+h*0.05;
+    ctx.shadowOffsetY=2;
+    if(e.ready&&e.img.naturalWidth){
+      const ar=e.img.naturalWidth/e.img.naturalHeight;
+      ctx.globalAlpha=alpha;
+      ctx.drawImage(e.img,-h*ar/2,-h/2,h*ar,h);
+    }else{
+      ctx.fillStyle=`rgba(226,230,222,${0.13*alpha})`;
+      ctx.fillRect(-w/2,-h/2,w,h);
+    }
+    ctx.restore();
+    ctx.globalAlpha=1;
+  }
+
+  /* HUD — 현재 시야의 연대 범위 */
+  const halfYears=(visibleW/(MAP_W-2*MARGIN_X))*(YEAR_MAX-YEAR_MIN)/2;
+  const camT=clamp((cam.x-MARGIN_X)/(MAP_W-2*MARGIN_X),0,1);
+  const camYear=YEAR_MIN+camT*(YEAR_MAX-YEAR_MIN);
+  const y0=Math.max(YEAR_MIN,Math.round(camYear-halfYears));
+  const y1=Math.min(YEAR_MAX,Math.round(camYear+halfYears));
+  ctx.textAlign='left';
+  ctx.fillStyle=`rgba(236,242,232,${0.55*alpha*(1-focus*0.5)})`;
+  ctx.font='700 10px Inter, sans-serif';
+  ctx.fillText('ARCHIVE ATLAS · 578 COVERS',vp.x+16,vp.y+vp.h-30);
+  ctx.fillStyle=`rgba(214,220,210,${0.4*alpha*(1-focus*0.5)})`;
+  ctx.fillText(`IN VIEW ${y0}–${y1}`,vp.x+16,vp.y+vp.h-16);
+
+  ctx.restore();
+
+  /* 사운드: 카메라 중앙에 가장 가까운 표지의 특성을 샘플로 전달 */
+  if(reveal>0.2&&centerCover&&now-lastSonifyAt>140){
+    lastSonifyAt=now;
+    parent.postMessage({type:'cyberatlas:sonify',sample:{
+      progress:cam.t??0.5,
+      pointDepth:centerCover.cluster,
+      pointDegree:centerCover.regions,
+      pointRadius:camT,
+      degreeEnergy:centerCover.complexity*10,
+      depthEnergy:centerCover.entropy*10,
+      seed:centerCover.year,
+      pointIndex:covers.indexOf(centerCover),
+    }},location.origin);
+  }
+}
+
+/* ---------- 입력(팬) ---------- */
+let pointerActive=false, lastPX=0, lastPY=0;
+canvas.addEventListener('pointerdown',e=>{
+  pointerActive=true; lastPX=e.clientX; lastPY=e.clientY;
+  canvas.setPointerCapture?.(e.pointerId);
+  parent.postMessage({type:'cyberatlas:interaction',phase:'start'},location.origin);
+});
+canvas.addEventListener('pointermove',e=>{
+  if(!pointerActive) return;
+  const reveal=VIEW.reveal.value, focus=VIEW.focus.value;
+  const visibleW=lerp(OVERVIEW_VISIBLE_W,TRAVEL_VISIBLE_W,smooth(reveal));
+  const zoom=W/visibleW;
+  pan.tx=clamp(pan.tx-(e.clientX-lastPX)/zoom,-MAP_W*0.4,MAP_W*0.4);
+  if(focus<0.5) pan.ty=clamp(pan.ty-(e.clientY-lastPY)/zoom,-MAP_H*0.45,MAP_H*0.45);
+  lastPX=e.clientX; lastPY=e.clientY;
+  parent.postMessage({type:'cyberatlas:interaction',phase:'move'},location.origin);
+});
+const endPointer=()=>{
+  if(!pointerActive) return;
+  pointerActive=false;
+  parent.postMessage({type:'cyberatlas:interaction',phase:'end'},location.origin);
+};
+canvas.addEventListener('pointerup',endPointer);
+canvas.addEventListener('pointercancel',endPointer);
+
+/* ---------- 메시지 계약 ---------- */
+addEventListener('message',e=>{
+  if(e.origin!==location.origin) return;
+  const d=e.data||{};
+  if(d.type==='cyberatlas:request-ready'){
+    READY_REQUESTED=true;
+    if(READY) parent.postMessage({type:'cyberatlas:ready',source:'atlas'},location.origin);
+  }else if(d.type==='cyberatlas:set-reveal'){
+    setView('reveal',clamp(Number(d.progress)||0,0,1),0,220);
+  }else if(d.type==='cyberatlas:set-focus'){
+    setView('focus',d.focused?1:0,Number(d.delay)||0,Number(d.duration)||1280);
+  }else if(d.type==='cyberatlas:set-lower-center'){
+    setView('lower',d.lowered?1:0,Number(d.delay)||0,Number(d.duration)||1280);
+  }else if(d.type==='cyberatlas:start-exploration'){
+    if(!exploring){exploring=true;explorationStartedAt=performance.now();}
+    explorationTurns=Math.max(1,Number(d.turns)||1);
+  }
+});
+
+/* ---------- 부트 ---------- */
+function resize(){
+  W=innerWidth;H=innerHeight;
+  DPR=Math.min(devicePixelRatio||1,W<=820?1:1.5);
+  canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
+}
+addEventListener('resize',resize);
+resize();
+requestAnimationFrame(draw);
+
+fetch('/data/monthly-design-cover-topology.json',{headers:{Accept:'application/json'}})
+  .then(r=>r.json())
+  .then(payload=>{
+    buildAtlas(payload);
+    READY=true;
+    parent.postMessage({type:'cyberatlas:ready',source:'atlas'},location.origin);
+  })
+  .catch(()=>{
+    /* 데이터 실패 시에도 인트로를 막지 않는다 — 빈 필드로 ready. */
+    covers=[];dots=[];links=[];
+    READY=true;
+    parent.postMessage({type:'cyberatlas:ready',source:'atlas-fallback'},location.origin);
+  });
+</script>
+</body>
+</html>
