@@ -50,10 +50,13 @@ let W=innerWidth,H=innerHeight,DPR=1;
 /* ---------- 상태 ---------- */
 const VIEW={reveal:{value:0,from:0,to:0,startedAt:0,duration:1},
             focus:{value:0,from:0,to:0,startedAt:0,duration:1},
-            lower:{value:0,from:0,to:0,startedAt:0,duration:1}};
+            lower:{value:0,from:0,to:0,startedAt:0,duration:1},
+            /* morph 0 = 유기체 디스크(정보 아키텍처), 1 = 타임라인(생성 시스템).
+               스테이트먼트 등장(set-focus)과 함께 천천히 펼쳐진다. */
+            morph:{value:0,from:0,to:0,startedAt:0,duration:1}};
 let READY=false, READY_REQUESTED=false;
 let exploring=false, explorationStartedAt=0, explorationTurns=1, explorationDone=false;
-let covers=[], dots=[], links=[];
+let covers=[], dots=[], links=[], spokes=[];
 const pan={x:0,y:0,tx:0,ty:0};
 let lastSonifyAt=0;
 const REDUCE_MOTION=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -89,8 +92,20 @@ function buildAtlas(payload){
       y:MARGIN_Y+v*(MAP_H-2*MARGIN_Y)+(rnd()-0.5)*220,
       h:COVER_MAP_H*(0.82+0.36*(f.complexity??0.4)),
       aspect:0.74,
+      /* 디스크(유기체) 좌표: 골든앵글 배치 + 중심 밀집 반경 */
+      diskA:i*2.399963+(rnd()-0.5)*0.3,
+      diskU:Math.pow(rnd(),0.62),
+      featured:i%8===0,   /* 디스크에서는 1/8만 이미지, 나머지는 점 — morph되며 '생성'된다 */
+      wob:rnd()*Math.PI*2,
     };
   });
+
+  /* 디스크 모드의 방사 스포크(코로나 선) — morph되며 사라진다 */
+  spokes=[];
+  for(let i=0;i<88;i++){
+    spokes.push({a:rnd()*Math.PI*2,r0:0.05+rnd()*0.18,r1:0.5+rnd()*0.78,
+      alpha:0.05+rnd()*0.09,w:rnd()<0.12?1.05:0.6});
+  }
 
   /* 성긴 별점: 70%는 표지 주변 가우시안, 30%는 균등 산포. 4%만 라임. */
   dots=[];
@@ -103,8 +118,11 @@ function buildAtlas(payload){
     }else{
       x=rnd()*MAP_W; y=rnd()*MAP_H;
     }
+    const spoke=rnd()<0.28;
     dots.push({x,y,size:0.6+rnd()*1.5,phase:rnd()*Math.PI*2,
-      lime:rnd()<0.04,light:40+rnd()*38});
+      lime:rnd()<0.04,light:40+rnd()*38,
+      diskA:spoke?(Math.floor(rnd()*56)/56)*Math.PI*2:rnd()*Math.PI*2,
+      diskU:spoke?0.25+rnd()*0.95:Math.pow(Math.abs(rnd()+rnd()-1),0.9)*1.12});
   }
 
   /* 연결선: 같은 시각 군집의 시간순 이웃만, 가까울 때만 잇는다. */
@@ -221,54 +239,110 @@ function draw(now){
   const toX=x=>cx+(x-cam.x)*zoom, toY=y=>cy+(y-cam.y)*zoom;
   const alpha=smooth(clamp(reveal*1.35,0,1));
 
-  /* 연대 눈금 — 지도임을 말해주는 카토그래피 신호 */
-  ctx.strokeStyle=`rgba(214,220,210,${0.05*alpha})`;
-  ctx.fillStyle=`rgba(214,220,210,${0.34*alpha})`;
-  ctx.lineWidth=1;
-  ctx.font='600 9px Inter, sans-serif';
-  ctx.textAlign='center';
-  for(let year=1980;year<=2020;year+=10){
-    const t=((year-YEAR_MIN)*12)/((YEAR_MAX-YEAR_MIN)*12+11);
-    const gx=toX(MARGIN_X+t*(MAP_W-2*MARGIN_X));
-    if(gx<vp.x-40||gx>vp.x+vp.w+40) continue;
-    ctx.beginPath();ctx.moveTo(gx,vp.y);ctx.lineTo(gx,vp.y+vp.h);ctx.stroke();
-    if(zoom>0.12) ctx.fillText(String(year),gx,vp.y+18);
+  /* morph 0 = 유기체 디스크(정보 아키텍처), 1 = 타임라인(생성 시스템).
+     스테이트먼트가 등장하면 디스크가 풀리며 연대기 지형으로 펼쳐진다. */
+  const morph=smooth(viewValue('morph',now));
+  const inv=1-morph;
+  const breath=1+0.022*Math.sin(now*0.0006)*inv;   /* 디스크의 호흡 */
+  const spin=now*0.000055*inv+0.4;                  /* 디스크의 느린 자전 */
+  const diskR=Math.min(vp.w,vp.h)*0.56*smooth(reveal)*breath*creep;
+
+  /* 디스크 핵 글로우 — morph되며 사라진다 */
+  if(inv>0.02){
+    const glow=ctx.createRadialGradient(cx,cy,diskR*0.04,cx,cy,diskR*0.72);
+    glow.addColorStop(0,`rgba(206,212,200,${0.16*inv*alpha})`);
+    glow.addColorStop(0.6,`rgba(160,168,158,${0.05*inv*alpha})`);
+    glow.addColorStop(1,'rgba(96,102,96,0)');
+    ctx.fillStyle=glow;
+    ctx.fillRect(vp.x,vp.y,vp.w,vp.h);
   }
 
-  /* 연결선 */
+  /* 연대 눈금 — 지도가 되어가면서(morph) 함께 떠오른다 */
+  const gridA=alpha*morph;
+  if(gridA>0.02){
+    ctx.strokeStyle=`rgba(214,220,210,${0.05*gridA})`;
+    ctx.fillStyle=`rgba(214,220,210,${0.34*gridA})`;
+    ctx.lineWidth=1;
+    ctx.font='600 9px Inter, sans-serif';
+    ctx.textAlign='center';
+    for(let year=1980;year<=2020;year+=10){
+      const t=((year-YEAR_MIN)*12)/((YEAR_MAX-YEAR_MIN)*12+11);
+      const gx=toX(MARGIN_X+t*(MAP_W-2*MARGIN_X));
+      if(gx<vp.x-40||gx>vp.x+vp.w+40) continue;
+      ctx.beginPath();ctx.moveTo(gx,vp.y);ctx.lineTo(gx,vp.y+vp.h);ctx.stroke();
+      if(zoom>0.12) ctx.fillText(String(year),gx,vp.y+18);
+    }
+  }
+
+  /* 방사 스포크(디스크 전용 코로나 선) */
+  if(inv>0.02){
+    for(const s of spokes){
+      const a=s.a+spin;
+      ctx.strokeStyle=`rgba(196,202,192,${s.alpha*inv*alpha})`;
+      ctx.lineWidth=s.w;
+      ctx.beginPath();
+      ctx.moveTo(cx+Math.cos(a)*diskR*s.r0,cy+Math.sin(a)*diskR*s.r0*0.94);
+      ctx.lineTo(cx+Math.cos(a)*diskR*s.r1,cy+Math.sin(a)*diskR*s.r1*0.94);
+      ctx.stroke();
+    }
+  }
+
+  /* 표지 위치: 디스크 좌표와 타임라인 좌표를 morph로 보간해 저장 */
+  let visibleCovers=0, centerCover=null, centerDist=1e9;
+  for(const c of covers){
+    const da=c.diskA+spin;
+    const dx=cx+Math.cos(da)*diskR*c.diskU;
+    const dy=cy+Math.sin(da)*diskR*c.diskU*0.94+Math.sin(now*0.0009+c.wob)*3*inv;
+    c.sx=lerp(dx,toX(c.x),morph);
+    c.sy=lerp(dy,toY(c.y),morph);
+  }
+
+  /* 연결선 — 양 끝이 함께 morph되므로 유기적 그물이 지형의 실로 풀린다 */
   ctx.lineWidth=0.6;
   for(const l of links){
-    const x1=toX(l.a.x),y1=toY(l.a.y),x2=toX(l.b.x),y2=toY(l.b.y);
+    const x1=l.a.sx,y1=l.a.sy,x2=l.b.sx,y2=l.b.sy;
     if(Math.max(x1,x2)<vp.x-30||Math.min(x1,x2)>vp.x+vp.w+30) continue;
     ctx.strokeStyle=`rgba(200,206,196,${l.alpha*alpha})`;
     ctx.beginPath();ctx.moveTo(x1,y1);
-    ctx.quadraticCurveTo((x1+x2)/2,(y1+y2)/2-12*zoom,x2,y2);
+    ctx.quadraticCurveTo((x1+x2)/2,(y1+y2)/2-12*zoom*morph,x2,y2);
     ctx.stroke();
   }
 
   /* 별점 */
   for(const d of dots){
-    const x=toX(d.x),y=toY(d.y);
+    const da=d.diskA+spin*1.35;
+    const x=lerp(cx+Math.cos(da)*diskR*d.diskU,toX(d.x),morph);
+    const y=lerp(cy+Math.sin(da)*diskR*d.diskU*0.94,toY(d.y),morph);
     if(x<vp.x-8||x>vp.x+vp.w+8||y<vp.y-8||y>vp.y+vp.h+8) continue;
     const tw=0.62+0.38*Math.sin(now*0.0009+d.phase);
-    const size=clamp(d.size*zoom*3.4,0.5,2.3);
+    const size=clamp(d.size*lerp(1.1,zoom*3.4,morph),0.5,2.3);
     ctx.fillStyle=d.lime
       ?`hsla(84,64%,56%,${0.5*tw*alpha})`
       :`hsla(92,7%,${d.light}%,${0.42*tw*alpha})`;
     ctx.fillRect(x-size/2,y-size/2,size,size);
   }
 
-  /* 표지 — 프레임 안의 것만, 지도 위 물체로서 줌에 비례해 커진다 */
-  let visibleCovers=0, centerCover=null, centerDist=1e9;
+  /* 표지 — 디스크에서는 1/8만 이미지, 나머지는 점.
+     morph가 진행되면 점들이 이미지로 '생성'되며 아카이브가 펼쳐진다. */
   for(const c of covers){
-    const x=toX(c.x),y=toY(c.y);
-    const h=c.h*zoom, w=h*c.aspect;
+    const x=c.sx,y=c.sy;
+    const hT=c.h*zoom;
+    const hD=30*(0.85+0.5*c.complexity)*smooth(reveal);
+    const h=lerp(hD,hT,morph);
+    const w=h*c.aspect;
     if(x<vp.x-w||x>vp.x+vp.w+w||y<vp.y-h||y>vp.y+vp.h+h) continue;
     visibleCovers++;
     const dc=Math.hypot(x-cx,y-cy);
     if(dc<centerDist){centerDist=dc;centerCover=c;}
-    if(h<7){ /* 조망 고도에서는 표지를 점으로 축약 */
-      ctx.fillStyle=`hsla(92,9%,72%,${0.5*alpha})`;
+    const imageAlpha=c.featured?1:morph;
+    const speckAlpha=c.featured?0:inv;
+    if(speckAlpha>0.02){
+      ctx.fillStyle=`hsla(92,9%,74%,${0.55*speckAlpha*alpha})`;
+      ctx.fillRect(x-1.3,y-1.3,2.6,2.6);
+    }
+    if(imageAlpha<0.02) continue;
+    if(h<7){
+      ctx.fillStyle=`hsla(92,9%,72%,${0.5*imageAlpha*alpha})`;
       ctx.fillRect(x-1.2,y-1.2,2.4,2.4);
       continue;
     }
@@ -280,28 +354,31 @@ function draw(now){
     ctx.shadowOffsetY=2;
     if(e.ready&&e.img.naturalWidth){
       const ar=e.img.naturalWidth/e.img.naturalHeight;
-      ctx.globalAlpha=alpha;
+      ctx.globalAlpha=alpha*imageAlpha;
       ctx.drawImage(e.img,-h*ar/2,-h/2,h*ar,h);
     }else{
-      ctx.fillStyle=`rgba(226,230,222,${0.13*alpha})`;
+      ctx.fillStyle=`rgba(226,230,222,${0.13*alpha*imageAlpha})`;
       ctx.fillRect(-w/2,-h/2,w,h);
     }
     ctx.restore();
     ctx.globalAlpha=1;
   }
 
-  /* HUD — 현재 시야의 연대 범위 */
-  const halfYears=(visibleW/(MAP_W-2*MARGIN_X))*(YEAR_MAX-YEAR_MIN)/2;
-  const camT=clamp((cam.x-MARGIN_X)/(MAP_W-2*MARGIN_X),0,1);
-  const camYear=YEAR_MIN+camT*(YEAR_MAX-YEAR_MIN);
-  const y0=Math.max(YEAR_MIN,Math.round(camYear-halfYears));
-  const y1=Math.min(YEAR_MAX,Math.round(camYear+halfYears));
-  ctx.textAlign='left';
-  ctx.fillStyle=`rgba(236,242,232,${0.55*alpha*(1-focus*0.5)})`;
-  ctx.font='700 10px Inter, sans-serif';
-  ctx.fillText('ARCHIVE ATLAS · 578 COVERS',vp.x+16,vp.y+vp.h-30);
-  ctx.fillStyle=`rgba(214,220,210,${0.4*alpha*(1-focus*0.5)})`;
-  ctx.fillText(`IN VIEW ${y0}–${y1}`,vp.x+16,vp.y+vp.h-16);
+  /* HUD — 지도 상태에서만: 현재 시야의 연대 범위 */
+  if(morph>0.4){
+    const hudA=alpha*(morph-0.4)/0.6;
+    const halfYears=(visibleW/(MAP_W-2*MARGIN_X))*(YEAR_MAX-YEAR_MIN)/2;
+    const camT=clamp((cam.x-MARGIN_X)/(MAP_W-2*MARGIN_X),0,1);
+    const camYear=YEAR_MIN+camT*(YEAR_MAX-YEAR_MIN);
+    const y0=Math.max(YEAR_MIN,Math.round(camYear-halfYears));
+    const y1=Math.min(YEAR_MAX,Math.round(camYear+halfYears));
+    ctx.textAlign='left';
+    ctx.fillStyle=`rgba(236,242,232,${0.55*hudA*(1-focus*0.5)})`;
+    ctx.font='700 10px Inter, sans-serif';
+    ctx.fillText('ARCHIVE ATLAS · 578 COVERS',vp.x+16,vp.y+vp.h-30);
+    ctx.fillStyle=`rgba(214,220,210,${0.4*hudA*(1-focus*0.5)})`;
+    ctx.fillText(`IN VIEW ${y0}–${y1}`,vp.x+16,vp.y+vp.h-16);
+  }
 
   ctx.restore();
 
@@ -312,7 +389,7 @@ function draw(now){
       progress:cam.t??0.5,
       pointDepth:centerCover.cluster,
       pointDegree:centerCover.regions,
-      pointRadius:camT,
+      pointRadius:clamp((cam.x-MARGIN_X)/(MAP_W-2*MARGIN_X),0,1),
       degreeEnergy:centerCover.complexity*10,
       depthEnergy:centerCover.entropy*10,
       seed:centerCover.year,
@@ -357,6 +434,7 @@ addEventListener('message',e=>{
     setView('reveal',clamp(Number(d.progress)||0,0,1),0,220);
   }else if(d.type==='cyberatlas:set-focus'){
     setView('focus',d.focused?1:0,Number(d.delay)||0,Number(d.duration)||1280);
+    setView('morph',d.focused?1:0,Number(d.delay)||0,d.focused?3400:900);
   }else if(d.type==='cyberatlas:set-lower-center'){
     setView('lower',d.lowered?1:0,Number(d.delay)||0,Number(d.duration)||1280);
   }else if(d.type==='cyberatlas:start-exploration'){
