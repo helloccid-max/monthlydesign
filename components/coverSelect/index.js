@@ -135,11 +135,15 @@ function buildParticleNode(index, cover, generation = 0) {
   const near = depthTier === 3;
   const middle = depthTier === 1;
   const depthName = near ? 'near' : middle ? 'middle' : 'far';
-  const z = near
+  const rawZ = near
     ? ULTRA_NEAR_Z_MIN + hash(index, cycleSalt + 8) * ULTRA_NEAR_Z_SPAN
     : middle
       ? -80 + hash(index, cycleSalt + 8) * 240
       : -420 + hash(index, cycleSalt + 8) * 260;
+  // 가장 큰(near) 표지와 그 아래 티어의 크기 격차가 커서, near의 절반은
+  // 투영 스케일 80% 지점으로 물러난다. 선택 확대 크기는 z와 무관해 동일.
+  const nearSoftened = near && hash(index, cycleSalt + 47) < 0.5;
+  const z = nearSoftened ? getDepthAtProjectedScaleRatio(rawZ, 0.8) : rawZ;
 
   return {
     id: `archive-particle-${index}`,
