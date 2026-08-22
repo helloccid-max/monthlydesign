@@ -641,11 +641,11 @@ export default function IntroScreen({
             aria-label="From Information Architecture to Generative Systems"
           >
             <span className={styles.titleFaceHeadline}>
-              <span>FROM</span>
-              <span>INFORMATION</span>
-              <span>ARCHITECTURE</span>
-              <span className={styles.titleFaceAccent}>TO GENERATIVE</span>
-              <span className={styles.titleFaceAccent}>SYSTEMS</span>
+              <span>From</span>
+              <span>Information</span>
+              <span>Architecture</span>
+              <span>to Generative</span>
+              <span>Systems</span>
             </span>
           </div>
         </div>
