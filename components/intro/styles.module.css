@@ -459,7 +459,8 @@
   background: transparent;
   color: rgba(255, 255, 255, 0.96);
   font-family: 'Neue Haas Grotesk', 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
-  font-size: 0.9757rem;
+  /* 0.9757rem의 88%. */
+  font-size: 0.8586rem;
   font-weight: 400;
   line-height: 1;
   letter-spacing: 0.025em;
