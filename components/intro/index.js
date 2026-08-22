@@ -26,7 +26,9 @@ const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 const INTRO_ASSET_RELEASE_MS = 10000;
 // Loading → Tap to Play 전환: 기본형 타자기 — Loading을 오른쪽부터 지운 뒤
 // Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
-const START_PROMPT_LOADING_TEXT = 'Loading';
+const START_PROMPT_LOADING_TEXT = 'LOADING';
+// 소문자 하나가 왼→오로 자리를 옮겨가는 간격(rAF 프레임 수). 3프레임 ≈ 50ms.
+const LOADING_CASE_CYCLE_FRAMES = 3;
 const START_PROMPT_READY_TEXT = 'Tap to Play';
 const START_PROMPT_ERASE_DURATION_MS = 233;
 const START_PROMPT_TYPE_DURATION_MS = 500;
@@ -284,6 +286,26 @@ export default function IntroScreen({
     const timer = window.setTimeout(() => setAssetReleaseExpired(true), INTRO_ASSET_RELEASE_MS);
     return () => window.clearTimeout(timer);
   }, [coverAssetReady, topologyAssetReady]);
+
+  useEffect(() => {
+    if (introAssetsReady) return undefined;
+    let frame = 0;
+    let framesSinceStep = 0;
+    let lowercasePosition = 0;
+    const tick = () => {
+      framesSinceStep += 1;
+      if (framesSinceStep >= LOADING_CASE_CYCLE_FRAMES) {
+        framesSinceStep = 0;
+        const characters = START_PROMPT_LOADING_TEXT.split('');
+        characters[lowercasePosition] = characters[lowercasePosition].toLowerCase();
+        setStartPromptText(characters.join(''));
+        lowercasePosition = (lowercasePosition + 1) % START_PROMPT_LOADING_TEXT.length;
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [introAssetsReady]);
 
   useEffect(() => {
     if (!introAssetsReady) return undefined;
@@ -698,19 +720,7 @@ export default function IntroScreen({
           handleTap();
         }}
       >
-        <span>
-          {!introAssetsReady
-            ? Array.from(START_PROMPT_LOADING_TEXT).map((character, index) => (
-              <span
-                key={`loading-character-${index}`}
-                className={styles.loadingCharacter}
-                style={{ '--loading-character-index': index }}
-              >
-                {character}
-              </span>
-            ))
-            : startPromptText}
-        </span>
+        <span>{startPromptText}</span>
       </button>
 
     </main>
