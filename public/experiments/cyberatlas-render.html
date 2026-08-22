@@ -160,18 +160,20 @@ const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 const nextSeed=s=>((Math.imul(s,1103515245)+12345)>>>0)%2147483647;
 function faithfulEdgeColor(analysisId,f,alpha){
-  // Walrus reads as a hierarchy because the tree lives in a restrained
-  // olive spectrum. Keeping the hue range narrow also prevents thousands of
-  // overlapping links from washing into the pale neon cloud we had before.
+  /* 그린 단색조는 검은 배경에서 병원체(바이러스) 도상으로 읽혔다. 구조선은
+     본화이트/웜그레이 스펙트럼으로 낮춰 성도(星圖)처럼 읽히게 하고,
+     라임은 허브 팬과 최상위 노드에만 희소 액센트로 남긴다. */
   const sceneShift=(analysisId==='communities'||analysisId==='medusa'||analysisId==='visual-genealogy')?4:
     ((analysisId==='traces'||analysisId==='bridges'||analysisId==='palette-constellations')?-3:0);
-  return `hsla(${82+sceneShift+12*f},${42+34*f}%,${24+34*f}%,${alpha})`;
+  return `hsla(${86+sceneShift+8*f},${7+7*f}%,${28+36*f}%,${alpha})`;
 }
 function faithfulNodeColor(analysisId,degree,alpha,measuredTone=0.5){
   const sceneShift=(analysisId==='communities'||analysisId==='medusa'||analysisId==='visual-genealogy')?5:
     ((analysisId==='traces'||analysisId==='bridges'||analysisId==='palette-constellations')?-2:0);
   const tone=clamp(Number(measuredTone)||0.5,0,1);
-  return `hsla(${85+sceneShift+10*(1-degree)},${66+25*degree}%,${35+23*degree+13*tone}%,${alpha})`;
+  /* 최상위 허브만 라임 액센트 — 나머지는 본화이트 계열. */
+  if(degree>0.82) return `hsla(${84+sceneShift},64%,${52+10*tone}%,${alpha})`;
+  return `hsla(${88+sceneShift+8*(1-degree)},${9+9*degree}%,${44+26*degree+12*tone}%,${alpha})`;
 }
 
 const S = {
@@ -1272,14 +1274,16 @@ function drawWalrusDensityAuras(ctx,graph,A,B,cA,sA,cB,sB,cC,sC,cx,cy,RX,RY){
     const angle=0.5*Math.atan2(2*xy,xx-yy);
     const alpha=(0.042+0.082*populationGain)*(0.76+0.28*Math.max(0,meanZ))*layoutGain;
     ctx.save(); ctx.translate(meanX,meanY); ctx.rotate(angle); ctx.scale(1,minor/major);
+    /* 군집 오라: 녹색 발광 덩어리가 미생물 군락처럼 읽혀 중성 그레이로
+       낮추고 강도도 절반 수준으로 줄인다(형태 보정). */
     const glow=ctx.createRadialGradient(0,0,major*0.04,0,0,major);
-    glow.addColorStop(0,`rgba(128,180,65,${alpha*1.32})`);
-    glow.addColorStop(0.45,`rgba(102,155,57,${alpha*0.78})`);
-    glow.addColorStop(0.78,`rgba(75,121,51,${alpha*0.30})`);
-    glow.addColorStop(1,'rgba(54,92,46,0)');
+    glow.addColorStop(0,`rgba(196,202,192,${alpha*0.72})`);
+    glow.addColorStop(0.45,`rgba(168,174,166,${alpha*0.42})`);
+    glow.addColorStop(0.78,`rgba(132,138,131,${alpha*0.16})`);
+    glow.addColorStop(1,'rgba(96,102,96,0)');
     ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0,major,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle=`rgba(157,201,61,${0.10+populationGain*0.13})`;
-    ctx.lineWidth=clusterIndex===0?0.78:0.48;
+    ctx.strokeStyle=`rgba(206,212,200,${0.06+populationGain*0.08})`;
+    ctx.lineWidth=clusterIndex===0?0.6:0.4;
     ctx.beginPath(); ctx.arc(0,0,major*0.72,0,Math.PI*2); ctx.stroke();
     ctx.restore();
   }
@@ -1298,8 +1302,10 @@ function drawWalrusHubFans(ctx,graph){
     ctx.moveTo(_xy[base],_xy[base+1]);
     for(let j=1;j<=SEG;j++) ctx.lineTo(_xy[base+j*2],_xy[base+j*2+1]);
   }
-  ctx.strokeStyle=graph.analysisLayout==='communities'?'rgba(178,214,68,.23)':'rgba(155,197,62,.18)';
-  ctx.lineWidth=0.72;
+  /* 허브 팬은 라임 액센트로 유지하되, 방사 스파이크 인상을 줄이도록
+     더 가늘고 옅게 긋는다(형태 보정). */
+  ctx.strokeStyle=graph.analysisLayout==='communities'?'rgba(178,214,68,.16)':'rgba(155,197,62,.13)';
+  ctx.lineWidth=0.55;
   ctx.stroke();
   ctx.restore();
 }
@@ -1439,7 +1445,7 @@ function drawSkitter3D(ctx,W,H,t){
         const [sx,sy]=walrusProjectPoint(x,y,z,cA,sA,cB,sB,cC,sC,cx,cy,RX,RY);
         if(k===0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
       }
-      ctx.strokeStyle=`rgba(91,132,113,${0.115+(i%3)*0.025})`;
+      ctx.strokeStyle=`rgba(138,146,141,${0.10+(i%3)*0.022})`;
       ctx.lineWidth=i%4===0?0.78:0.48;
       ctx.stroke();
     }
