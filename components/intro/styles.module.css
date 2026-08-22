@@ -146,17 +146,14 @@
   pointer-events: auto;
 }
 
-/* QA 점프: 디버그 상태에서는 지연 애니메이션을 기다리지 않고 카드가
-   즉시 플립 종점(뒷면 = 캔버스)에 가 있는다. */
+/* QA 점프: 디버그 상태에서는 지연 애니메이션을 기다리지 않는다.
+   (started 디버그 상태는 아래 도킹 규칙이 즉시 플랫 캔버스로 만든다.) */
 .page[data-debug='true'] .titleFilm,
 .page[data-debug='true'] .coverFilm {
   animation: none;
 }
 
-.page[data-debug='true'][data-started='true'] .coverCard {
-  animation: none;
-  transform: perspective(1400px) rotateY(180deg) scale(1.1);
-}
+
 
 /* 영문 타이틀 — 프레임·캡션 없이 메인 타이틀만 중앙 정렬. */
 .titleFace {
@@ -548,4 +545,44 @@
     animation: none;
     opacity: 0.72;
   }
+}
+
+/* 줌 도킹: 순 스케일이 1에 닿는 순간 3D·스케일 체인을 전부 항등으로
+   스냅해 캔버스가 컴포지터에서 1:1로 합성된다(비정수 스케일 리샘플링에
+   의한 텍스트 블러 제거). 시각적으로는 줌 종점과 동일하다. */
+.page[data-canvas-docked='true'] .coverFilm {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  translate: none;
+  transform: none;
+}
+
+.page[data-canvas-docked='true'] .coverArrivalTilt {
+  transform: none;
+}
+
+.page[data-canvas-docked='true'] .coverCard {
+  animation: none;
+  transform: none;
+  box-shadow: none;
+}
+
+.page[data-canvas-docked='true'] .coverFront {
+  display: none;
+}
+
+.page[data-canvas-docked='true'] .coverBack {
+  transform: none;
+  clip-path: none;
+}
+
+.page[data-canvas-docked='true'] .coverBackViewport {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform: none;
 }

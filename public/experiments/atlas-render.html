@@ -301,7 +301,8 @@ function draw(now){
   const gridA=alpha*morph;
   if(gridA>0.02){
     ctx.strokeStyle=`rgba(214,220,210,${0.05*gridA})`;
-    ctx.fillStyle=`rgba(214,220,210,${0.34*gridA})`;
+    /* 텍스트는 감쇠 없이 순수 화이트 — morph 진입 페이드만 탄다 */
+    ctx.fillStyle=`rgba(255,255,255,${gridA})`;
     ctx.lineWidth=1;
     ctx.font='600 9px "Neue Haas Grotesk", Inter, sans-serif';
     ctx.textAlign='center';
@@ -429,10 +430,9 @@ function draw(now){
     const y0=Math.max(YEAR_MIN,Math.round(camYear-halfYears));
     const y1=Math.min(YEAR_MAX,Math.round(camYear+halfYears));
     ctx.textAlign='left';
-    ctx.fillStyle=`rgba(236,242,232,${0.55*hudA*(1-focus*0.5)})`;
+    ctx.fillStyle=`rgba(255,255,255,${hudA})`;
     ctx.font='700 10px "Neue Haas Grotesk", Inter, sans-serif';
     ctx.fillText('ARCHIVE ATLAS · 578 COVERS',vp.x+16,vp.y+vp.h-30);
-    ctx.fillStyle=`rgba(214,220,210,${0.4*hudA*(1-focus*0.5)})`;
     ctx.fillText(`IN VIEW ${y0}–${y1}`,vp.x+16,vp.y+vp.h-16);
   }
 

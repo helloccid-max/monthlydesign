@@ -40,7 +40,7 @@ const INTRO_ASSET_RELEASE_MS = 10000;
 // Loading → Tap to Play 전환: 기본형 타자기 — Loading을 오른쪽부터 지운 뒤
 // Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
 const START_PROMPT_LOADING_TEXT = 'LOADING';
-const START_PROMPT_READY_TEXT = 'Tap to Play';
+const START_PROMPT_READY_TEXT = 'TAP TO VIEW';
 const START_PROMPT_ERASE_DURATION_MS = 233;
 const START_PROMPT_TYPE_DURATION_MS = 500;
 // Mobile image decoding or iframe rendering can occasionally occupy the main
@@ -562,6 +562,10 @@ export default function IntroScreen({
   const coverNetScale = coverWindowBase + (1 - coverWindowBase) * coverZoomProgress;
   const coverFilmScale = coverWindowScale / COVER_FLIP_END_CARD_SCALE;
   const coverInnerScale = coverNetScale / coverWindowScale;
+  // 줌이 끝나면(순 스케일 1) 트랜스폼 체인을 항등의 플랫 풀스크린으로
+  // 스냅한다 — 시각적으로 동일하지만 비정수 스케일 합성에 의한 캔버스
+  // 텍스트 리샘플링 블러가 사라진다.
+  const canvasDocked = started && scrubProgress >= 0.16;
   const topologySoundReady = started && scrubProgress >= TOPOLOGY_SOUND_START_PROGRESS;
   // 플립 중 미리 깨운 리빌(preReveal)에서 이어받아 1까지 채운다.
   const topologyReveal = started
@@ -617,6 +621,7 @@ export default function IntroScreen({
       data-leaving={leaving ? 'true' : 'false'}
       data-assets-ready={introAssetsReady ? 'true' : 'false'}
       data-debug={debugState ? 'true' : 'false'}
+      data-canvas-docked={canvasDocked ? 'true' : 'false'}
       onClick={handleTap}
       onPointerDown={beginInteraction}
       onPointerMove={continueInteraction}
@@ -661,7 +666,7 @@ export default function IntroScreen({
             '--cover-enter-duration': `${COVER_ENTER_DURATION_MS}ms`,
             '--cover-shrink-delay': `${COVER_FLIP_START_MS}ms`,
             '--cover-shrink-duration': `${COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS}ms`,
-            ...(started
+            ...(started && !canvasDocked
               ? { transform: `translate3d(0, 0, 0) scale(${coverFilmScale.toFixed(5)})` }
               : null),
           }}
@@ -701,7 +706,7 @@ export default function IntroScreen({
                     줌인될 때 역스케일로 받쳐 캔버스 해상도가 끝까지 1:1이다. */}
                 <div
                   className={styles.coverBackViewport}
-                  style={started
+                  style={started && !canvasDocked
                     ? { transform: `translate(-50%, -50%) scale(${coverInnerScale.toFixed(5)})` }
                     : null}
                 >

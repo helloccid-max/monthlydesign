@@ -53,6 +53,9 @@ const COVER_SELECTION_TITLE_LINES = [
 ];
 const VOICE_BUTTON_LABEL = '나만의 오마주 표지 만들기';
 const VOICE_GUIDE_PROMPT_TEXT = '프롬프트를 말해보세요';
+// 탭 직후 이 시간 동안은 기존 버튼 모양을 그대로 유지하고, 그 뒤에
+// 컨테이너 morph(1초)와 가이드 타자기가 함께 시작된다.
+const VOICE_MORPH_HOLD_MS = 400;
 
 const SPEECH_ERROR_MESSAGES = {
   'not-allowed': '마이크 권한 허용해주세요',
@@ -350,6 +353,8 @@ export default function CoverSelectScreen({
   // 리스닝 시작~첫 단어 사이: 트랜스크립트 자리에 가이드 문구를 띄우는 단계.
   // 가이드가 같은 요소에 있어야 컨테이너·텍스트·웨이브가 끊기지 않고 이어진다.
   const [promptPlaceholder, setPromptPlaceholder] = useState(false);
+  const [voiceMorphHold, setVoiceMorphHold] = useState(false);
+  const voiceMorphHoldTimerRef = useRef(null);
   const [guidanceDismissed, setGuidanceDismissed] = useState(false);
   const [coverPool, setCoverPool] = useState(initialCoverPool);
   const [particles, setParticles] = useState(() => buildParticleNodes(initialCoverPool));
@@ -585,7 +590,9 @@ export default function CoverSelectScreen({
 
   // 가이드 단계: "프롬프트를 말해보세요"가 컨테이너 morph(1초)와 같은 호흡으로
   // 한 글자씩 입력된다. 발화가 시작되면 placeholder가 풀리며 즉시 중단된다.
+  // 버튼 모양을 유지하는 홀드 구간에는 시작하지 않는다.
   useEffect(() => {
+    if (voiceMorphHold) return undefined;
     if (!promptPlaceholder || promptValue) return undefined;
     if (displayedPrompt === VOICE_GUIDE_PROMPT_TEXT) return undefined;
     if (!VOICE_GUIDE_PROMPT_TEXT.startsWith(displayedPrompt)) return undefined;
@@ -597,7 +604,7 @@ export default function CoverSelectScreen({
       ));
     }, Math.round(1000 / VOICE_GUIDE_PROMPT_TEXT.length));
     return () => window.clearTimeout(timer);
-  }, [displayedPrompt, promptPlaceholder, promptValue]);
+  }, [displayedPrompt, promptPlaceholder, promptValue, voiceMorphHold]);
 
   useEffect(() => {
     if (Array.isArray(initialCovers) && initialCovers.length) return undefined;
@@ -1061,6 +1068,7 @@ export default function CoverSelectScreen({
     if (!basePrompt) {
       // 버튼이 입력 창으로 morph(1초)되는 동안 가이드 문구가 타자기로
       // 입력된다 — 즉시 세팅하지 않고 아래 타이핑 이펙트가 채운다.
+      // (버튼 외형 홀드는 탭 시점의 requestMicrophonePermission이 앵커.)
       setPromptPlaceholder(true);
       setDisplayedPrompt('');
     } else {
@@ -1165,6 +1173,20 @@ export default function CoverSelectScreen({
 
   const requestMicrophonePermission = useCallback(async (basePromptOverride) => {
     if (speechStatus === 'requesting-permission') return;
+
+    // 홀드는 사용자 탭에 앵커: 새 세션(기존 프롬프트 없음)이면 지금부터
+    // 400ms 동안 버튼 외형을 유지한다 — 권한 요청·시작 상태 전환을 포함.
+    const effectiveBase = typeof basePromptOverride === 'string'
+      ? basePromptOverride
+      : promptValueRef.current;
+    if (!effectiveBase.trim()) {
+      setVoiceMorphHold(true);
+      window.clearTimeout(voiceMorphHoldTimerRef.current);
+      voiceMorphHoldTimerRef.current = window.setTimeout(
+        () => setVoiceMorphHold(false),
+        VOICE_MORPH_HOLD_MS
+      );
+    }
 
     setSpeechStatus('requesting-permission');
     setSpeechActive(false);
@@ -1519,20 +1541,25 @@ export default function CoverSelectScreen({
   }, []);
 
   const voicePermissionRequesting = speechStatus === 'requesting-permission';
-  const voicePermissionPrompt = voicePermissionRequesting
+  // 홀드 중에는 권한 요청 UI로도 바뀌지 않는다 — 이미 허용된 마이크의
+  // 순간적인 requesting 상태가 버튼을 흔드는 플리커도 함께 막는다.
+  const voicePermissionPrompt = (voicePermissionRequesting && !voiceMorphHold)
     || speechError === SPEECH_ERROR_MESSAGES['not-allowed'];
   const voiceRecording = speechStatus === 'starting' || speechStatus === 'listening';
-  const voiceAwaitingSpeech = voiceRecording && promptPlaceholder;
+  // 홀드 구간(탭 직후 400ms)에는 녹음이 시작됐어도 버튼 외형을 그대로 둔다.
+  const voiceInputLive = voiceRecording && !voiceMorphHold;
+  const voiceAwaitingSpeech = voiceInputLive && promptPlaceholder;
   const voiceSendReady = Boolean(displayedPrompt)
     && ((voiceRecording && speechSendReady) || pendingSubmit);
-  const voiceButtonIdle = !displayedPrompt && !speechError && !voiceRecording && !voicePermissionRequesting;
+  const voiceButtonIdle = !displayedPrompt && !speechError && !voiceInputLive && !voicePermissionRequesting;
   const voiceButtonCopy = displayedPrompt || (speechError && !voicePermissionPrompt
     ? speechError
     : VOICE_BUTTON_LABEL);
-  // voiceRecording 포함: 가이드가 다 지워진 빈 프레임에 컨테이너가
+  // voiceInputLive 포함: 가이드가 다 지워진 빈 프레임에 컨테이너가
   // 수축했다 재확장하는 출렁임을 막는다.
   const voiceButtonExpanded = Boolean(
-    displayedPrompt || voiceRecording || speechError || voicePermissionRequesting
+    displayedPrompt || voiceInputLive || speechError
+    || (voicePermissionRequesting && !voiceMorphHold)
   );
   const voicePromptCancellable = Boolean(displayedPrompt) && !promptPlaceholder;
   const voiceCopyTyping = !speechError && displayedPrompt.length < promptValue.length;
@@ -1545,6 +1572,19 @@ export default function CoverSelectScreen({
   const promptWords = displayedPrompt.trim().split(/\s+/).filter(Boolean);
   const promptLastWord = promptWords.at(-1) || '';
   const promptLeadingText = promptWords.slice(0, -1).join(' ');
+
+  // 세션 종료(에러·유휴 복귀) 시 홀드 타이머를 정리한다. 권한 요청·시작·
+  // 청취 상태에서는 유지 — 홀드는 탭부터 morph 시작까지를 덮는다.
+  useEffect(() => {
+    if (
+      speechStatus === 'requesting-permission'
+      || speechStatus === 'starting'
+      || speechStatus === 'listening'
+    ) return undefined;
+    window.clearTimeout(voiceMorphHoldTimerRef.current);
+    setVoiceMorphHold(false);
+    return undefined;
+  }, [speechStatus]);
   const renderVoiceWave = () => (
     <span className={styles.voiceIconSlot} aria-hidden="true">
       <span
@@ -1654,13 +1694,13 @@ export default function CoverSelectScreen({
             timedGlare={voiceButtonIdle || pendingSubmit}
             timedGlareMode={pendingSubmit ? 'confirm' : 'idle'}
             data-expanded={voiceButtonExpanded ? 'true' : 'false'}
-            data-listening={voiceRecording ? 'true' : 'false'}
+            data-listening={voiceInputLive ? 'true' : 'false'}
             data-send-ready={voiceSendReady ? 'true' : 'false'}
             data-send-confirmed={pendingSubmit ? 'true' : 'false'}
             data-awaiting-speech={voiceAwaitingSpeech ? 'true' : 'false'}
             data-idle={voiceButtonIdle ? 'true' : 'false'}
             data-permission={voicePermissionPrompt ? 'true' : 'false'}
-            data-has-transcript={displayedPrompt || voiceRecording ? 'true' : 'false'}
+            data-has-transcript={displayedPrompt || voiceInputLive ? 'true' : 'false'}
             data-error={speechError && !voicePermissionPrompt ? 'true' : 'false'}
             data-cancellable={voicePromptCancellable ? 'true' : 'false'}
             data-pressing="false"
@@ -1688,7 +1728,7 @@ export default function CoverSelectScreen({
               data-typing={voiceCopyTyping ? 'true' : 'false'}
               aria-live="polite"
             >
-              {(voiceRecording || pendingSubmit) ? (
+              {(voiceInputLive || pendingSubmit) ? (
                 displayedPrompt ? (
                   <>
                     {promptLeadingText ? `${promptLeadingText} ` : ''}
