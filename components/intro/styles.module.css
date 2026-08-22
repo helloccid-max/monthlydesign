@@ -195,6 +195,11 @@
 .titleFaceHeadline > span:nth-child(4) { animation-delay: 550ms; }
 .titleFaceHeadline > span:nth-child(5) { animation-delay: 700ms; }
 
+/* 탭 변이: 라임으로 물드는 모음. */
+.titleGlyphLime {
+  color: var(--editorial-lime);
+}
+
 @keyframes titleParagraphIn {
   from {
     transform: translate3d(0, 10dvh, 0);
@@ -532,7 +537,7 @@
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.52);
   transition:
     transform 480ms cubic-bezier(0.16, 1, 0.3, 1),
-    color 160ms ease;
+    color 350ms ease;
 }
 
 .startPrompt:active > span {
@@ -579,9 +584,24 @@
   transition-delay: 1000ms;
 }
 
+/* 스위치를 누른 듯 내려갔다 바로 제자리로 — 라임 전환은 color 트랜지션. */
 .page[data-engaged='true'] .startPrompt > span {
   color: var(--editorial-lime);
-  transform: translate(-50%, 12px);
+  animation: promptSwitchPress 380ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
+}
+
+@keyframes promptSwitchPress {
+  0% {
+    transform: translate(-50%, 0);
+  }
+
+  45% {
+    transform: translate(-50%, 12px);
+  }
+
+  100% {
+    transform: translate(-50%, 0);
+  }
 }
 
 @media (max-height: 680px) {

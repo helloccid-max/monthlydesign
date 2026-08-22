@@ -38,6 +38,14 @@ const AUTOPLAY_END_HOLD_MS = 5200;
 const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
 const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 const INTRO_ASSET_RELEASE_MS = 10000;
+// 탭 순간 타이틀 글자가 변이한다: 한글 독음의 초성에 해당하는 자음은
+// 랜덤 대문자로, 모음(y 포함 — '시스템스'의 ㅣ)은 랜덤 라임으로.
+const TITLE_LINES = ['From', 'Information', 'Architecture', 'to Generative', 'Systems'];
+const TITLE_VOWEL_SET = 'aeiouyAEIOUY';
+const TITLE_CONSONANT_PATTERN = /[b-df-hj-np-tv-xz]/;
+const TITLE_MUTATION_INTERVAL_MS = 140;
+const TITLE_MUTATION_STOP_MS = 1300;
+
 // Loading → Tap to Play 전환: 기본형 타자기 — Loading을 오른쪽부터 지운 뒤
 // Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
 const START_PROMPT_LOADING_TEXT = 'LOADING';
@@ -262,6 +270,8 @@ export default function IntroScreen({
   const [coverAssetReady, setCoverAssetReady] = useState(false);
   const [topologyAssetReady, setTopologyAssetReady] = useState(false);
   const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
+  // 탭 순간의 타이틀 글자 변이 상태 — null이면 원문 그대로.
+  const [titleMutation, setTitleMutation] = useState(null);
   // 카드 창(줌 창)이 뷰포트를 완전히 덮는 데 필요한 카드 전체 스케일.
   const [coverZoomTarget, setCoverZoomTarget] = useState(2);
   // 플립이 도는 동안 뒷면 캔버스를 미리 깨워두는 리빌(0 → 0.4).
@@ -321,6 +331,31 @@ export default function IntroScreen({
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, []);
+
+  // 탭 직후 ~1.3초 동안 타이틀 글자를 주기적으로 재추첨(변이)한다 —
+  // 마지막 상태는 타이틀이 떠오르는 동안 그대로 얼어붙는다.
+  useEffect(() => {
+    if (!engaged || started || debugState) {
+      setTitleMutation(null);
+      return undefined;
+    }
+    const roll = () => setTitleMutation(TITLE_LINES.map((line) => [...line].map((glyph) => ({
+      glyph: TITLE_CONSONANT_PATTERN.test(glyph) && Math.random() < 0.45
+        ? glyph.toUpperCase()
+        : glyph,
+      lime: TITLE_VOWEL_SET.includes(glyph) && Math.random() < 0.45,
+    }))));
+    roll();
+    const interval = window.setInterval(roll, TITLE_MUTATION_INTERVAL_MS);
+    const stop = window.setTimeout(
+      () => window.clearInterval(interval),
+      TITLE_MUTATION_STOP_MS
+    );
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(stop);
+    };
+  }, [debugState, engaged, started]);
 
   // 플립 시작~시퀀스 종점 사이에 뒷면 캔버스의 리빌을 미리 끌어올린다 —
   // 카드가 도는 순간 뒷면에 이미 살아 있는 원판이 보인다.
@@ -613,11 +648,22 @@ export default function IntroScreen({
             aria-label="From Information Architecture to Generative Systems"
           >
             <span className={styles.titleFaceHeadline}>
-              <span>From</span>
-              <span>Information</span>
-              <span>Architecture</span>
-              <span>to Generative</span>
-              <span>Systems</span>
+              {TITLE_LINES.map((line, lineIndex) => (
+                <span key={line}>
+                  {titleMutation
+                    ? titleMutation[lineIndex].map((entry, glyphIndex) => (entry.lime
+                      ? (
+                        <span
+                          key={`${glyphIndex}-${entry.glyph}`}
+                          className={styles.titleGlyphLime}
+                        >
+                          {entry.glyph}
+                        </span>
+                      )
+                      : entry.glyph))
+                    : line}
+                </span>
+              ))}
             </span>
           </div>
         </div>
