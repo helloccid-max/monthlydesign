@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Monthly Design — Archive Atlas</title>
 <style>
+  @font-face{font-family:'Neue Haas Grotesk';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/NeueHaasGrotText-55Roman-Web.woff2') format('woff2'),url('/fonts/NeueHaasGrotText-55Roman-Web.woff') format('woff')}
   html,body{margin:0;height:100%;background:#020702;overflow:hidden}
   canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
   canvas:active{cursor:grabbing}
 </style>
+<script>try{document.fonts.load('9px "Neue Haas Grotesk"')}catch(e){}</script>
 </head>
 <body>
 <canvas id="stage"></canvas>
@@ -301,7 +303,7 @@ function draw(now){
     ctx.strokeStyle=`rgba(214,220,210,${0.05*gridA})`;
     ctx.fillStyle=`rgba(214,220,210,${0.34*gridA})`;
     ctx.lineWidth=1;
-    ctx.font='600 9px Inter, sans-serif';
+    ctx.font='600 9px "Neue Haas Grotesk", Inter, sans-serif';
     ctx.textAlign='center';
     for(let year=1980;year<=2020;year+=10){
       const t=((year-YEAR_MIN)*12)/((YEAR_MAX-YEAR_MIN)*12+11);
@@ -428,7 +430,7 @@ function draw(now){
     const y1=Math.min(YEAR_MAX,Math.round(camYear+halfYears));
     ctx.textAlign='left';
     ctx.fillStyle=`rgba(236,242,232,${0.55*hudA*(1-focus*0.5)})`;
-    ctx.font='700 10px Inter, sans-serif';
+    ctx.font='700 10px "Neue Haas Grotesk", Inter, sans-serif';
     ctx.fillText('ARCHIVE ATLAS · 578 COVERS',vp.x+16,vp.y+vp.h-30);
     ctx.fillStyle=`rgba(214,220,210,${0.4*hudA*(1-focus*0.5)})`;
     ctx.fillText(`IN VIEW ${y0}–${y1}`,vp.x+16,vp.y+vp.h-16);

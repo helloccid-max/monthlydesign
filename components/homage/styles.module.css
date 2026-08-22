@@ -59,7 +59,7 @@
   backdrop-filter: blur(18px) saturate(120%);
   -webkit-backdrop-filter: blur(18px) saturate(120%);
   color: #fff;
-  font-family: Inter, 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
+  font-family: 'Neue Haas Grotesk', 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1;

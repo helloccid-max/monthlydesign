@@ -9,14 +9,6 @@
   unicode-range: U+20, U+acfc, U+ad6c, U+b2e8, U+b3d9, U+b85c, U+bcf4, U+c0dd, U+c11c, U+c131, U+c2a4, U+c2dc, U+c544, U+c5d0, U+c73c, U+c758, U+c815, U+c870, U+cc98, U+d0a4, U+d14d, U+d15c, U+d310, U+d589;
 }
 
-@font-face {
-  font-family: 'Inter Tight';
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url('/fonts/inter-tight-latin-variable.woff2') format('woff2-variations');
-}
-
 .page {
   position: relative;
   width: 100%;
@@ -179,10 +171,10 @@
   display: flex;
   flex-direction: column;
   gap: 0.02em;
-  font-family: 'Inter Tight', Inter, 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
-  /* 화면에 가득 차는 크기, 라이트 웨이트. */
+  font-family: 'Neue Haas Grotesk', 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
+  /* 화면에 가득 차는 크기 — Neue Haas는 55 Roman 단일 웨이트. */
   font-size: clamp(2.4rem, 13.6vw, 5rem);
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.04;
   letter-spacing: 0.004em;
   text-align: center;
@@ -429,7 +421,7 @@
   bottom: clamp(18px, 3.6dvh, 30px);
   margin: 0;
   padding-left: clamp(9px, 2.1vw, 13px);
-  font-family: Inter, 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
+  font-family: 'Neue Haas Grotesk', 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
   font-size: clamp(0.756rem, 3.15vw, 1.116rem);
   font-weight: 650;
   line-height: 1.42;
@@ -468,7 +460,7 @@
   border: 0;
   background: transparent;
   color: rgba(255, 255, 255, 0.96);
-  font-family: 'Inter Tight', Inter, 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
+  font-family: 'Neue Haas Grotesk', 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
   font-size: 0.9757rem;
   font-weight: 400;
   line-height: 1;

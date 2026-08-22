@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Internet Topology 2026 — hyperbolic living map</title>
 <style>
+  @font-face{font-family:'Neue Haas Grotesk';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/NeueHaasGrotText-55Roman-Web.woff2') format('woff2'),url('/fonts/NeueHaasGrotText-55Roman-Web.woff') format('woff')}
   :root{ --bg:#0b0b0c; --panel:#121214; --line:#26262b; --ink:#e8e8ea; --dim:#8b8b93; }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -67,6 +68,7 @@
   #stage{width:100vw;height:100vh;padding:0;overflow:hidden;background:#020702}
   canvas{max-width:none;max-height:none;box-shadow:none;touch-action:none}
 </style>
+<script>try{document.fonts.load('9px "Neue Haas Grotesk"')}catch(e){}</script>
 </head>
 <body>
 
@@ -1593,7 +1595,7 @@ function drawSkitter3D(ctx,W,H,t){
     const roots=GA.anchorIndexes.filter(anchor=>anchor.role!=='edge'&&anchor.role!=='bridge').slice(0,3);
     const shared=GA.anchorIndexes.filter(anchor=>anchor.role==='bridge').slice(0,4);
     ctx.save();
-    ctx.font='500 7px ui-sans-serif, -apple-system, Helvetica Neue, Arial, sans-serif';
+    ctx.font='500 7px "Neue Haas Grotesk", ui-sans-serif, -apple-system, Helvetica Neue, Arial, sans-serif';
     ctx.textBaseline='middle';
     for(const anchor of [...roots,...shared]){
       const i=anchor.index, x=A.px[i], y=A.py[i], z=A.pz[i];

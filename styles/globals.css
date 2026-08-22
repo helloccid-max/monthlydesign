@@ -1,3 +1,15 @@
+/* 라틴 전용 본문 산세리프 — 영문 글리프는 모두 이 서체가 먼저 잡고,
+   한글은 뒤따르는 한국어 폰트로 떨어진다. */
+@font-face {
+  font-family: 'Neue Haas Grotesk';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    url('/fonts/NeueHaasGrotText-55Roman-Web.woff2') format('woff2'),
+    url('/fonts/NeueHaasGrotText-55Roman-Web.woff') format('woff');
+}
+
 *,
 *::before,
 *::after {
@@ -11,8 +23,8 @@ html {
 }
 
 :root {
-  --app-font-family: 'SD Jan', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
-  --ui-sans: 'Inter Tight', Inter, 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --app-font-family: 'Neue Haas Grotesk', 'SD Jan', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  --ui-sans: 'Neue Haas Grotesk', 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
   --editorial-serif: 'Iowan Old Style', 'Bodoni 72', Didot, 'Times New Roman', serif;
   --editorial-sans: var(--ui-sans);
   --editorial-black: #020302;
