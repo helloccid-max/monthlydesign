@@ -5,15 +5,19 @@ import styles from './styles.module.css';
 
 const INTRO_IDLE_MS = 1800;
 const INTRO_AUTO_ADVANCE_ENABLED = false;
-// 표지는 처음부터 중앙에 놓여 있다(진입 연출 없음). 탭 후 잠깐 호흡을 두고
-// 글레어가 지나가면 카드가 뒤집혀 파란 뒷면을 보여준 뒤 틸트 퇴장한다.
-const COVER_CENTER_HOLD_MS = 1200;
-const COVER_GLARE_DELAY_MS = COVER_CENTER_HOLD_MS;
-const COVER_GLARE_DURATION_MS = 1600;
+// 2카드 시퀀스: 첫 화면의 영문 타이틀 카드가 탭에 꿈틀(프레스 팝)한 뒤
+// 회전하며 위로 사라지고, 아래에서 277호 표지가 올라와 뒤집히면
+// 그 뒷면이 시각화 캔버스로 이어진다.
+const TITLE_EXIT_START_MS = 480;
+const TITLE_EXIT_DURATION_MS = 900;
+const COVER_ENTER_START_MS = 750;
+const COVER_ENTER_DURATION_MS = 1150;
+const COVER_GLARE_DELAY_MS = 1750;
+const COVER_GLARE_DURATION_MS = 900;
 // 글레어 시트가 피크를 지나는 순간 바로 뒤집힌다 — 광택이 회전으로 이어진다.
-const COVER_FLIP_START_MS = COVER_GLARE_DELAY_MS + 600;
+const COVER_FLIP_START_MS = 2150;
 const COVER_FLIP_DURATION_MS = 1350;
-const COVER_BACK_HOLD_MS = 2500;
+const COVER_BACK_HOLD_MS = 800;
 const COVER_SEQUENCE_DURATION_MS =
   COVER_FLIP_START_MS + COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS;
 const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
@@ -28,8 +32,6 @@ const INTRO_ASSET_RELEASE_MS = 10000;
 // Loading → Tap to Play 전환: 기본형 타자기 — Loading을 오른쪽부터 지운 뒤
 // Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
 const START_PROMPT_LOADING_TEXT = 'LOADING';
-// 소문자 하나가 왼→오로 자리를 옮겨가는 간격(rAF 프레임 수). 3프레임 ≈ 50ms.
-const LOADING_CASE_CYCLE_FRAMES = 3;
 const START_PROMPT_READY_TEXT = 'Tap to Play';
 const START_PROMPT_ERASE_DURATION_MS = 233;
 const START_PROMPT_TYPE_DURATION_MS = 500;
@@ -289,26 +291,6 @@ export default function IntroScreen({
   }, [coverAssetReady, topologyAssetReady]);
 
   useEffect(() => {
-    if (introAssetsReady) return undefined;
-    let frame = 0;
-    let framesSinceStep = 0;
-    let lowercasePosition = 0;
-    const tick = () => {
-      framesSinceStep += 1;
-      if (framesSinceStep >= LOADING_CASE_CYCLE_FRAMES) {
-        framesSinceStep = 0;
-        const characters = START_PROMPT_LOADING_TEXT.split('');
-        characters[lowercasePosition] = characters[lowercasePosition].toLowerCase();
-        setStartPromptText(characters.join(''));
-        lowercasePosition = (lowercasePosition + 1) % START_PROMPT_LOADING_TEXT.length;
-      }
-      frame = window.requestAnimationFrame(tick);
-    };
-    frame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frame);
-  }, [introAssetsReady]);
-
-  useEffect(() => {
     if (!introAssetsReady) return undefined;
     const startedAt = performance.now();
     // 가속 이징: 처음 몇 글자는 머뭇거리다 갈수록 빨라진다.
@@ -540,8 +522,8 @@ export default function IntroScreen({
   const finalTitleIndent = easeOutQuint(segment(scrubProgress, 0.8, 0.89));
   const finalTranslation = easeOutQuint(segment(scrubProgress, 0.795, 0.88));
   const finalSplitActive = scrubProgress >= 0.745;
-  // 대기 중 슬로우 축소의 종점(0.62)에서 끊김 없이 이어받아 계속 수축한다.
-  const coverExitScale = 0.62 * (1 - 0.2 * coverExitScaleProgress);
+  // 슬로우 축소의 종점(0.64)에서 끊김 없이 이어받아 계속 수축한다.
+  const coverExitScale = 0.64 * (1 - 0.2 * coverExitScaleProgress);
   const coverTransform = `translate3d(0, ${(-132 * coverRise).toFixed(3)}dvh, 0) perspective(1400px) rotateY(${(45 * coverExitSpinProgress).toFixed(3)}deg) scale(${coverExitScale.toFixed(4)})`;
 
   useEffect(() => {
@@ -640,11 +622,38 @@ export default function IntroScreen({
 
         <Grainient className={styles.grainientOverlay} />
 
+        {/* 첫 화면: 영문 타이틀 카드. 탭하면 꿈틀했다가 회전하며 위로 사라진다. */}
+        <div
+          className={styles.titleFilm}
+          style={{
+            '--title-exit-start': `${TITLE_EXIT_START_MS}ms`,
+            '--title-exit-duration': `${TITLE_EXIT_DURATION_MS}ms`,
+          }}
+        >
+          <div
+            className={styles.titleFace}
+            role="img"
+            aria-label="From Information Architecture to Generative Systems"
+          >
+            <span className={styles.titleFaceHeadline}>
+              <span>FROM</span>
+              <span>INFORMATION</span>
+              <span>ARCHITECTURE</span>
+              <span className={styles.titleFaceAccent}>TO GENERATIVE</span>
+              <span className={styles.titleFaceAccent}>SYSTEMS</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 타이틀이 떠난 뒤 아래에서 올라오는 277호 표지 — 뒤집히면 뒷면이
+            시각화 캔버스로 이어진다. */}
         <div
           className={styles.coverFilm}
           style={{
-            '--cover-shrink-delay': `${COVER_FLIP_START_MS + COVER_FLIP_DURATION_MS}ms`,
-            '--cover-back-hold': `${COVER_BACK_HOLD_MS}ms`,
+            '--cover-enter-start': `${COVER_ENTER_START_MS}ms`,
+            '--cover-enter-duration': `${COVER_ENTER_DURATION_MS}ms`,
+            '--cover-shrink-delay': `${COVER_FLIP_START_MS}ms`,
+            '--cover-shrink-duration': `${COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS}ms`,
             ...(started ? { transform: coverTransform } : null),
           }}
         >
@@ -681,7 +690,7 @@ export default function IntroScreen({
               <div
                 className={`${styles.coverFace} ${styles.coverBack}`}
                 role="img"
-                aria-label="추후 다른 표지가 들어갈 파란색 뒷면"
+                aria-label="시각화 캔버스로 이어지는 파란색 뒷면"
               />
             </div>
           </div>

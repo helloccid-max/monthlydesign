@@ -37,11 +37,22 @@
 }
 
 /* 토폴로지 캔버스(불투명) 위에 빛만 얹는 그라디언트 — screen 블렌드라
-   검은 영역은 그대로 두고 블롭의 발광만 더해진다. */
+   검은 영역은 그대로 두고 블롭의 발광만 더해진다.
+   카드가 위로 떠날 때 배경도 카드보다 느리게 따라 올라간다(패럴랙스). */
 .grainientOverlay {
   z-index: 1;
   mix-blend-mode: screen;
   opacity: 0.85;
+  transition: transform 1800ms cubic-bezier(0.3, 0.6, 0.2, 1);
+  will-change: transform;
+}
+
+.page[data-engaged='true'] .grainientOverlay {
+  transform: translate3d(0, -8dvh, 0);
+}
+
+.page[data-started='true'] .grainientOverlay {
+  transform: translate3d(0, -19dvh, 0);
 }
 
 .cyberAtlasBackground {
@@ -76,25 +87,77 @@
   overflow: visible;
   background: transparent;
   translate: -50% -50%;
-  /* 표지는 처음부터 화면 중앙에, 꽉 차지 않게 0.8 크기로 놓여 있다. */
-  transform: translate3d(0, 0, 0) scale(0.8);
+  /* 표지는 화면 아래에서 대기 — 타이틀 카드가 떠난 뒤 올라온다. */
+  transform: translate3d(0, 120dvh, 0) scale(0.68);
   transform-origin: 50% 50%;
   transform-style: preserve-3d;
   will-change: transform;
   pointer-events: none;
 }
 
-/* Tap to Play 순간, 표지를 실제로 누른 것처럼 0.8 → 0.64(눌림) → 0.68(반동)로
-   축소된다. (1→0.8→0.85 비율을 기본 크기 0.8에 맞춰 축소한 값.)
-   data-started='false' 게이트 덕분에 퇴장이 시작되면 애니메이션이 해제되어
-   JS 인라인 퇴장 트랜스폼(0.68에서 이어받음)이 그대로 적용된다. */
-.page[data-engaged='true'][data-started='false'] .coverFilm {
-  /* 프레스 팝 이후, 플립이 끝나 파란 뒷면이 보이는 순간부터 대기 내내
-     0.68 → 0.62로 아주 느리게 계속 축소된다(coverSlowShrink). 퇴장이
-     시작되면(data-started) 해제되고 JS 퇴장 트랜스폼이 0.62를 이어받는다. */
+/* 첫 화면의 영문 타이틀 카드 필름 — 표지 필름과 같은 프레임. */
+.titleFilm {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  width: min(100vw - 0.4em, 74.2778dvh);
+  height: auto;
+  aspect-ratio: 1337 / 1800;
+  overflow: visible;
+  translate: -50% -50%;
+  transform: translate3d(0, 0, 0) scale(0.8);
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+/* 탭: 타이틀이 표지처럼 꿈틀(프레스 팝)했다가 회전하며 위로 사라진다. */
+.page[data-engaged='true'][data-started='false'] .titleFilm {
   animation:
     coverPressPop 560ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards,
-    coverSlowShrink var(--cover-back-hold, 5000ms) linear var(--cover-shrink-delay, 4150ms) forwards;
+    titleExit var(--title-exit-duration, 900ms) cubic-bezier(0.55, 0, 0.3, 1) var(--title-exit-start, 480ms) forwards;
+}
+
+.page[data-started='true'] .titleFilm {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* 탭 이후: 표지가 아래에서 올라와 안착하고, 플립이 시작되면 그때부터
+   0.68 → 0.64로 아주 느리게 계속 축소된다(coverSlowShrink). 퇴장이
+   시작되면(data-started) 해제되고 JS 퇴장 트랜스폼이 0.64를 이어받는다. */
+.page[data-engaged='true'][data-started='false'] .coverFilm {
+  animation:
+    coverEnter var(--cover-enter-duration, 1150ms) cubic-bezier(0.16, 1, 0.3, 1) var(--cover-enter-start, 750ms) forwards,
+    coverSlowShrink var(--cover-shrink-duration, 2150ms) linear var(--cover-shrink-delay, 2150ms) forwards;
+}
+
+/* 영문 타이틀 — 프레임·캡션 없이 메인 타이틀만 중앙 정렬. */
+.titleFace {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.titleFaceHeadline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.02em;
+  font-family: 'Inter Tight', Inter, 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
+  /* 화면에 가득 차는 크기, 라이트 웨이트. */
+  font-size: clamp(2.4rem, 13.6vw, 5rem);
+  font-weight: 300;
+  line-height: 1.04;
+  letter-spacing: 0.004em;
+  text-align: center;
+  color: #f2f5ee;
+}
+
+.titleFaceAccent {
+  color: #a8f22a;
 }
 
 .coverArrivalTilt {
@@ -205,7 +268,29 @@
   }
 
   to {
-    transform: translate3d(0, 0, 0) scale(0.62);
+    transform: translate3d(0, 0, 0) scale(0.64);
+  }
+}
+
+@keyframes coverEnter {
+  from {
+    transform: translate3d(0, 120dvh, 0) scale(0.68);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0) scale(0.68);
+  }
+}
+
+@keyframes titleExit {
+  from {
+    transform: translate3d(0, 0, 0) perspective(1400px) rotateY(0deg) scale(0.68);
+    opacity: 1;
+  }
+
+  to {
+    transform: translate3d(0, -118dvh, 0) perspective(1400px) rotateY(44deg) scale(0.52);
+    opacity: 0;
   }
 }
 
