@@ -10,14 +10,17 @@ const INTRO_AUTO_ADVANCE_ENABLED = false;
 // 표지 상승이 같은 커브·같은 구간으로 동시에 움직인다 — 뷰포인트가 아래층으로
 // 내려가는 카메라 팬. 표지가 뒤집히면 뒷면이 곧 시각화 캔버스(iframe)이고,
 // 카드 창이 줌인되면서 캔버스가 풀스크린을 이어받는다.
-const TITLE_EXIT_START_MS = 500;
+// 타이틀 프레스(꿈틀)는 TAP TO VIEW가 사라지기 직전에 시작한다 —
+// 라임 홀드(1초)가 끝나갈 무렵 눌렸다가 상승으로 이어진다.
+const TITLE_PRESS_DELAY_MS = 950;
+const TITLE_EXIT_START_MS = 1450;
 const TITLE_EXIT_DURATION_MS = 1800;
-const COVER_ENTER_START_MS = 500;
+const COVER_ENTER_START_MS = 1450;
 const COVER_ENTER_DURATION_MS = 1800;
-const COVER_GLARE_DELAY_MS = 2150;
+const COVER_GLARE_DELAY_MS = 3100;
 const COVER_GLARE_DURATION_MS = 900;
 // 글레어 시트가 피크를 지나는 순간 바로 뒤집힌다 — 광택이 회전으로 이어진다.
-const COVER_FLIP_START_MS = 2550;
+const COVER_FLIP_START_MS = 3500;
 const COVER_FLIP_DURATION_MS = 1350;
 const COVER_BACK_HOLD_MS = 400;
 const COVER_SEQUENCE_DURATION_MS =
@@ -638,6 +641,7 @@ export default function IntroScreen({
         <div
           className={styles.titleFilm}
           style={{
+            '--title-press-delay': `${TITLE_PRESS_DELAY_MS}ms`,
             '--title-exit-start': `${TITLE_EXIT_START_MS}ms`,
             '--title-exit-duration': `${TITLE_EXIT_DURATION_MS}ms`,
           }}

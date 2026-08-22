@@ -119,12 +119,12 @@
   pointer-events: none;
 }
 
-/* 탭: 타이틀이 표지처럼 꿈틀(프레스 팝)했다가 — 탭에서 상승 시작까지 0.5초 —
-   회전하며 위로 사라진다. 상승은 표지 상승과 같은 커브·같은 구간. */
+/* 탭: TAP TO VIEW의 라임 홀드가 끝나갈 무렵(--title-press-delay) 타이틀이
+   꿈틀(프레스 팝)하고 곧바로 상승한다. 상승은 표지 상승과 같은 커브·구간. */
 .page[data-engaged='true'][data-started='false'] .titleFilm {
   animation:
-    coverPressPop 500ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards,
-    titleExit var(--title-exit-duration, 1800ms) cubic-bezier(0.55, 0, 0.3, 1) var(--title-exit-start, 500ms) forwards;
+    coverPressPop 500ms cubic-bezier(0.3, 0.6, 0.3, 1) var(--title-press-delay, 950ms) both,
+    titleExit var(--title-exit-duration, 1800ms) cubic-bezier(0.55, 0, 0.3, 1) var(--title-exit-start, 1450ms) forwards;
 }
 
 .page[data-started='true'] .titleFilm {
