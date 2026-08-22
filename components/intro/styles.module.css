@@ -156,13 +156,15 @@
 
 
 
-/* 영문 타이틀 — 프레임·캡션 없이 메인 타이틀만 중앙 정렬. */
+/* 영문 타이틀 — 프레임·캡션 없이 메인 타이틀만 중앙 정렬.
+   세로로는 중앙보다 화면의 8% 위에 앉는다(필름 스케일 0.8 보정: 10dvh×0.8). */
 .titleFace {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  transform: translateY(-10dvh);
 }
 
 .titleFaceHeadline {
