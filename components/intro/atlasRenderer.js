@@ -87,17 +87,18 @@ export default function createAtlasRenderer(canvas, {
       const year = +ys, month = +ms;
       const f = c.features || {};
       const t = ((year - YEAR_MIN) * 12 + (month - 1)) / ((YEAR_MAX - YEAR_MIN) * 12 + 11);
-      /* Y: 밝고 채도 높은 표지가 위, 어둡고 무거운 표지가 아래 */
-      const clusterSpread = ((c.visualCluster ?? 0) / 11 - 0.5) * 0.34;
-      const v = clamp(1 - rankOf[i] / Math.max(1, list.length - 1) + clusterSpread, 0, 1);
+      /* 위치는 순수 데이터: X = 발행 연월(지터 없음), Y = 톤 순위(밝고
+         채도 높은 표지가 위). 랜덤 요소를 걷어내야 축이 그대로 읽힌다. */
+      const v = 1 - rankOf[i] / Math.max(1, list.length - 1);
       return {
         id: c.id, url: atlasThumbUrl(c.id), year, month,
         cluster: c.visualCluster ?? 0,
+        toneRank: rankOf[i],
         complexity: clamp(f.complexity ?? 0.4, 0, 1),
         entropy: clamp(f.entropy ?? 0.4, 0, 1),
         regions: f.regionCount ?? 4,
-        x: MARGIN_X + t * (MAP_W - 2 * MARGIN_X) + (rnd() - 0.5) * 54,
-        y: MARGIN_Y + v * (MAP_H - 2 * MARGIN_Y) + (rnd() - 0.5) * 220,
+        x: MARGIN_X + t * (MAP_W - 2 * MARGIN_X),
+        y: MARGIN_Y + v * (MAP_H - 2 * MARGIN_Y),
         h: COVER_MAP_H * (0.82 + 0.36 * (f.complexity ?? 0.4)),
         aspect: 0.74,
         /* 디스크(유기체) 좌표: 골든앵글 배치 + 중심 밀집 반경 */
@@ -108,41 +109,42 @@ export default function createAtlasRenderer(canvas, {
       };
     });
 
-    /* 겹침 완화: 표지가 이유 없이 포개지지 않도록 서로 밀어낸다.
-       화면 투영 비율(가로 순항 줌 vs 세로 줌)을 반영해 맵 좌표에서
-       필요한 간격을 계산하고, 얕게 겹친 축으로 반씩 민다 — 연도·톤
-       정렬은 소폭 이동 안에서 유지된다. */
+    /* 그리드 배치 — X는 연월 그대로 두고, Y는 톤 순위를 그리드 행으로
+       양자화해 줄을 맞춘다. X가 겹치는 이웃과 행이 충돌하면 목표 행에서
+       가장 가까운 빈 행으로 옮긴다(±1, ±2 …). 정렬은 유지되고 겹침은
+       구조적으로 사라지며, 배치가 랜덤이 아니라 격자로 읽힌다. */
     const kX = Math.max(1e-6, W / TRAVEL_VISIBLE_W);
     const kY = Math.max(1e-6, (H * 0.88) / MAP_H);
     const yFactor = kX / kY;
-    for (let pass = 0; pass < 36; pass++) {
-      let moved = false;
-      for (let a = 0; a < covers.length; a++) {
-        const A = covers[a];
-        for (let b = a + 1; b < covers.length; b++) {
-          const B = covers[b];
-          const needX = (A.h + B.h) * 0.5 * 0.74 + 6;
-          const needY = ((A.h + B.h) * 0.5 + 8) * yFactor;
-          const dx = B.x - A.x, dy = B.y - A.y;
-          const overlapX = needX - Math.abs(dx);
-          if (overlapX <= 0) continue;
-          const overlapY = needY - Math.abs(dy);
-          if (overlapY <= 0) continue;
-          if (overlapX / needX < overlapY / needY) {
-            const shift = (dx >= 0 ? 1 : -1) * overlapX * 0.5;
-            A.x -= shift; B.x += shift;
-          } else {
-            const shift = (dy >= 0 ? 1 : -1) * overlapY * 0.5;
-            A.y -= shift; B.y += shift;
+    const maxCoverH = covers.reduce((m, c) => Math.max(m, c.h), 1);
+    const rowPitch = (maxCoverH + 12) * yFactor;
+    const gridTop = 150, gridBottom = MAP_H - 150;
+    const rows = Math.max(4, Math.floor((gridBottom - gridTop) / rowPitch));
+    const lastRank = Math.max(1, covers.length - 1);
+    const byX = [...covers].sort((a, b) => a.x - b.x);
+    const maxNeedX = maxCoverH * 0.74 + 6;
+    for (let i = 0; i < byX.length; i++) {
+      const c = byX[i];
+      /* 밝은 표지(높은 순위)가 위 행. */
+      const targetRow = Math.round((1 - c.toneRank / lastRank) * (rows - 1));
+      const taken = new Set();
+      for (let j = i - 1; j >= 0; j--) {
+        const p = byX[j];
+        if (c.x - p.x >= maxNeedX) break;
+        if (c.x - p.x < (c.h + p.h) * 0.5 * 0.74 + 6) taken.add(p.gridRow);
+      }
+      let chosen = null;
+      for (let d = 0; d < rows && chosen === null; d++) {
+        const candidates = d === 0 ? [targetRow] : [targetRow + d, targetRow - d];
+        for (const candidate of candidates) {
+          if (candidate >= 0 && candidate < rows && !taken.has(candidate)) {
+            chosen = candidate;
+            break;
           }
-          moved = true;
         }
       }
-      if (!moved) break;
-    }
-    for (const c of covers) {
-      c.x = clamp(c.x, MARGIN_X, MAP_W - MARGIN_X);
-      c.y = clamp(c.y, 60, MAP_H - 60);
+      c.gridRow = chosen === null ? targetRow : chosen;
+      c.y = gridTop + (c.gridRow + 0.5) * ((gridBottom - gridTop) / rows);
     }
 
     /* 디스크 모드의 방사 스포크(코로나 선) — morph되며 사라진다 */
@@ -151,6 +153,7 @@ export default function createAtlasRenderer(canvas, {
       spokes.push({
         a: rnd() * Math.PI * 2, r0: 0.05 + rnd() * 0.18, r1: 0.5 + rnd() * 0.78,
         alpha: 0.05 + rnd() * 0.09, w: rnd() < 0.12 ? 1.05 : 0.6,
+        lime: rnd() < 0.26,
       });
     }
 
@@ -168,7 +171,8 @@ export default function createAtlasRenderer(canvas, {
       const spoke = rnd() < 0.28;
       dots.push({
         x, y, size: 0.6 + rnd() * 1.5, phase: rnd() * Math.PI * 2,
-        lime: rnd() < 0.04, light: 40 + rnd() * 38,
+        /* 라임 비중을 높여 저채도로 쳐지지 않게. */
+        lime: rnd() < 0.14, light: 40 + rnd() * 38,
         diskA: spoke ? (Math.floor(rnd() * 56) / 56) * Math.PI * 2 : rnd() * Math.PI * 2,
         diskU: spoke ? 0.25 + rnd() * 0.95 : Math.pow(Math.abs(rnd() + rnd() - 1), 0.9) * 1.12,
       });
@@ -348,8 +352,9 @@ export default function createAtlasRenderer(canvas, {
     /* 디스크 핵 글로우 — morph되며 사라진다 */
     if (inv > 0.02) {
       const glow = ctx.createRadialGradient(cx, cy, diskR * 0.04, cx, cy, diskR * 0.72);
-      glow.addColorStop(0, `rgba(206,212,200,${0.16 * inv * alpha})`);
-      glow.addColorStop(0.6, `rgba(160,168,158,${0.05 * inv * alpha})`);
+      /* 핵 글로우에 라임 기운 — 유기체에 생기를 준다. */
+      glow.addColorStop(0, `rgba(190,236,90,${0.15 * inv * alpha})`);
+      glow.addColorStop(0.6, `rgba(150,180,110,${0.05 * inv * alpha})`);
       glow.addColorStop(1, 'rgba(96,102,96,0)');
       ctx.fillStyle = glow;
       ctx.fillRect(vp.x, vp.y, vp.w, vp.h);
@@ -377,7 +382,9 @@ export default function createAtlasRenderer(canvas, {
     if (inv > 0.02) {
       for (const s of spokes) {
         const a = s.a + spin;
-        ctx.strokeStyle = `rgba(196,202,192,${s.alpha * inv * alpha})`;
+        ctx.strokeStyle = s.lime
+          ? `rgba(168,242,42,${s.alpha * 1.5 * inv * alpha})`
+          : `rgba(196,202,192,${s.alpha * inv * alpha})`;
         ctx.lineWidth = s.w;
         ctx.beginPath();
         ctx.moveTo(cx + Math.cos(a) * diskR * s.r0, cy + Math.sin(a) * diskR * s.r0 * 0.94);
