@@ -167,21 +167,23 @@ export default function createAtlasRenderer(canvas, {
     v.startedAt = now + (delay || 0); v.duration = Math.max(1, duration || 820);
   }
 
-  /* 연대 스텝핑 스케줄: 0.5초에 슝 넘어가고 1.5초 서행을 반복하며
-     1980→1990→2000→2010을 지나, 2020에서 3초 머문 뒤 처음으로 되돌아간다. */
+  /* 연대 스텝핑 스케줄: 타임라인 morph 순간을 기점으로 1980에서 출발해
+     0.55초 홉 + 2.2초 서행으로 1990→2000→2010을 지나고, 2020 구간을
+     천천히 흐른 뒤 그 자리에 머문다 — 한 번만 재생, 처음으로 되감지 않는다.
+     (총 17초 ≥ 타임라인 노출 15.3초라 인트로가 끝날 때까지 안 돈다.) */
   let SCHEDULE = null;
   function buildSchedule() {
-    const drift = 1500, hop = 500, hold = 3000, back = 900, driftYears = 2.2;
+    const drift = 2200, hop = 550, finalDrift = 6000, driftYears = 2.6;
     const segs = []; let acc = 0;
     for (let i = 0; i < DECADES.length; i++) {
       const year = DECADES[i], last = i === DECADES.length - 1;
       const d = {
-        t0: acc, dur: last ? hold : drift, from: yearT(year),
-        to: yearT(year + (last ? 1.1 : driftYears)), ease: 'lin',
+        t0: acc, dur: last ? finalDrift : drift, from: yearT(year),
+        to: yearT(year + (last ? 3.4 : driftYears)), ease: 'lin',
       };
       segs.push(d); acc += d.dur;
-      const next = last ? DECADES[0] : DECADES[i + 1];
-      const h = { t0: acc, dur: last ? back : hop, from: d.to, to: yearT(next), ease: 'smooth' };
+      if (last) break;
+      const h = { t0: acc, dur: hop, from: d.to, to: yearT(DECADES[i + 1]), ease: 'smooth' };
       segs.push(h); acc += h.dur;
     }
     SCHEDULE = { segs, total: acc };
@@ -192,7 +194,8 @@ export default function createAtlasRenderer(canvas, {
     if (exploring) {
       if (!SCHEDULE) buildSchedule();
       const scale = REDUCE_MOTION ? 1.7 : 1;
-      const elapsed = ((now - explorationStartedAt) / scale) % SCHEDULE.total;
+      /* 클램프 — 스케줄 종점(2020 서행 끝)에 도달하면 그 자리에 머문다. */
+      const elapsed = Math.min((now - explorationStartedAt) / scale, SCHEDULE.total - 1);
       t = SCHEDULE.segs[0].from;
       for (const s of SCHEDULE.segs) {
         if (elapsed >= s.t0 && elapsed < s.t0 + s.dur) {
@@ -546,6 +549,12 @@ export default function createAtlasRenderer(canvas, {
     setFocus(focused, delay = 0, duration = 1280) {
       setView('focus', focused ? 1 : 0, Number(delay) || 0, Number(duration) || 1280);
       setView('morph', focused ? 1 : 0, Number(delay) || 0, focused ? 1000 : 700);
+      // 타임라인이 펼쳐지는 순간을 연대 여정의 기점으로 삼는다 —
+      // 1980에서 출발해 한 번만 순행하고 2020에 머문다.
+      if (focused) {
+        explorationStartedAt = performance.now() + (Number(delay) || 0);
+        explorationDone = false;
+      }
     },
     setLowerCenter(lowered, delay = 0, duration = 1280) {
       setView('lower', lowered ? 1 : 0, Number(delay) || 0, Number(duration) || 1280);

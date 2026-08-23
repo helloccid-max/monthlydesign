@@ -685,6 +685,7 @@ export default function IntroScreen({
           style={{
             '--cover-enter-start': `${COVER_ENTER_START_MS}ms`,
             '--cover-enter-duration': `${COVER_ENTER_DURATION_MS}ms`,
+            '--article-grow-delay': `${ARTICLE_CYCLE_START_MS}ms`,
           }}
         >
           <div className={styles.coverArrivalTilt}>
