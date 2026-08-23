@@ -199,3 +199,56 @@ select {
     transform: rotate(360deg);
   }
 }
+
+/* ---------- 모바일 세로 전용 가드 ----------
+   터치 기기(hover 없음 + coarse 포인터)가 가로로 돌아가면 — 폰 스케일의
+   가로 높이(≤620px)일 때만 — 전체 화면을 덮어 세로 복귀를 요청한다.
+   태블릿·데스크톱 가로 화면은 높이 조건에 걸리지 않아 영향이 없다. */
+.orientationGuard {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 620px) {
+  .orientationGuard {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    background: #020702;
+    color: var(--editorial-bone);
+    text-align: center;
+  }
+
+  .orientationGuard p {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.7;
+    letter-spacing: 0.02em;
+  }
+
+  .orientationGuard p span {
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: rgba(241, 241, 233, 0.55);
+    letter-spacing: 0.05em;
+  }
+
+  /* 세로로 돌아가는 폰 실루엣 */
+  .orientationGuardIcon {
+    width: 44px;
+    height: 28px;
+    border: 2px solid var(--editorial-lime);
+    border-radius: 6px;
+    animation: orientationGuardRotate 1.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes orientationGuardRotate {
+    0%, 18% { transform: rotate(0deg); }
+    58%, 100% { transform: rotate(90deg); }
+  }
+}
