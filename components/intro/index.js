@@ -24,11 +24,11 @@ const TITLE_FADE_DURATION_MS = 1500;
 // 올라온다 — 2.0s 시작, 3.8s 안착.
 const COVER_ENTER_START_MS = 2000;
 const COVER_ENTER_DURATION_MS = 1800;
-// 나래이션이 "하이퍼볼릭"을 처음 말하는 순간(탭 +8.6s)부터 그 호의 특집
-// 지면 8장이 2.8s 간격(회전 0.65s + 대기 2.15s)으로 넘어간다 —
-// 마지막 장 착지 ≈28.85s.
+// 나래이션이 "인터넷의 복잡한 연결 관계를"의 "인터넷"을 말하는 순간
+// (오디오 5.14s → 탭 +6.35s)에 표지가 이미지 1로 넘어가고, 이후 2.8s
+// 간격(회전 0.81s + 대기)으로 8장이 이어진다 — 마지막 착지 ≈26.8s.
 const ARTICLE_PAGE_COUNT = 8;
-const ARTICLE_CYCLE_START_MS = 8600;
+const ARTICLE_CYCLE_START_MS = 6350;
 const ARTICLE_FRAME_MS = 2800;
 const ARTICLE_PAGES = Array.from(
   { length: ARTICLE_PAGE_COUNT },
