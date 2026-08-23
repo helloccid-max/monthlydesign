@@ -25,7 +25,7 @@ const mulberry32 = (s) => () => {
 
 /* ---------- 필드(지도) 좌표계 ---------- */
 const MAP_W = 6200, MAP_H = 1500;
-const MARGIN_X = 260, MARGIN_Y = 210;
+const MARGIN_X = 260, MARGIN_Y = 120;
 const YEAR_MIN = 1976, YEAR_MAX = 2026;
 const TRAVEL_VISIBLE_W = 1200;   /* 순항 고도에서 보이는 필드 폭(맵 단위) */
 const OVERVIEW_VISIBLE_W = 5600; /* 리빌 시작 시 전체 조망 폭 */
@@ -71,23 +71,25 @@ export default function createAtlasRenderer(canvas, {
   /* ---------- 데이터 → 지도 배치 ---------- */
   function buildAtlas(payload) {
     const list = (payload.covers || []).filter((c) => c && c.imageUrl && /^(\d{4})_(\d{2})$/.test(c.id));
-    let lumMin = 1e9, lumMax = -1e9, satMin = 1e9, satMax = -1e9;
-    for (const c of list) {
+    /* 톤(명도·채도 혼합)의 순위 균등화 — 값 분포가 중앙에 몰려 있어도
+       세로축에 고르게 펴진다. 정렬(밝음=위) 자체는 그대로 유지된다. */
+    const tones = list.map((c) => {
       const f = c.features || {};
-      lumMin = Math.min(lumMin, f.luminance ?? 0.5); lumMax = Math.max(lumMax, f.luminance ?? 0.5);
-      satMin = Math.min(satMin, f.saturation ?? 0.5); satMax = Math.max(satMax, f.saturation ?? 0.5);
-    }
+      return clamp((f.luminance ?? 0.5) * 0.62 + (f.saturation ?? 0.5) * 0.38, 0, 1);
+    });
+    const rankOf = new Array(list.length);
+    tones.map((tone, index) => [tone, index])
+      .sort((a, b) => a[0] - b[0])
+      .forEach(([, index], rank) => { rankOf[index] = rank; });
     const rnd = mulberry32(payload.seed || 20260822);
     covers = list.map((c, i) => {
       const [, ys, ms] = /^(\d{4})_(\d{2})$/.exec(c.id);
       const year = +ys, month = +ms;
       const f = c.features || {};
-      const lum = (f.luminance - lumMin) / Math.max(1e-6, lumMax - lumMin);
-      const sat = (f.saturation - satMin) / Math.max(1e-6, satMax - satMin);
       const t = ((year - YEAR_MIN) * 12 + (month - 1)) / ((YEAR_MAX - YEAR_MIN) * 12 + 11);
       /* Y: 밝고 채도 높은 표지가 위, 어둡고 무거운 표지가 아래 */
       const clusterSpread = ((c.visualCluster ?? 0) / 11 - 0.5) * 0.34;
-      const v = clamp(1 - clamp(lum * 0.62 + sat * 0.38, 0, 1) + clusterSpread, 0, 1);
+      const v = clamp(1 - rankOf[i] / Math.max(1, list.length - 1) + clusterSpread, 0, 1);
       return {
         id: c.id, url: atlasThumbUrl(c.id), year, month,
         cluster: c.visualCluster ?? 0,
@@ -289,10 +291,11 @@ export default function createAtlasRenderer(canvas, {
     const visibleW = lerp(OVERVIEW_VISIBLE_W, TRAVEL_VISIBLE_W, smooth(reveal)) / creep;
     const zoom = vp.w / visibleW;
     const cam = cameraCenter(now);
-    /* 스테이트먼트가 위 52.5%를 덮는 동안 투영 중심을 노출 밴드의
-       중앙(아래로 26.25%)에 맞춘다 — 스케일 변화 없는 평행이동. */
     const cx = vp.x + vp.w / 2, cy = vp.y + vp.h / 2 + H * 0.2625 * lower;
-    const toX = (x) => cx + (x - cam.x) * zoom, toY = (y) => cy + (y - cam.y) * zoom;
+    /* 세로는 화면을 채우는 전용 줌 — 색상(톤) 정렬 축이 중앙에 뭉치지 않고
+       화면 높이의 88%에 펼쳐진다. 가로(연대) 줌과는 독립. */
+    const zoomY = (vp.h * 0.88) / MAP_H;
+    const toX = (x) => cx + (x - cam.x) * zoom, toY = (y) => cy + (y - cam.y) * zoomY;
     const alpha = smooth(clamp(reveal * 1.35, 0, 1));
 
     /* morph 0 = 유기체 디스크, 1 = 타임라인. */

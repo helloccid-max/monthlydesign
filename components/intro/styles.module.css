@@ -273,7 +273,7 @@
 .coverCard {
   position: absolute;
   inset: 0;
-  border-radius: 24px;
+  border-radius: 3px;
   box-shadow: 0 28px 72px rgba(0, 0, 0, 0.42);
   transform-style: preserve-3d;
   will-change: transform;
@@ -295,8 +295,8 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  /* 레퍼런스 영상의 라운드 카드 — 화면상 카드 폭의 ~6%. */
-  border-radius: 24px;
+  /* 미미한 라운드 — 3px. */
+  border-radius: 3px;
   background: #020302;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -325,7 +325,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: 3px;
   background: #020302;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -600,9 +600,8 @@
   transition-delay: 1000ms;
 }
 
-/* 스위치를 누른 듯 내려갔다 바로 제자리로 — 라임 전환은 color 트랜지션. */
+/* 스위치를 누른 듯 내려갔다 바로 제자리로 — 색은 화이트 유지. */
 .page[data-engaged='true'] .startPrompt > span {
-  color: var(--editorial-lime);
   animation: promptSwitchPress 380ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
 }
 
