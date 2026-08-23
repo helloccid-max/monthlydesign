@@ -108,6 +108,43 @@ export default function createAtlasRenderer(canvas, {
       };
     });
 
+    /* 겹침 완화: 표지가 이유 없이 포개지지 않도록 서로 밀어낸다.
+       화면 투영 비율(가로 순항 줌 vs 세로 줌)을 반영해 맵 좌표에서
+       필요한 간격을 계산하고, 얕게 겹친 축으로 반씩 민다 — 연도·톤
+       정렬은 소폭 이동 안에서 유지된다. */
+    const kX = Math.max(1e-6, W / TRAVEL_VISIBLE_W);
+    const kY = Math.max(1e-6, (H * 0.88) / MAP_H);
+    const yFactor = kX / kY;
+    for (let pass = 0; pass < 36; pass++) {
+      let moved = false;
+      for (let a = 0; a < covers.length; a++) {
+        const A = covers[a];
+        for (let b = a + 1; b < covers.length; b++) {
+          const B = covers[b];
+          const needX = (A.h + B.h) * 0.5 * 0.74 + 6;
+          const needY = ((A.h + B.h) * 0.5 + 8) * yFactor;
+          const dx = B.x - A.x, dy = B.y - A.y;
+          const overlapX = needX - Math.abs(dx);
+          if (overlapX <= 0) continue;
+          const overlapY = needY - Math.abs(dy);
+          if (overlapY <= 0) continue;
+          if (overlapX / needX < overlapY / needY) {
+            const shift = (dx >= 0 ? 1 : -1) * overlapX * 0.5;
+            A.x -= shift; B.x += shift;
+          } else {
+            const shift = (dy >= 0 ? 1 : -1) * overlapY * 0.5;
+            A.y -= shift; B.y += shift;
+          }
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    for (const c of covers) {
+      c.x = clamp(c.x, MARGIN_X, MAP_W - MARGIN_X);
+      c.y = clamp(c.y, 60, MAP_H - 60);
+    }
+
     /* 디스크 모드의 방사 스포크(코로나 선) — morph되며 사라진다 */
     spokes = [];
     for (let i = 0; i < 88; i++) {
@@ -359,15 +396,15 @@ export default function createAtlasRenderer(canvas, {
     }
 
     /* 표지 위치: 디스크 좌표와 타임라인 좌표를 morph로 보간해 저장.
-       타임라인에서도 정지하지 않는다 — 표지마다 위상이 다른 아주 느린
-       위글(주기 ~11–15초)로 지형이 살아 숨쉰다. */
+       타임라인에서는 제 위치에 정확히 고정된다(위글 없음) — 축의 의미가
+       그대로 읽히게. */
     let centerCover = null, centerDist = 1e9;
     for (const c of covers) {
       const da = c.diskA + spin;
       const dx = cx + Math.cos(da) * diskR * c.diskU;
       const dy = cy + Math.sin(da) * diskR * c.diskU * 0.94 + Math.sin(now * 0.0009 + c.wob) * 3 * inv;
-      c.sx = lerp(dx, toX(c.x), morph) + Math.cos(now * 0.00042 + c.wob * 1.7) * 1.8 * morph;
-      c.sy = lerp(dy, toY(c.y), morph) + Math.sin(now * 0.00058 + c.wob) * 2.4 * morph;
+      c.sx = lerp(dx, toX(c.x), morph);
+      c.sy = lerp(dy, toY(c.y), morph);
     }
 
     /* 연결선 — 양 끝이 함께 morph되므로 유기적 그물이 지형의 실로 풀린다 */
@@ -456,21 +493,20 @@ export default function createAtlasRenderer(canvas, {
       ctx.fillText('ARCHIVE ATLAS · 578 COVERS', vp.x + 16, vp.y + vp.h - 30);
       ctx.fillText(`IN VIEW ${y0}–${y1}`, vp.x + 16, vp.y + vp.h - 16);
 
-      /* 세로축 설명 — Y는 각 표지를 이미지 분석해 얻은 톤(명도·채도)이라는
-         것을 노출 밴드의 위·아래 라벨과 범례 한 줄로 알린다. */
-      const visTop = H * 0.525 * lower;
+      /* 세로축 설명 — 연도 라벨 행과 겹치지 않게 상하단 마진을 3배로
+         띄운다(위 66px, 아래 156px). */
       ctx.font = '600 9px "Neue Haas Grotesk", Inter, sans-serif';
       ctx.fillStyle = `rgba(255,255,255,${hudA})`;
-      ctx.fillText('BRIGHT · SATURATED', vp.x + 16, visTop + 22);
-      ctx.fillText('DARK · MUTED', vp.x + 16, vp.y + vp.h - 52);
+      ctx.fillText('BRIGHT · SATURATED', vp.x + 16, vp.y + 66);
+      ctx.fillText('DARK · MUTED', vp.x + 16, vp.y + vp.h - 156);
       ctx.fillStyle = `rgba(255,255,255,${0.66 * hudA})`;
-      ctx.fillText('Y · LUMINANCE + SATURATION, ANALYZED FROM EACH COVER', vp.x + 16, visTop + 36);
+      ctx.fillText('Y · LUMINANCE + SATURATION, ANALYZED FROM EACH COVER', vp.x + 16, vp.y + 80);
       /* 위–아래를 잇는 가는 축선 */
       ctx.strokeStyle = `rgba(255,255,255,${0.22 * hudA})`;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(vp.x + 10, visTop + 28);
-      ctx.lineTo(vp.x + 10, vp.y + vp.h - 58);
+      ctx.moveTo(vp.x + 10, vp.y + 74);
+      ctx.lineTo(vp.x + 10, vp.y + vp.h - 166);
       ctx.stroke();
     }
 
