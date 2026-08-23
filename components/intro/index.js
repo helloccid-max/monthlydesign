@@ -18,7 +18,10 @@ const INTRO_AUTO_ADVANCE_ENABLED = false;
 // 더했다"가 끝나는 ≈탭 +64.8s에 온다.
 const TITLE_FADE_START_MS = 24400;
 const TITLE_FADE_DURATION_MS = 800;
-const COVER_ENTER_START_MS = 24900;
+// 표지는 나래이션이 "3차원 하이퍼볼릭"을 말하기 직전(탭 +8.3s 발화)에
+// 아래에서 올라온다 — 6.6s 시작, 8.4s 안착. 타이틀(위 8% 지점)이 사라질
+// 때까지 표지 위에 텍스트가 겹쳐 떠 있는 레이어드 구성.
+const COVER_ENTER_START_MS = 6600;
 const COVER_ENTER_DURATION_MS = 1800;
 const COVER_GLARE_DELAY_MS = 26550;
 const COVER_GLARE_DURATION_MS = 900;
