@@ -287,6 +287,10 @@ export default function IntroScreen({
   const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
   // 카드 위에서 넘어가는 특집 지면 인덱스(-1 = 277 표지).
   const [articleFrame, setArticleFrame] = useState(-1);
+  // 플리퍼 양면에 실린 시퀀스 인덱스. 들어오는 면은 이전 스텝이 미리
+  // 실어 두고, 나가는 면은 플립이 끝나 가려진 뒤에야 다음 장으로 바뀐다.
+  const [faceAIndex, setFaceAIndex] = useState(0);
+  const [faceBIndex, setFaceBIndex] = useState(1);
   // 플립이 도는 동안 배경 캔버스를 미리 깨워두는 리빌.
   const [preReveal, setPreReveal] = useState(0);
   const completedRef = useRef(false);
@@ -341,25 +345,41 @@ export default function IntroScreen({
   useEffect(() => {
     if (!engaged || started || debugState) {
       setArticleFrame(-1);
+      setFaceAIndex(0);
+      setFaceBIndex(1);
       return undefined;
     }
     let interval = 0;
+    const faceTimers = [];
+    const lastIndex = PAGE_SEQUENCE.length - 1;
+    const step = (frameIndex) => {
+      setArticleFrame(frameIndex);
+      const position = frameIndex + 1;
+      // 나가는 면(직전 면)은 플립 종료 후 가려진 상태에서 다음 장을 싣는다.
+      faceTimers.push(window.setTimeout(() => {
+        if (position % 2 === 1) setFaceAIndex(Math.min(position + 1, lastIndex));
+        else setFaceBIndex(Math.min(position + 1, lastIndex));
+      }, 720));
+    };
     const startTimer = window.setTimeout(() => {
       let frameIndex = 0;
-      setArticleFrame(0);
+      step(0);
       interval = window.setInterval(() => {
         frameIndex += 1;
         if (frameIndex >= ARTICLE_PAGE_COUNT) {
           window.clearInterval(interval);
           return;
         }
-        setArticleFrame(frameIndex);
+        step(frameIndex);
       }, ARTICLE_FRAME_MS);
     }, ARTICLE_CYCLE_START_MS);
     return () => {
       window.clearTimeout(startTimer);
       window.clearInterval(interval);
+      faceTimers.forEach((timer) => window.clearTimeout(timer));
       setArticleFrame(-1);
+      setFaceAIndex(0);
+      setFaceBIndex(1);
     };
   }, [debugState, engaged, started]);
 
@@ -682,59 +702,44 @@ export default function IntroScreen({
               }}
             >
               <div className={`${styles.coverFace} ${styles.coverFront}`}>
-                {/* 양면 플리퍼: 매 단계 +180° 회전, 숨은 면에 다음 장을
-                    미리 실어 회전이 끝나면 그 장이 정면이 된다. */}
-                {(() => {
-                  const pagePosition = articleFrame + 1;
-                  const lastIndex = PAGE_SEQUENCE.length - 1;
-                  const faceASrc = PAGE_SEQUENCE[
-                    pagePosition % 2 === 0
-                      ? pagePosition
-                      : Math.min(pagePosition + 1, lastIndex)
-                  ];
-                  const faceBSrc = PAGE_SEQUENCE[
-                    pagePosition % 2 === 1
-                      ? pagePosition
-                      : Math.min(pagePosition + 1, lastIndex)
-                  ];
-                  return (
-                    <div
-                      className={styles.pageFlipper}
-                      style={{ transform: `rotateY(${pagePosition * 180}deg)` }}
-                    >
-                      <div className={styles.pageFace}>
-                        <img
-                          className={styles.coverImage}
-                          src={faceASrc}
-                          alt="월간 디자인 2001년 7월호 277호 표지"
-                          loading="eager"
-                          decoding="async"
-                          fetchpriority="high"
-                          onLoad={(event) => {
-                            const image = event.currentTarget;
-                            if (typeof image.decode !== 'function') {
-                              setCoverAssetReady(true);
-                              return;
-                            }
-                            image.decode()
-                              .catch(() => {})
-                              .finally(() => setCoverAssetReady(true));
-                          }}
-                        />
-                      </div>
-                      <div className={`${styles.pageFace} ${styles.pageFaceBack}`}>
-                        <img
-                          className={styles.coverImage}
-                          src={faceBSrc}
-                          alt=""
-                          aria-hidden="true"
-                          loading="eager"
-                          decoding="async"
-                        />
-                      </div>
-                    </div>
-                  );
-                })()}
+                {/* 양면 플리퍼: 매 단계 -180°(우→좌) 회전 — 뒷면에 미리
+                    실린 다음 장이 뒤에서 앞으로 돌아 나온다. 나가는 면은
+                    가려진 뒤에야 교체되어 회전 전반부에도 이전 장이 남는다. */}
+                <div
+                  className={styles.pageFlipper}
+                  style={{ transform: `rotateY(${(articleFrame + 1) * -180}deg)` }}
+                >
+                  <div className={styles.pageFace}>
+                    <img
+                      className={styles.coverImage}
+                      src={PAGE_SEQUENCE[faceAIndex]}
+                      alt="월간 디자인 2001년 7월호 277호 표지"
+                      loading="eager"
+                      decoding="async"
+                      fetchpriority="high"
+                      onLoad={(event) => {
+                        const image = event.currentTarget;
+                        if (typeof image.decode !== 'function') {
+                          setCoverAssetReady(true);
+                          return;
+                        }
+                        image.decode()
+                          .catch(() => {})
+                          .finally(() => setCoverAssetReady(true));
+                      }}
+                    />
+                  </div>
+                  <div className={`${styles.pageFace} ${styles.pageFaceBack}`}>
+                    <img
+                      className={styles.coverImage}
+                      src={PAGE_SEQUENCE[faceBIndex]}
+                      alt=""
+                      aria-hidden="true"
+                      loading="eager"
+                      decoding="async"
+                    />
+                  </div>
+                </div>
               </div>
               <div
                 className={`${styles.coverFace} ${styles.coverBack}`}

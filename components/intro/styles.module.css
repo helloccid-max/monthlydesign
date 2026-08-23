@@ -184,8 +184,8 @@
   letter-spacing: 0.004em;
   text-align: center;
   color: #f2f5ee;
-  /* 등장: 문단 전체가 아래에서 위로 떠오른다(투명도는 줄별로). */
-  animation: titleParagraphIn 1700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* 등장: 줄별 회전보다 0.3초 늦게, 문단 전체가 아래에서 현 위치로 떠오른다. */
+  animation: titleParagraphIn 1700ms cubic-bezier(0.16, 1, 0.3, 1) 300ms both;
 }
 
 /* 등장: 각 줄이 rotateY 90°→0°(모서리에서 펼쳐짐)로 위→아래 순차 등장. */
@@ -248,6 +248,7 @@
 .coverCard {
   position: absolute;
   inset: 0;
+  border-radius: 24px;
   box-shadow: 0 28px 72px rgba(0, 0, 0, 0.42);
   transform-style: preserve-3d;
   will-change: transform;
@@ -282,8 +283,12 @@
 
 .coverFront {
   transform: rotateY(0deg) translateZ(0.1px);
-  /* 내부 페이지 플리퍼의 3D 원근. */
-  perspective: 1200px;
+  /* 내부 페이지 플리퍼의 3D 원근. 클리핑을 풀어야 회전 중 카드 모서리가
+     프레임 밖으로 자연스럽게 튀어나온다 — 양면 카드의 물리감. 라운드
+     클리핑은 pageFace가 각자 갖는다. */
+  overflow: visible;
+  background: transparent;
+  perspective: 900px;
 }
 
 /* 양면 페이지 플리퍼 — 단계마다 +180° 회전하며 다음 장을 드러낸다. */
@@ -303,10 +308,12 @@
   background: #020302;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  /* 얇은 카드 두께 — 앞·뒷면이 2px씩 떠 있어 옆에서 볼 때 몸통이 생긴다. */
+  transform: translateZ(2px);
 }
 
 .pageFaceBack {
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) translateZ(2px);
 }
 
 
