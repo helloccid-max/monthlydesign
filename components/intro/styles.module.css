@@ -131,10 +131,10 @@
   pointer-events: none;
 }
 
-/* 탭: 타이틀은 이동·회전 없이 제자리에 머물다가, 나래이션 1문단이 끝나는
-   지점(--title-fade-start)에서 페이드 아웃만 한다. */
+/* 탭: 타이틀은 제자리에 머물다가, 표지가 안착하는 순간(--title-fade-start)
+   180° 회전하며 위로 올라가 페이드 아웃한다. */
 .page[data-engaged='true'][data-started='false'] .titleFilm {
-  animation: titleFadeOut var(--title-fade-duration, 800ms) cubic-bezier(0.4, 0, 0.6, 1) var(--title-fade-start, 24400ms) forwards;
+  animation: titleFadeOut var(--title-fade-duration, 1500ms) cubic-bezier(0.55, 0, 0.3, 1) var(--title-fade-start, 8000ms) forwards;
 }
 
 .page[data-started='true'] .titleFilm {
@@ -337,10 +337,12 @@
 @keyframes titleFadeOut {
   from {
     opacity: 1;
+    transform: translate3d(0, 0, 0) perspective(1200px) rotateY(0deg) scale(0.8);
   }
 
   to {
     opacity: 0;
+    transform: translate3d(0, -64dvh, 0) perspective(1200px) rotateY(180deg) scale(0.8);
   }
 }
 
