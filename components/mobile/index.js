@@ -10,6 +10,7 @@ import GenerationFlow, {
 } from '@/components/generation';
 import End2Screen from '@/components/end2';
 import { WALL_ENABLED } from '@/lib/featureFlags';
+import { startCoverNarration, stopAllNarration } from '@/lib/narration';
 import { MONTHLY_DESIGN_COVERS } from '@/lib/monthlyDesignCovers';
 import { preloadImageBatch } from '@/lib/preloadImages';
 import styles from './styles.module.css';
@@ -90,6 +91,7 @@ export default function MobileScreen() {
   const [sphereCovers, setSphereCovers] = useState(null);
   const warmCoverArchiveRef = useRef(null);
   const extraWarmCoversRef = useRef(null);
+  const coverNarrationPlayedRef = useRef(false);
   const [qaIndex, setQaIndex] = useState(null);
   const qaStage = qaIndex == null ? null : QA_STAGES[qaIndex];
   const coverTransitionReady = coverPreload.ready || coverPreload.timedOut;
@@ -254,6 +256,16 @@ export default function MobileScreen() {
     );
     return () => window.clearTimeout(timer);
   }, [loadMounted, step, transitioningToLoad]);
+
+  // 나래이션 파트 2(표지 생성 경험·디자이너에게 던지는 질문) — 표지 선택
+  // 화면 첫 도착 시 한 번만. QA 점프에서는 재생하지 않는다.
+  useEffect(() => {
+    if (step !== STEPS.COVER || qaStage || coverNarrationPlayedRef.current) return;
+    coverNarrationPlayedRef.current = true;
+    startCoverNarration();
+  }, [qaStage, step]);
+
+  useEffect(() => () => stopAllNarration(), []);
 
   useEffect(() => {
     if (!transitioningToLoad) return undefined;

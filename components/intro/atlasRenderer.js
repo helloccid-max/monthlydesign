@@ -297,8 +297,9 @@ export default function createAtlasRenderer(canvas, {
     const inv = 1 - morph;
     const breath = 1 + 0.022 * Math.sin(now * 0.0006) * inv; /* 디스크의 호흡 */
     const spin = now * 0.000055 * inv + 0.4;                 /* 디스크의 느린 자전 */
-    /* 스케일 0에서 자라나지 않는다 — 62% 크기에서 등장해 알파와 함께 안착. */
-    const diskR = Math.min(vp.w, vp.h) * 0.56 * (0.62 + 0.38 * smooth(reveal)) * breath * creep;
+    /* 스케일 0에서 자라나지 않는다 — 62% 크기에서 등장해 알파와 함께 안착.
+       확대가 끝나면 화면을 가득 채워도 된다 — 최대변 기준 반경. */
+    const diskR = Math.max(vp.w, vp.h) * 0.54 * (0.62 + 0.38 * smooth(reveal)) * breath * creep;
 
     /* 디스크 핵 글로우 — morph되며 사라진다 */
     if (inv > 0.02) {

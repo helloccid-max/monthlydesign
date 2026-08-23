@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Grainient from '@/components/Grainient';
 import { startRunPodPrewarm } from '@/lib/runpod/prewarmClient';
 import createAtlasRenderer from './atlasRenderer';
+import { startIntroNarration, stopIntroNarration } from '@/lib/narration';
 import styles from './styles.module.css';
 
 const INTRO_IDLE_MS = 1800;
@@ -36,8 +37,12 @@ const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
 const FOCUS_DELAY_MS = 650;
 const FOCUS_DURATION_MS = 820;
 const POST_FOCUS_HOLD_MS = 5200;
-const AUTOPLAY_DURATION_MS = 12000;
-const AUTOPLAY_END_HOLD_MS = 5200;
+// 나래이션(98.5s, 2분할)에 안무를 맞춘다: 파트 1이 탭과 함께 재생되고
+//  - 디스크→타임라인 morph(스테이트먼트)는 2문단 시작(24.7s)에,
+//  - 인트로 종료는 2문단 종료 직후(≈54.6s)에 온다.
+// started(5.25s) + 0.745×26100 ≈ 24.7s / 31.35s + 23300 ≈ 54.65s.
+const AUTOPLAY_DURATION_MS = 26100;
+const AUTOPLAY_END_HOLD_MS = 23300;
 const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
 const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 const INTRO_ASSET_RELEASE_MS = 10000;
@@ -482,6 +487,9 @@ export default function IntroScreen({
     clearIdleExit();
     soundEngineRef.current?.stop();
     soundEngineRef.current = null;
+    // 파트 1은 인트로 종료(54.65s)와 거의 동시에 자연 종료(54.9s)되지만,
+    // QA 점프·리로드 등으로 일찍 떠나는 경우를 정리한다.
+    stopIntroNarration();
   }, [clearIdleExit]);
 
   useEffect(() => {
@@ -566,6 +574,8 @@ export default function IntroScreen({
     if (!engaged) {
       if (!soundEngineRef.current) soundEngineRef.current = createCyberAtlasSoundEngine();
       soundEngineRef.current?.start({ muted: true }).catch(() => {});
+      // 나래이션 파트 1 재생 시작 — 반드시 이 탭 제스처 안에서.
+      startIntroNarration();
       // The call is best-effort: the intro never waits for RunPod or Redis.
       startRunPodPrewarm();
       setEngaged(true);

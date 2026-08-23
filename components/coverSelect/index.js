@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import GlassSurface from '@/components/GlassSurface';
 import { DEFAULT_MONTHLY_DESIGN_COVER, MONTHLY_DESIGN_COVERS } from '@/lib/monthlyDesignCovers';
+import { duckNarration } from '@/lib/narration';
 import { POSTCARD_QUOTE_MAX_CHARS } from '@/lib/postcardQuoteLimit';
 import styles from './styles.module.css';
 
@@ -1575,6 +1576,12 @@ export default function CoverSelectScreen({
   const promptWords = displayedPrompt.trim().split(/\s+/).filter(Boolean);
   const promptLastWord = promptWords.at(-1) || '';
   const promptLeadingText = promptWords.slice(0, -1).join(' ');
+
+  // 마이크 세션(권한 요청 포함) 동안 나래이션을 덕킹해 STT·발화를
+  // 방해하지 않는다. 세션이 끝나면 원래 볼륨으로 돌아온다.
+  useEffect(() => {
+    duckNarration(voiceRecording || voicePermissionRequesting);
+  }, [voicePermissionRequesting, voiceRecording]);
 
   // 세션 종료(에러·유휴 복귀) 시 홀드 타이머를 정리한다. 권한 요청·시작·
   // 청취 상태에서는 유지 — 홀드는 탭부터 morph 시작까지를 덮는다.
