@@ -648,9 +648,11 @@ export default function IntroScreen({
           </div>
         </div>
 
+        {/* 카드 필름 묶음 — started에서 기존 씬 전환 문법대로 좌측으로
+            밀려 나가고, 캔버스가 우측에서 밀고 들어온다. */}
+        <div className={styles.cardFilms}>
         {/* 타이틀이 사라진 뒤 아래에서 올라오는 277호 표지 — 뒤집히면 뒷면
-            (라임 플레이스홀더, 이미지 별도 제공 예정)이 보이고, started에서
-            카드 전체가 페이드 아웃되며 배경 캔버스로 넘어간다. */}
+            (라임 플레이스홀더, 이미지 별도 제공 예정)이 보인다. */}
         <div
           className={styles.coverFilm}
           style={{
@@ -697,6 +699,7 @@ export default function IntroScreen({
               />
             </div>
           </div>
+        </div>
         </div>
 
       </div>

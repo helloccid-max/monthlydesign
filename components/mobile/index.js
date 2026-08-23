@@ -49,10 +49,10 @@ const QA_SCENE_START = {
 const SCENE_TRANSITION_MS = 660;
 const RESULT_TRANSITION_MS = 820;
 // send 확인 글레어 안무가 끝날 때까지 로드 화면 공개를 미룬다:
-// 커밋(send+500ms) 후 6340ms 대기 → send 기준 0.88s 딜레이 + 스윕(1.68s)
-// + 1.8s 쉼 + 스윕(1.68s) + 0.8s 뒤(=6.84s)에 슬라이드가 시작된다.
+// 커밋(send+500ms) 후 5980ms 대기 → send 기준 0.88s 딜레이 + 스윕(1.68s)
+// + 1.44s 쉼 + 스윕(1.68s) + 0.8s 뒤(=6.48s)에 슬라이드가 시작된다.
 // 그 사이 로드 화면은 이미 마운트되어 준비를 마친다.
-const LOAD_REVEAL_DELAY_MS = 6340;
+const LOAD_REVEAL_DELAY_MS = 5980;
 const DESKTOP_COVER_PRELOAD_CONCURRENCY = 4;
 const MOBILE_COVER_PRELOAD_CONCURRENCY = 2;
 const COVER_PRELOAD_RELEASE_MS = 12000;
