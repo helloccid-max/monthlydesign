@@ -28,11 +28,7 @@ const COVER_FLIP_DURATION_MS = 1350;
 const COVER_BACK_HOLD_MS = 400;
 const COVER_SEQUENCE_DURATION_MS =
   COVER_FLIP_START_MS + COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS;
-// 플립 종점의 카드 스케일(coverFlip 키프레임과 일치해야 한다).
-const COVER_FLIP_END_CARD_SCALE = 1.1;
-// 슬로우 축소 종점의 필름 스케일(coverSlowShrink 키프레임과 일치).
-const COVER_REST_FILM_SCALE = 0.64;
-// 플립 중 뒷면(캔버스)이 새까맣지 않도록 미리 올려두는 리빌 수준 —
+// 플립 중 뒷면이 열리는 동안 캔버스가 새까맣지 않도록 미리 올려두는 리빌 —
 // 플립이 끝나는 시점에 램프도 끝나, 뒷면이 열리는 동안 원판이 살아난다.
 const COVER_PRE_REVEAL_TARGET = 0.55;
 const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
@@ -279,16 +275,13 @@ export default function IntroScreen({
   const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
   // 탭 순간의 타이틀 글자 변이 상태 — null이면 원문 그대로.
   const [titleMutation, setTitleMutation] = useState(null);
-  // 카드 창(줌 창)이 뷰포트를 완전히 덮는 데 필요한 카드 전체 스케일.
-  const [coverZoomTarget, setCoverZoomTarget] = useState(2);
-  // 플립이 도는 동안 뒷면 캔버스를 미리 깨워두는 리빌(0 → 0.4).
+  // 플립이 도는 동안 배경 캔버스를 미리 깨워두는 리빌.
   const [preReveal, setPreReveal] = useState(0);
   const completedRef = useRef(false);
   const pendingCompleteRef = useRef(false);
   const atlasCanvasRef = useRef(null);
   const atlasApiRef = useRef(null);
   const atlasHandlersRef = useRef({});
-  const coverFilmRef = useRef(null);
   const scrubProgressRef = useRef(0);
   const soundEngineRef = useRef(null);
   const inactivityTimerRef = useRef(null);
@@ -322,22 +315,6 @@ export default function IntroScreen({
     const timer = window.setTimeout(() => setAssetReleaseExpired(true), INTRO_ASSET_RELEASE_MS);
     return () => window.clearTimeout(timer);
   }, [coverAssetReady, topologyAssetReady]);
-
-  // 카드 레이아웃 크기(트랜스폼 이전)를 기준으로, 창이 뷰포트를 덮는 데
-  // 필요한 스케일을 잰다. 1.02는 반올림 이음새 방지용 오버스캔.
-  useEffect(() => {
-    const measure = () => {
-      const film = coverFilmRef.current;
-      if (!film || !film.offsetWidth || !film.offsetHeight) return;
-      setCoverZoomTarget(Math.max(
-        window.innerWidth / film.offsetWidth,
-        window.innerHeight / film.offsetHeight
-      ) * 1.02);
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, []);
 
   // 탭 직후 ~1.3초 동안 타이틀 글자를 주기적으로 재추첨(변이)한다 —
   // 마지막 상태는 타이틀이 떠오르는 동안 그대로 얼어붙는다.
@@ -584,33 +561,15 @@ export default function IntroScreen({
     continueInteraction();
   }, [continueInteraction, debugState, engaged, introAssetsReady]);
 
-  // 카드가 떠나는 대신 카드 창이 줌인된다. 창(필름×카드) 스케일은
-  // 0.704 → coverZoomTarget으로 열려 뷰포트를 덮고, 그 안의 뷰포트 레이어는
-  // 역스케일로 받쳐 캔버스의 순 스케일이 0.704 → 정확히 1에 도킹한다 —
-  // 줌이 끝나는 순간 캔버스가 픽셀 그대로 풀스크린이 된다.
-  const easeOutCubicIntro = (value) => 1 - ((1 - clamp01(value)) ** 3);
-  const coverZoomProgress = easeOutCubicIntro(segment(scrubProgress, 0, 0.16));
-  const coverWindowBase = COVER_REST_FILM_SCALE * COVER_FLIP_END_CARD_SCALE;
-  const coverWindowScale = coverWindowBase
-    + (coverZoomTarget - coverWindowBase) * coverZoomProgress;
-  const coverNetScale = coverWindowBase + (1 - coverWindowBase) * coverZoomProgress;
-  const coverFilmScale = coverWindowScale / COVER_FLIP_END_CARD_SCALE;
-  const coverInnerScale = coverNetScale / coverWindowScale;
-  // 줌이 끝나면(순 스케일 1) 트랜스폼 체인을 항등의 플랫 풀스크린으로
-  // 스냅한다 — 시각적으로 동일하지만 비정수 스케일 합성에 의한 캔버스
-  // 텍스트 리샘플링 블러가 사라진다.
-  const canvasDocked = started && scrubProgress >= 0.16;
   const topologySoundReady = started && scrubProgress >= TOPOLOGY_SOUND_START_PROGRESS;
   // 플립 중 미리 깨운 리빌(preReveal)에서 이어받아 1까지 채운다.
   const topologyReveal = started
     ? COVER_PRE_REVEAL_TARGET
       + (1 - COVER_PRE_REVEAL_TARGET) * easeHumanImpulse(segment(scrubProgress, 0, 0.26))
     : preReveal;
-  const finalSplit = easeOutQuint(segment(scrubProgress, 0.745, 0.825));
-  const finalTitle = easeOutQuint(segment(scrubProgress, 0.765, 0.855));
-  // 둘째 줄 인덴트는 타이틀이 반쯤 올라온 뒤에야 0에서 서서히 벌어진다.
-  const finalTitleIndent = easeOutQuint(segment(scrubProgress, 0.8, 0.89));
-  const finalTranslation = easeOutQuint(segment(scrubProgress, 0.795, 0.88));
+  // 스테이트먼트(텍스트·라임 분할)는 제거됐다 — 이 지점은 이제 디스크가
+  // 타임라인 지도로 morph되는 트리거로만 남는다(나래이션 "50년의 연대기
+  // 지도" ≈ 탭 +49.5초).
   const finalSplitActive = scrubProgress >= 0.745;
 
   useEffect(() => {
@@ -623,7 +582,8 @@ export default function IntroScreen({
   }, [topologyReveal]);
 
   useEffect(() => {
-    atlasApiRef.current?.setLowerCenter(finalSplitActive, 0, 1280);
+    // 라임 패널이 사라졌으므로 중심 하향(lower)은 보내지 않는다 —
+    // 풀스크린 그대로 morph만 일어난다.
     atlasApiRef.current?.setFocus(finalSplitActive, 0, 1280);
   }, [finalSplitActive]);
 
@@ -635,7 +595,6 @@ export default function IntroScreen({
       data-leaving={leaving ? 'true' : 'false'}
       data-assets-ready={introAssetsReady ? 'true' : 'false'}
       data-debug={debugState ? 'true' : 'false'}
-      data-canvas-docked={canvasDocked ? 'true' : 'false'}
       onClick={handleTap}
       onPointerDown={beginInteraction}
       onPointerMove={continueInteraction}
@@ -644,6 +603,15 @@ export default function IntroScreen({
       onKeyDown={continueInteraction}
     >
       <div className={styles.scene}>
+        {/* 아카이브 아틀라스 — 카드와 분리된 독립 풀스크린 레이어. 트랜스폼
+            없이 항상 1:1로 합성되므로 텍스트가 항상 선명하다. started에서
+            카드가 페이드 아웃되며 이 레이어가 페이드 인으로 이어받는다. */}
+        <canvas
+          ref={atlasCanvasRef}
+          className={styles.atlasCanvas}
+          role="img"
+          aria-label="살아 움직이는 아카이브 아틀라스"
+        />
         <Grainient className={styles.grainientOverlay} />
 
         {/* 첫 화면: 영문 타이틀 카드. 탭하면 꿈틀했다가 회전하며 위로 사라진다. */}
@@ -680,20 +648,16 @@ export default function IntroScreen({
           </div>
         </div>
 
-        {/* 타이틀과 함께 아래에서 올라오는 277호 표지 — 뒤집히면 뒷면이 곧
-            시각화 캔버스(iframe)이고, started 이후 카드 창이 줌인되면서
-            캔버스가 순 스케일 1로 풀스크린을 이어받는다. */}
+        {/* 타이틀이 사라진 뒤 아래에서 올라오는 277호 표지 — 뒤집히면 뒷면
+            (라임 플레이스홀더, 이미지 별도 제공 예정)이 보이고, started에서
+            카드 전체가 페이드 아웃되며 배경 캔버스로 넘어간다. */}
         <div
-          ref={coverFilmRef}
           className={styles.coverFilm}
           style={{
             '--cover-enter-start': `${COVER_ENTER_START_MS}ms`,
             '--cover-enter-duration': `${COVER_ENTER_DURATION_MS}ms`,
             '--cover-shrink-delay': `${COVER_FLIP_START_MS}ms`,
             '--cover-shrink-duration': `${COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS}ms`,
-            ...(started && !canvasDocked
-              ? { transform: `translate3d(0, 0, 0) scale(${coverFilmScale.toFixed(5)})` }
-              : null),
           }}
         >
           <div className={styles.coverArrivalTilt}>
@@ -726,52 +690,14 @@ export default function IntroScreen({
                   }}
                 />
               </div>
-              <div className={`${styles.coverFace} ${styles.coverBack}`}>
-                {/* 카드 창 안에 항상 뷰포트 크기로 사는 캔버스 층 — 창이
-                    줌인될 때 역스케일로 받쳐 캔버스 해상도가 끝까지 1:1이다. */}
-                <div
-                  className={styles.coverBackViewport}
-                  style={started && !canvasDocked
-                    ? { transform: `translate(-50%, -50%) scale(${coverInnerScale.toFixed(5)})` }
-                    : null}
-                >
-                  {/* 아카이브 아틀라스를 부모 문서의 캔버스에 직접 그린다 —
-                      iframe 레이어 래스터 캐시(iOS 블러) 문제가 없다. */}
-                  <canvas
-                    ref={atlasCanvasRef}
-                    className={styles.coverCanvasFrame}
-                    role="img"
-                    aria-label="살아 움직이는 아카이브 아틀라스"
-                  />
-                  <Grainient className={styles.grainientOverlay} />
-                </div>
-              </div>
+              <div
+                className={`${styles.coverFace} ${styles.coverBack}`}
+                role="img"
+                aria-label="표지 뒷면 — 라임 플레이스홀더(이미지 별도 제공 예정)"
+              />
             </div>
           </div>
         </div>
-
-        <section
-          className={styles.statement}
-          aria-label="정보 아키텍처에서 생성 시스템으로"
-          style={{ transform: `translateY(${(-100 + finalSplit * 100).toFixed(3)}%)` }}
-        >
-          <h1
-            style={{
-              transform: `translateY(${(-48 * (1 - finalTitle)).toFixed(2)}px)`,
-              '--title-indent': finalTitleIndent.toFixed(4),
-            }}
-          >
-            <span>정보 아키텍처에서</span>
-            <span>생성 시스템으로</span>
-          </h1>
-          <p
-            className={styles.translation}
-            style={{ transform: `translateY(${(-58 * (1 - finalTranslation)).toFixed(2)}px)` }}
-          >
-            <span>FROM INFORMATION ARCHITECTURE</span>
-            <span>TO GENERATIVE SYSTEMS</span>
-          </p>
-        </section>
 
       </div>
 
