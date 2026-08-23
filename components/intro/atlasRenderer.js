@@ -39,6 +39,10 @@ const atlasThumbUrl = (id) => `/covers/archive-atlas/${id}.webp?v=${ATLAS_THUMB_
 
 const DECADES = [1980, 1990, 2000, 2010, 2020];
 const yearT = (y) => ((y - YEAR_MIN) * 12) / ((YEAR_MAX - YEAR_MIN) * 12 + 11);
+/* 3차 뷰(아트웍 유형 밴드)의 밴드 순서·라벨. */
+const BAND_ORDER = { photo: 0, illustration: 1, typography: 2, cg: 3 };
+const BAND_NAMES = ['PHOTO', 'ILLUSTRATION', 'TYPOGRAPHY', 'CG'];
+const seg01 = (v, a, b) => clamp((v - a) / Math.max(1e-4, b - a), 0, 1);
 
 export default function createAtlasRenderer(canvas, {
   onReady,
@@ -57,6 +61,9 @@ export default function createAtlasRenderer(canvas, {
     lower: { value: 0, from: 0, to: 0, startedAt: 0, duration: 1 },
     /* morph 0 = 유기체 디스크(정보 아키텍처), 1 = 타임라인(생성 시스템). */
     morph: { value: 0, from: 0, to: 0, startedAt: 0, duration: 1 },
+    /* band 0 = 타임라인(톤 축), 1 = 아트웍 유형 밴드(3차 뷰) —
+       전반부는 X 줌아웃, 후반부는 유형별 재정렬. */
+    band: { value: 0, from: 0, to: 0, startedAt: 0, duration: 1 },
   };
   let READY = false;
   let exploring = false, explorationStartedAt = 0, explorationTurns = 1, explorationDone = false;
@@ -93,6 +100,7 @@ export default function createAtlasRenderer(canvas, {
       return {
         id: c.id, url: atlasThumbUrl(c.id), year, month,
         cluster: c.visualCluster ?? 0,
+        bandIndex: BAND_ORDER[c.artworkType] ?? 0,
         toneRank: rankOf[i],
         complexity: clamp(f.complexity ?? 0.4, 0, 1),
         entropy: clamp(f.entropy ?? 0.4, 0, 1),
@@ -146,6 +154,19 @@ export default function createAtlasRenderer(canvas, {
       c.gridRow = chosen === null ? targetRow : chosen;
       c.y = gridTop + (c.gridRow + 0.5) * ((gridBottom - gridTop) / rows);
     }
+
+    /* 3차 뷰: 유형 밴드 내부 세로 위치 — 밴드 안에서도 밝은 표지가 위. */
+    const byBand = new Map();
+    for (const c of covers) {
+      if (!byBand.has(c.bandIndex)) byBand.set(c.bandIndex, []);
+      byBand.get(c.bandIndex).push(c);
+    }
+    byBand.forEach((group) => {
+      group.sort((a, b) => b.toneRank - a.toneRank);
+      group.forEach((c, i) => {
+        c.bandInnerU = group.length > 1 ? i / (group.length - 1) : 0.5;
+      });
+    });
 
     /* 디스크 모드의 방사 스포크(코로나 선) — morph되며 사라진다 */
     spokes = [];
@@ -329,14 +350,21 @@ export default function createAtlasRenderer(canvas, {
       if (!settledAt) settledAt = now;
       creep = 1 + Math.min(0.14, (now - settledAt) * 0.000008) * (1 - focus);
     } else settledAt = 0;
-    const visibleW = lerp(OVERVIEW_VISIBLE_W, TRAVEL_VISIBLE_W, smooth(reveal)) / creep;
+    /* 3차 뷰(유형 밴드): 전반부는 X 줌아웃(Y·텍스트는 그대로), 후반부는
+       유형별 재정렬. */
+    const bandRaw = viewValue('band', now);
+    const bandZoom = smooth(seg01(bandRaw, 0, 0.6));
+    const bandGroup = smooth(seg01(bandRaw, 0.35, 1));
+    let visibleW = lerp(OVERVIEW_VISIBLE_W, TRAVEL_VISIBLE_W, smooth(reveal)) / creep;
+    visibleW = lerp(visibleW, MAP_W * 1.04, bandZoom);
     const zoom = vp.w / visibleW;
     const cam = cameraCenter(now);
+    const camX = lerp(cam.x, MAP_W / 2, bandZoom);
     const cx = vp.x + vp.w / 2, cy = vp.y + vp.h / 2 + H * 0.2625 * lower;
     /* 세로는 화면을 채우는 전용 줌 — 색상(톤) 정렬 축이 중앙에 뭉치지 않고
        화면 높이의 88%에 펼쳐진다. 가로(연대) 줌과는 독립. */
     const zoomY = (vp.h * 0.88) / MAP_H;
-    const toX = (x) => cx + (x - cam.x) * zoom, toY = (y) => cy + (y - cam.y) * zoomY;
+    const toX = (x) => cx + (x - camX) * zoom, toY = (y) => cy + (y - cam.y) * zoomY;
     const alpha = smooth(clamp(reveal * 1.35, 0, 1));
 
     /* morph 0 = 유기체 디스크, 1 = 타임라인. */
@@ -406,12 +434,17 @@ export default function createAtlasRenderer(canvas, {
        타임라인에서는 제 위치에 정확히 고정된다(위글 없음) — 축의 의미가
        그대로 읽히게. */
     let centerCover = null, centerDist = 1e9;
+    const bandsTop = vp.y + vp.h * 0.09;
+    const bandPitch = (vp.h * 0.82) / BAND_NAMES.length;
     for (const c of covers) {
       const da = c.diskA + spin;
       const dx = cx + Math.cos(da) * diskR * c.diskU;
       const dy = cy + Math.sin(da) * diskR * c.diskU * 0.94 + Math.sin(now * 0.0009 + c.wob) * 3 * inv;
+      const bandY = bandsTop + c.bandIndex * bandPitch
+        + (0.16 + 0.68 * (c.bandInnerU ?? 0.5)) * bandPitch;
+      const targetY = lerp(toY(c.y), bandY, bandGroup);
       c.sx = lerp(dx, toX(c.x), morph);
-      c.sy = lerp(dy, toY(c.y), morph);
+      c.sy = lerp(dy, targetY, morph);
     }
 
     /* 연결선 — 양 끝이 함께 morph되므로 유기적 그물이 지형의 실로 풀린다 */
@@ -445,7 +478,8 @@ export default function createAtlasRenderer(canvas, {
       const x = c.sx, y = c.sy;
       const hT = c.h * zoom;
       const hD = 30 * (0.85 + 0.5 * c.complexity) * smooth(reveal);
-      const h = lerp(hD, hT, morph);
+      /* 밴드 뷰에선 최소 크기 바닥을 둬 초소형 화면에서도 이미지로 남는다. */
+      const h = Math.max(lerp(hD, hT, morph), 13 * bandGroup);
       const w = h * c.aspect;
       if (x < vp.x - w || x > vp.x + vp.w + w || y < vp.y - h || y > vp.y + vp.h + h) continue;
       const dc = Math.hypot(x - cx, y - cy);
@@ -500,21 +534,41 @@ export default function createAtlasRenderer(canvas, {
       ctx.fillText('ARCHIVE ATLAS · 578 COVERS', vp.x + 16, vp.y + vp.h - 30);
       ctx.fillText(`IN VIEW ${y0}–${y1}`, vp.x + 16, vp.y + vp.h - 16);
 
-      /* 세로축 설명 — 연도 라벨 행과 겹치지 않게 상하단 마진을 3배로
-         띄운다(위 66px, 아래 156px). */
-      ctx.font = '600 9px "Neue Haas Grotesk", Inter, sans-serif';
-      ctx.fillStyle = `rgba(255,255,255,${hudA})`;
-      ctx.fillText('BRIGHT · SATURATED', vp.x + 16, vp.y + 66);
-      ctx.fillText('DARK · MUTED', vp.x + 16, vp.y + vp.h - 156);
-      ctx.fillStyle = `rgba(255,255,255,${0.66 * hudA})`;
-      ctx.fillText('Y · LUMINANCE + SATURATION, ANALYZED FROM EACH COVER', vp.x + 16, vp.y + 80);
-      /* 위–아래를 잇는 가는 축선 */
-      ctx.strokeStyle = `rgba(255,255,255,${0.22 * hudA})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(vp.x + 10, vp.y + 74);
-      ctx.lineTo(vp.x + 10, vp.y + vp.h - 166);
-      ctx.stroke();
+      /* 세로축 설명(톤) — 밴드 뷰로 넘어가면 페이드 아웃. */
+      const toneA = hudA * (1 - bandGroup);
+      if (toneA > 0.02) {
+        ctx.font = '600 9px "Neue Haas Grotesk", Inter, sans-serif';
+        ctx.fillStyle = `rgba(255,255,255,${toneA})`;
+        ctx.fillText('BRIGHT · SATURATED', vp.x + 16, vp.y + 66);
+        ctx.fillText('DARK · MUTED', vp.x + 16, vp.y + vp.h - 156);
+        ctx.fillStyle = `rgba(255,255,255,${0.66 * toneA})`;
+        ctx.fillText('Y · LUMINANCE + SATURATION, ANALYZED FROM EACH COVER', vp.x + 16, vp.y + 80);
+        ctx.strokeStyle = `rgba(255,255,255,${0.22 * toneA})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(vp.x + 10, vp.y + 74);
+        ctx.lineTo(vp.x + 10, vp.y + vp.h - 166);
+        ctx.stroke();
+      }
+
+      /* 3차 뷰: 아트웍 유형 밴드 라벨·구분선. */
+      if (bandGroup > 0.02) {
+        const bandA = alpha * bandGroup;
+        ctx.font = '600 9px "Neue Haas Grotesk", Inter, sans-serif';
+        for (let i = 0; i < BAND_NAMES.length; i++) {
+          const top = bandsTop + i * bandPitch;
+          ctx.fillStyle = `rgba(255,255,255,${bandA})`;
+          ctx.fillText(BAND_NAMES[i], vp.x + 16, top + 12);
+          if (i > 0) {
+            ctx.strokeStyle = `rgba(255,255,255,${0.1 * bandA})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(vp.x, top);
+            ctx.lineTo(vp.x + vp.w, top);
+            ctx.stroke();
+          }
+        }
+      }
     }
 
     ctx.restore();
@@ -605,6 +659,10 @@ export default function createAtlasRenderer(canvas, {
     },
     setLowerCenter(lowered, delay = 0, duration = 1280) {
       setView('lower', lowered ? 1 : 0, Number(delay) || 0, Number(duration) || 1280);
+    },
+    /* 3차 뷰: 타임라인 이동 중 줌아웃 → 아트웍 유형 밴드로 재정렬. */
+    setBand(active, delay = 0, duration = 3000) {
+      setView('band', active ? 1 : 0, Number(delay) || 0, Number(duration) || 3000);
     },
     startExploration(turns = 1) {
       if (!exploring) { exploring = true; explorationStartedAt = performance.now(); }

@@ -82,12 +82,13 @@
   pointer-events: auto;
 }
 
-/* 카드 필름 묶음 — started에서 좌측으로 밀려 나간다(같은 전환 문법). */
+/* 카드 필름 묶음 — 캔버스(z1)·그라디언트보다 위: 시각화는 카드 뒤에서
+   나온다. */
 .cardFilms {
   position: absolute;
   inset: 0;
+  z-index: 2;
   transform: translate3d(0, 0, 0);
-  transition: transform 660ms cubic-bezier(0.76, 0, 0.24, 1);
   will-change: transform;
   pointer-events: none;
 }

@@ -636,6 +636,13 @@ export default function IntroScreen({
     atlasApiRef.current?.setFocus(finalSplitActive, 0, 1280);
   }, [finalSplitActive]);
 
+  // 3차 뷰(아트웍 유형 밴드): 스크럽 종점(≈56.2s, "아카이브를 자유롭게
+  // 탐색…" 직전)에 타임라인이 이동 중 줌아웃되며 유형 밴드로 재정렬된다.
+  const bandActive = scrubProgress >= 0.995;
+  useEffect(() => {
+    atlasApiRef.current?.setBand(bandActive, 0, 3000);
+  }, [bandActive]);
+
   return (
     <main
       className={styles.page}
