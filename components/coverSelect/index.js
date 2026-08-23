@@ -30,7 +30,10 @@ const SELECTED_ACTION_TRAVEL_PX = 16;
 const RELEASE_EASE_MS = 480;
 const VOICE_LONG_PRESS_MS = 520;
 const SPEECH_SEND_READY_DELAY_MS = 2000;
-const PROMPT_CONFIRM_HOLD_MS = 4000;
+// send 직후 빠르게 커밋해 다음 화면(로딩)이 글레어 2회가 도는 동안
+// 미리 마운트·준비되게 한다. 실제 화면 전환 타이밍은 mobile 쪽
+// LOAD_REVEAL_DELAY_MS가 잡는다 (send +6.84초).
+const PROMPT_CONFIRM_HOLD_MS = 500;
 const FLOCK_SPEED_MULTIPLIER = 2.76;
 const POINTER_SLOW_RADIUS = 168;
 const POINTER_SLOW_MINIMUM = 0.22;

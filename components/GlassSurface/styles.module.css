@@ -146,8 +146,9 @@
     rgba(168, 242, 42, 0.08) 73%,
     transparent 80%
   );
-  /* send 이후의 확인 글레어는 절반 속도(2800→5600ms)로 천천히 지나간다. */
-  animation: confirmGlarePair 5600ms linear 1000ms 1 both;
+  /* send 후 0.88초에 시작 — 스윕(1680ms) → 1.8초 쉼 → 스윕(1680ms).
+     두 번째 스윕 종점 +0.8초에 다음 화면 전환이 걸린다(mobile 쪽 타이밍). */
+  animation: confirmGlarePair 5160ms linear 880ms 1 both;
 }
 
 .red {
@@ -261,26 +262,27 @@
   }
 }
 
+/* 5160ms 기준: 스윕 1680ms(0→32.56%) + 쉼 1800ms(→67.44%) + 스윕 1680ms(→100%). */
 @keyframes confirmGlarePair {
   0% {
     opacity: 1;
     transform: translate3d(-72%, 0, 0);
     animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
-  30% {
+  32.56% {
     opacity: 0;
     transform: translate3d(72%, 0, 0);
   }
-  30.1%, 65.7% {
+  32.66%, 67.34% {
     opacity: 0;
     transform: translate3d(-72%, 0, 0);
   }
-  66% {
+  67.44% {
     opacity: 1;
     transform: translate3d(-72%, 0, 0);
     animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
-  96%, 100% {
+  100% {
     opacity: 0;
     transform: translate3d(72%, 0, 0);
   }
