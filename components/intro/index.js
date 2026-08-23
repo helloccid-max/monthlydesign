@@ -35,11 +35,9 @@ const ARTICLE_PAGES = Array.from(
   (_, index) => `/covers/article-200107/${String(index + 1).padStart(2, '0')}.webp`
 );
 const INTRO_COVER_SRC = '/covers/D277-2001-07-intro.webp';
-// 플립 시퀀스: 277 표지 → 특집 지면 8장. 매 전환마다 카드가 Y축 360°를
-// 이어 돌며, 도는 중반(뒷면 노출 구간)에 뒷면에 실린 다음 장이 보이고
-// 앞면은 가려진 사이 다음 장으로 교체되어 착지한다.
+// 플립 시퀀스: 277 표지 → 특집 지면 8장. 레퍼런스 영상처럼 매 전환마다
+// 카드가 Y축 +180° 돌며 반대 면에 미리 실린 다음 장을 드러낸다.
 const PAGE_SEQUENCE = [INTRO_COVER_SRC, ...ARTICLE_PAGES];
-const PAGE_TURN_MS = 900;
 const COVER_GLARE_DELAY_MS = 26550;
 const COVER_GLARE_DURATION_MS = 900;
 // 글레어 시트가 피크를 지나는 순간 바로 뒤집힌다 — 광택이 회전으로 이어진다.
@@ -289,10 +287,6 @@ export default function IntroScreen({
   const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
   // 카드 위에서 넘어가는 특집 지면 인덱스(-1 = 277 표지).
   const [articleFrame, setArticleFrame] = useState(-1);
-  // 앞면·뒷면에 실린 시퀀스 인덱스 — 앞면은 회전 중반(가려진 사이)에,
-  // 뒷면은 착지 후(안 보일 때)에 갱신된다.
-  const [frontPageIndex, setFrontPageIndex] = useState(0);
-  const [backPageIndex, setBackPageIndex] = useState(1);
   // 플립이 도는 동안 배경 캔버스를 미리 깨워두는 리빌.
   const [preReveal, setPreReveal] = useState(0);
   const completedRef = useRef(false);
@@ -342,51 +336,30 @@ export default function IntroScreen({
     });
   }, []);
 
-  // 표지 안착 후 1문장이 끝나면 특집 지면 8장을 360° 연속 회전으로 넘긴다 —
-  // 마지막 장은 플립 직전까지 유지된다.
+  // "하이퍼볼릭" 첫 발화부터 특집 지면 8장을 180° 플립으로 넘긴다 —
+  // 마지막 장은 카드 플립 직전까지 유지된다.
   useEffect(() => {
     if (!engaged || started || debugState) {
       setArticleFrame(-1);
-      setFrontPageIndex(0);
-      setBackPageIndex(1);
       return undefined;
     }
     let interval = 0;
-    const faceTimers = [];
-    const lastIndex = PAGE_SEQUENCE.length - 1;
-    const step = (frameIndex) => {
-      setArticleFrame(frameIndex);
-      const position = frameIndex + 1;
-      // 앞면은 회전 중반(90–270° 사이, 안 보일 때) 다음 장으로 교체.
-      faceTimers.push(window.setTimeout(
-        () => setFrontPageIndex(Math.min(position, lastIndex)),
-        PAGE_TURN_MS * 0.5
-      ));
-      // 뒷면은 착지 직후(안 보일 때) 그다음 장을 실어 둔다.
-      faceTimers.push(window.setTimeout(
-        () => setBackPageIndex(Math.min(position + 1, lastIndex)),
-        PAGE_TURN_MS + 60
-      ));
-    };
     const startTimer = window.setTimeout(() => {
       let frameIndex = 0;
-      step(0);
+      setArticleFrame(0);
       interval = window.setInterval(() => {
         frameIndex += 1;
         if (frameIndex >= ARTICLE_PAGE_COUNT) {
           window.clearInterval(interval);
           return;
         }
-        step(frameIndex);
+        setArticleFrame(frameIndex);
       }, ARTICLE_FRAME_MS);
     }, ARTICLE_CYCLE_START_MS);
     return () => {
       window.clearTimeout(startTimer);
       window.clearInterval(interval);
-      faceTimers.forEach((timer) => window.clearTimeout(timer));
       setArticleFrame(-1);
-      setFrontPageIndex(0);
-      setBackPageIndex(1);
     };
   }, [debugState, engaged, started]);
 
@@ -709,43 +682,59 @@ export default function IntroScreen({
               }}
             >
               <div className={`${styles.coverFace} ${styles.coverFront}`}>
-                {/* 양면 플리퍼: 매 단계 +360°를 이어 돌며, 도는 중반에는
-                    뒷면의 다음 장이 보이고 앞면은 가려진 사이 교체된다. */}
-                <div
-                  className={styles.pageFlipper}
-                  style={{ transform: `rotateY(${(articleFrame + 1) * 360}deg)` }}
-                >
-                  <div className={styles.pageFace}>
-                    <img
-                      className={styles.coverImage}
-                      src={PAGE_SEQUENCE[frontPageIndex]}
-                      alt="월간 디자인 2001년 7월호 277호 표지"
-                      loading="eager"
-                      decoding="async"
-                      fetchpriority="high"
-                      onLoad={(event) => {
-                        const image = event.currentTarget;
-                        if (typeof image.decode !== 'function') {
-                          setCoverAssetReady(true);
-                          return;
-                        }
-                        image.decode()
-                          .catch(() => {})
-                          .finally(() => setCoverAssetReady(true));
-                      }}
-                    />
-                  </div>
-                  <div className={`${styles.pageFace} ${styles.pageFaceBack}`}>
-                    <img
-                      className={styles.coverImage}
-                      src={PAGE_SEQUENCE[backPageIndex]}
-                      alt=""
-                      aria-hidden="true"
-                      loading="eager"
-                      decoding="async"
-                    />
-                  </div>
-                </div>
+                {/* 양면 플리퍼: 매 단계 +180° 회전, 숨은 면에 다음 장을
+                    미리 실어 회전이 끝나면 그 장이 정면이 된다. */}
+                {(() => {
+                  const pagePosition = articleFrame + 1;
+                  const lastIndex = PAGE_SEQUENCE.length - 1;
+                  const faceASrc = PAGE_SEQUENCE[
+                    pagePosition % 2 === 0
+                      ? pagePosition
+                      : Math.min(pagePosition + 1, lastIndex)
+                  ];
+                  const faceBSrc = PAGE_SEQUENCE[
+                    pagePosition % 2 === 1
+                      ? pagePosition
+                      : Math.min(pagePosition + 1, lastIndex)
+                  ];
+                  return (
+                    <div
+                      className={styles.pageFlipper}
+                      style={{ transform: `rotateY(${pagePosition * 180}deg)` }}
+                    >
+                      <div className={styles.pageFace}>
+                        <img
+                          className={styles.coverImage}
+                          src={faceASrc}
+                          alt="월간 디자인 2001년 7월호 277호 표지"
+                          loading="eager"
+                          decoding="async"
+                          fetchpriority="high"
+                          onLoad={(event) => {
+                            const image = event.currentTarget;
+                            if (typeof image.decode !== 'function') {
+                              setCoverAssetReady(true);
+                              return;
+                            }
+                            image.decode()
+                              .catch(() => {})
+                              .finally(() => setCoverAssetReady(true));
+                          }}
+                        />
+                      </div>
+                      <div className={`${styles.pageFace} ${styles.pageFaceBack}`}>
+                        <img
+                          className={styles.coverImage}
+                          src={faceBSrc}
+                          alt=""
+                          aria-hidden="true"
+                          loading="eager"
+                          decoding="async"
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               <div
                 className={`${styles.coverFace} ${styles.coverBack}`}
