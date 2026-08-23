@@ -770,7 +770,7 @@ export default function IntroScreen({
       {/* 탭 후 TAP TO PLAY가 사라진 자리에 3초간 떠 있는 사운드 안내 —
           나래이션 오디오가 붙을 예정이라 볼륨을 미리 올리게 한다. */}
       <div className={styles.volumeHint} aria-hidden={engaged ? undefined : 'true'}>
-        소리를 켜고 감상해 보세요
+        SOUND ON
       </div>
 
       <button

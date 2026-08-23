@@ -574,8 +574,9 @@
   justify-content: center;
   padding: 0 clamp(12px, 4vw, 22px);
   color: rgba(255, 255, 255, 0.96);
+  font-family: 'Neue Haas Grotesk', 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
   font-size: 0.8586rem;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.1em;
   white-space: nowrap;
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.52);
   opacity: 0;
