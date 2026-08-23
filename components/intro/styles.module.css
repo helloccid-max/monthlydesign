@@ -561,6 +561,55 @@
   50% { opacity: 1; }
 }
 
+/* 사운드 안내 — TAP TO PLAY가 페이드되는 자리(하단 중앙)에 이어서
+   나타나 3초 머문 뒤 사라진다. */
+.volumeHint {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+  z-index: 21;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 clamp(12px, 4vw, 22px);
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 0.8586rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.52);
+  opacity: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.page[data-engaged='true'][data-started='false'] .volumeHint {
+  /* 1.2s 대기(프롬프트 페이드와 교차) → 0.4s 인 → 3s 유지 → 0.4s 아웃 */
+  animation: volumeHintCycle 3800ms cubic-bezier(0.16, 1, 0.3, 1) 1200ms both;
+}
+
+@keyframes volumeHintCycle {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+
+  10.5% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  89.5% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+}
+
 .startPrompt:focus-visible {
   outline: none;
 }

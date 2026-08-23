@@ -52,7 +52,7 @@ const TITLE_MUTATION_STOP_MS = 1300;
 // Loading → Tap to Play 전환: 기본형 타자기 — Loading을 오른쪽부터 지운 뒤
 // Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
 const START_PROMPT_LOADING_TEXT = 'LOADING';
-const START_PROMPT_READY_TEXT = 'TAP TO VIEW';
+const START_PROMPT_READY_TEXT = 'TAP TO PLAY';
 const START_PROMPT_ERASE_DURATION_MS = 233;
 const START_PROMPT_TYPE_DURATION_MS = 500;
 // Mobile image decoding or iframe rendering can occasionally occupy the main
@@ -765,6 +765,12 @@ export default function IntroScreen({
           </p>
         </section>
 
+      </div>
+
+      {/* 탭 후 TAP TO PLAY가 사라진 자리에 3초간 떠 있는 사운드 안내 —
+          나래이션 오디오가 붙을 예정이라 볼륨을 미리 올리게 한다. */}
+      <div className={styles.volumeHint} aria-hidden={engaged ? undefined : 'true'}>
+        소리를 켜고 감상해 보세요
       </div>
 
       <button
