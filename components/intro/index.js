@@ -24,6 +24,16 @@ const TITLE_FADE_DURATION_MS = 1500;
 // 올라온다 — 2.0s 시작, 3.8s 안착.
 const COVER_ENTER_START_MS = 2000;
 const COVER_ENTER_DURATION_MS = 1800;
+// 표지를 설명하는 1문장이 끝나면(탭 +12.5s) 카드 위에서 그 호의 특집
+// 지면 8장이 비디오 컷처럼 순서대로 넘어간다 — 1.8s 간격, 8장이 플립
+// 시작(26.95s) 직전에 끝난다.
+const ARTICLE_PAGE_COUNT = 8;
+const ARTICLE_CYCLE_START_MS = 12600;
+const ARTICLE_FRAME_MS = 1800;
+const ARTICLE_PAGES = Array.from(
+  { length: ARTICLE_PAGE_COUNT },
+  (_, index) => `/covers/article-200107/${String(index + 1).padStart(2, '0')}.webp`
+);
 const COVER_GLARE_DELAY_MS = 26550;
 const COVER_GLARE_DURATION_MS = 900;
 // 글레어 시트가 피크를 지나는 순간 바로 뒤집힌다 — 광택이 회전으로 이어진다.
@@ -279,6 +289,8 @@ export default function IntroScreen({
   const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
   // 탭 순간의 타이틀 글자 변이 상태 — null이면 원문 그대로.
   const [titleMutation, setTitleMutation] = useState(null);
+  // 카드 위에서 넘어가는 특집 지면 인덱스(-1 = 277 표지).
+  const [articleFrame, setArticleFrame] = useState(-1);
   // 플립이 도는 동안 배경 캔버스를 미리 깨워두는 리빌.
   const [preReveal, setPreReveal] = useState(0);
   const completedRef = useRef(false);
@@ -342,6 +354,33 @@ export default function IntroScreen({
     return () => {
       window.clearInterval(interval);
       window.clearTimeout(stop);
+    };
+  }, [debugState, engaged, started]);
+
+  // 표지 안착 후 1문장이 끝나면 특집 지면 8장을 비디오 컷처럼 넘긴다 —
+  // 마지막 장은 플립 직전까지 유지된다.
+  useEffect(() => {
+    if (!engaged || started || debugState) {
+      setArticleFrame(-1);
+      return undefined;
+    }
+    let interval = 0;
+    const startTimer = window.setTimeout(() => {
+      let frameIndex = 0;
+      setArticleFrame(0);
+      interval = window.setInterval(() => {
+        frameIndex += 1;
+        if (frameIndex >= ARTICLE_PAGE_COUNT) {
+          window.clearInterval(interval);
+          return;
+        }
+        setArticleFrame(frameIndex);
+      }, ARTICLE_FRAME_MS);
+    }, ARTICLE_CYCLE_START_MS);
+    return () => {
+      window.clearTimeout(startTimer);
+      window.clearInterval(interval);
+      setArticleFrame(-1);
     };
   }, [debugState, engaged, started]);
 
@@ -695,6 +734,20 @@ export default function IntroScreen({
                       .finally(() => setCoverAssetReady(true));
                   }}
                 />
+                {/* 특집 지면 8장 — 전부 미리 마운트해 디코딩을 끝내 두고,
+                    activeFrame만 하드 컷으로 보여준다(비디오 프레임 감). */}
+                {ARTICLE_PAGES.map((src, index) => (
+                  <img
+                    key={src}
+                    className={styles.articlePage}
+                    src={src}
+                    alt=""
+                    aria-hidden="true"
+                    loading="eager"
+                    decoding="async"
+                    data-active={articleFrame === index ? 'true' : 'false'}
+                  />
+                ))}
               </div>
               <div
                 className={`${styles.coverFace} ${styles.coverBack}`}
