@@ -542,7 +542,7 @@
 }
 
 @keyframes loadingSine {
-  0%, 100% { opacity: 0.32; }
+  0%, 100% { opacity: 0.18; }
   50% { opacity: 1; }
 }
 
