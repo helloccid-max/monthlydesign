@@ -119,12 +119,10 @@
   pointer-events: none;
 }
 
-/* 탭: TAP TO VIEW의 라임 홀드가 끝나갈 무렵(--title-press-delay) 타이틀이
-   꿈틀(프레스 팝)하고 곧바로 상승한다. 상승은 표지 상승과 같은 커브·구간. */
+/* 탭: 타이틀은 이동·회전 없이 제자리에 머물다가, 나래이션 1문단이 끝나는
+   지점(--title-fade-start)에서 페이드 아웃만 한다. */
 .page[data-engaged='true'][data-started='false'] .titleFilm {
-  animation:
-    coverPressPop 500ms cubic-bezier(0.3, 0.6, 0.3, 1) var(--title-press-delay, 950ms) both,
-    titleExit var(--title-exit-duration, 1800ms) cubic-bezier(0.55, 0, 0.3, 1) var(--title-exit-start, 1450ms) forwards;
+  animation: titleFadeOut var(--title-fade-duration, 800ms) cubic-bezier(0.4, 0, 0.6, 1) var(--title-fade-start, 24400ms) forwards;
 }
 
 .page[data-started='true'] .titleFilm {
@@ -358,20 +356,12 @@
   }
 }
 
-@keyframes titleExit {
-  0% {
-    transform: translate3d(0, 0, 0) perspective(1400px) rotateY(0deg) scale(0.68);
+@keyframes titleFadeOut {
+  from {
     opacity: 1;
   }
 
-  /* 팬 후반까지 또렷하게 남아 있어야 표지와 '같이 이동'하는 층으로 읽힌다. */
-  55% {
-    opacity: 0.94;
-  }
-
-  100% {
-    /* 표지와 같은 105dvh 이동 — 같은 거리·같은 커브라야 한 팬으로 읽힌다. */
-    transform: translate3d(0, -105dvh, 0) perspective(1400px) rotateY(44deg) scale(0.52);
+  to {
     opacity: 0;
   }
 }

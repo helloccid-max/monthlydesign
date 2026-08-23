@@ -11,17 +11,19 @@ const INTRO_AUTO_ADVANCE_ENABLED = false;
 // 표지 상승이 같은 커브·같은 구간으로 동시에 움직인다 — 뷰포인트가 아래층으로
 // 내려가는 카메라 팬. 표지가 뒤집히면 뒷면이 곧 시각화 캔버스(iframe)이고,
 // 카드 창이 줌인되면서 캔버스가 풀스크린을 이어받는다.
-// 타이틀 프레스(꿈틀)는 TAP TO VIEW가 사라지기 직전에 시작한다 —
-// 라임 홀드(1초)가 끝나갈 무렵 눌렸다가 상승으로 이어진다.
-const TITLE_PRESS_DELAY_MS = 950;
-const TITLE_EXIT_START_MS = 1450;
-const TITLE_EXIT_DURATION_MS = 1800;
-const COVER_ENTER_START_MS = 1450;
+// 나래이션 동기: 파트 1이 SOUND ON(탭 +1.2s)과 함께 시작되고, 타이틀은
+// 이동 없이 1문단이 끝나는 지점(오디오 23.2s → 탭 +24.4s)에서 페이드만
+// 한다. 표지 시퀀스는 그 뒤를 잇고, 하이퍼볼릭→타임라인 morph는
+// "50년의 연대기 지도" 문장(≈탭 +49.5s)에, 인트로 종료는 "경험을
+// 더했다"가 끝나는 ≈탭 +64.8s에 온다.
+const TITLE_FADE_START_MS = 24400;
+const TITLE_FADE_DURATION_MS = 800;
+const COVER_ENTER_START_MS = 24900;
 const COVER_ENTER_DURATION_MS = 1800;
-const COVER_GLARE_DELAY_MS = 3100;
+const COVER_GLARE_DELAY_MS = 26550;
 const COVER_GLARE_DURATION_MS = 900;
 // 글레어 시트가 피크를 지나는 순간 바로 뒤집힌다 — 광택이 회전으로 이어진다.
-const COVER_FLIP_START_MS = 3500;
+const COVER_FLIP_START_MS = 26950;
 const COVER_FLIP_DURATION_MS = 1350;
 const COVER_BACK_HOLD_MS = 400;
 const COVER_SEQUENCE_DURATION_MS =
@@ -37,12 +39,9 @@ const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
 const FOCUS_DELAY_MS = 650;
 const FOCUS_DURATION_MS = 820;
 const POST_FOCUS_HOLD_MS = 5200;
-// 나래이션(98.5s, 2분할)에 안무를 맞춘다: 파트 1이 탭과 함께 재생되고
-//  - 디스크→타임라인 morph(스테이트먼트)는 2문단 시작(24.7s)에,
-//  - 인트로 종료는 2문단 종료 직후(≈54.6s)에 온다.
-// started(5.25s) + 0.745×26100 ≈ 24.7s / 31.35s + 23300 ≈ 54.65s.
-const AUTOPLAY_DURATION_MS = 26100;
-const AUTOPLAY_END_HOLD_MS = 23300;
+// started(28.7s) + 0.745×27900 ≈ 49.5s(morph) / 56.6s + 8200 ≈ 64.8s(종료).
+const AUTOPLAY_DURATION_MS = 27900;
+const AUTOPLAY_END_HOLD_MS = 8200;
 const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
 const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 const INTRO_ASSET_RELEASE_MS = 10000;
@@ -651,9 +650,8 @@ export default function IntroScreen({
         <div
           className={styles.titleFilm}
           style={{
-            '--title-press-delay': `${TITLE_PRESS_DELAY_MS}ms`,
-            '--title-exit-start': `${TITLE_EXIT_START_MS}ms`,
-            '--title-exit-duration': `${TITLE_EXIT_DURATION_MS}ms`,
+            '--title-fade-start': `${TITLE_FADE_START_MS}ms`,
+            '--title-fade-duration': `${TITLE_FADE_DURATION_MS}ms`,
           }}
         >
           <div
