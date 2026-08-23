@@ -65,16 +65,20 @@
   width: 100%;
   height: 100%;
   background: #020702;
-  /* 기존 씬 전환 문법: 우측 대기 → started에서 좌측으로 밀고 들어온다. */
-  transform: translate3d(100%, 0, 0);
-  transition: transform 660ms cubic-bezier(0.76, 0, 0.24, 1);
-  will-change: transform;
+  /* 작은 크기에서 화면 가득 확대되며 이어받는다. */
+  transform: scale(0.3);
+  opacity: 0;
+  transition:
+    transform 1700ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 500ms ease;
+  will-change: transform, opacity;
   touch-action: none;
   pointer-events: none;
 }
 
 .page[data-started='true'] .atlasCanvas {
-  transform: translate3d(0, 0, 0);
+  transform: scale(1);
+  opacity: 1;
   pointer-events: auto;
 }
 
@@ -86,10 +90,6 @@
   transition: transform 660ms cubic-bezier(0.76, 0, 0.24, 1);
   will-change: transform;
   pointer-events: none;
-}
-
-.page[data-started='true'] .cardFilms {
-  transform: translate3d(-100%, 0, 0);
 }
 
 .coverFilm {
@@ -142,12 +142,25 @@
   visibility: hidden;
 }
 
-/* 탭 이후: 타이틀 페이드가 끝날 무렵 표지가 아래에서 올라와 안착하고,
-   플립이 시작되면 0.68 → 0.64로 아주 느리게 계속 축소된다(coverSlowShrink). */
+/* 탭 이후: 타이틀 페이드가 끝날 무렵 표지가 아래에서 올라와 안착한다. */
 .page[data-engaged='true'][data-started='false'] .coverFilm {
-  animation:
-    coverEnter var(--cover-enter-duration, 1800ms) cubic-bezier(0.55, 0, 0.3, 1) var(--cover-enter-start, 500ms) forwards,
-    coverSlowShrink var(--cover-shrink-duration, 1750ms) linear var(--cover-shrink-delay, 2550ms) forwards;
+  animation: coverEnter var(--cover-enter-duration, 1800ms) cubic-bezier(0.55, 0, 0.3, 1) var(--cover-enter-start, 500ms) forwards;
+}
+
+/* started: 8장 넘김이 끝난 카드가 회전하며 위로 상승해 떠나고, 그 사이
+   캔버스가 작은 크기에서 화면 가득 확대되어 이어받는다. */
+.page[data-started='true'] .coverFilm {
+  animation: coverExitRise 1500ms cubic-bezier(0.55, 0, 0.3, 1) forwards;
+}
+
+@keyframes coverExitRise {
+  from {
+    transform: translate3d(0, 0, 0) perspective(1400px) rotateY(0deg) scale(0.68);
+  }
+
+  to {
+    transform: translate3d(0, -125dvh, 0) perspective(1400px) rotateY(38deg) scale(0.56);
+  }
 }
 
 
@@ -157,8 +170,6 @@
 .page[data-debug='true'] .coverFilm {
   animation: none;
 }
-
-
 
 /* 영문 타이틀 — 프레임·캡션 없이 메인 타이틀만 중앙 정렬.
    세로로는 중앙보다 화면의 8% 위에 앉는다(필름 스케일 0.8 보정: 10dvh×0.8). */
@@ -266,10 +277,6 @@
   -webkit-backface-visibility: hidden;
 }
 
-.page[data-engaged='true'] .coverCard {
-  animation: coverFlip var(--cover-flip-duration, 1350ms) cubic-bezier(0.72, 0, 0.18, 1) var(--cover-flip-delay, 4000ms) forwards;
-}
-
 .coverFace {
   position: absolute;
   inset: 0;
@@ -316,14 +323,6 @@
   transform: rotateY(180deg) translateZ(2px);
 }
 
-
-
-.coverBack {
-  /* 뒷면 이미지 제공 전까지의 라임 플레이스홀더. */
-  background: var(--editorial-lime);
-  transform: rotateY(180deg) translateZ(0.1px);
-}
-
 .coverImage {
   display: block;
   width: 100%;
@@ -348,16 +347,6 @@
   }
 }
 
-@keyframes coverSlowShrink {
-  from {
-    transform: translate3d(0, 0, 0) scale(0.68);
-  }
-
-  to {
-    transform: translate3d(0, 0, 0) scale(0.64);
-  }
-}
-
 @keyframes coverEnter {
   from {
     transform: translate3d(0, 105dvh, 0) scale(0.68);
@@ -377,34 +366,6 @@
   to {
     opacity: 0;
     transform: translate3d(0, -64dvh, 0) perspective(1200px) rotateY(180deg) scale(0.8);
-  }
-}
-
-@keyframes coverFlip {
-  0% {
-    transform: perspective(1400px) rotateY(0deg) scale(1);
-  }
-
-  100% {
-    transform: perspective(1400px) rotateY(180deg) scale(1.1);
-  }
-}
-
-@keyframes coverGeneratedSignal {
-  0%,
-  100% {
-    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
-    opacity: 0;
-  }
-
-  42% {
-    box-shadow: 0 0 18px rgba(255, 255, 255, 0.1);
-    opacity: 0.68;
-  }
-
-  82% {
-    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
-    opacity: 0;
   }
 }
 

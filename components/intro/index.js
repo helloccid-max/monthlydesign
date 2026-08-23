@@ -38,14 +38,12 @@ const INTRO_COVER_SRC = '/covers/D277-2001-07-intro.webp';
 // 플립 시퀀스: 277 표지 → 특집 지면 8장. 레퍼런스 영상처럼 매 전환마다
 // 카드가 Y축 +180° 돌며 반대 면에 미리 실린 다음 장을 드러낸다.
 const PAGE_SEQUENCE = [INTRO_COVER_SRC, ...ARTICLE_PAGES];
-const COVER_GLARE_DELAY_MS = 26550;
-const COVER_GLARE_DURATION_MS = 900;
-// 글레어 시트가 피크를 지나는 순간 바로 뒤집힌다 — 광택이 회전으로 이어진다.
-const COVER_FLIP_START_MS = 26950;
-const COVER_FLIP_DURATION_MS = 1350;
-const COVER_BACK_HOLD_MS = 400;
-const COVER_SEQUENCE_DURATION_MS =
-  COVER_FLIP_START_MS + COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS;
+// 8장 페이지 넘김이 끝나면(마지막 착지 ≈21.85s) 잠시 숨을 고른 뒤,
+// 카드가 위로 회전 상승하며 떠나고 하이퍼볼릭 캔버스가 작은 크기에서
+// 화면 가득 확대되어 이어받는다.
+const COVER_SEQUENCE_DURATION_MS = 22600;
+// 캔버스가 나타나기 전 리빌을 미리 끌어올리는 램프 시작점.
+const PRE_REVEAL_START_MS = 20500;
 // 플립 중 뒷면이 열리는 동안 캔버스가 새까맣지 않도록 미리 올려두는 리빌 —
 // 플립이 끝나는 시점에 램프도 끝나, 뒷면이 열리는 동안 원판이 살아난다.
 const COVER_PRE_REVEAL_TARGET = 0.55;
@@ -53,9 +51,9 @@ const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
 const FOCUS_DELAY_MS = 650;
 const FOCUS_DURATION_MS = 820;
 const POST_FOCUS_HOLD_MS = 5200;
-// started(28.7s) + 0.745×27900 ≈ 49.5s(morph) / 56.6s + 8200 ≈ 64.8s(종료).
-const AUTOPLAY_DURATION_MS = 27900;
-const AUTOPLAY_END_HOLD_MS = 8200;
+// started(22.6s) + 0.745×36100 ≈ 49.5s(morph) / 58.7s + 6100 ≈ 64.8s(종료).
+const AUTOPLAY_DURATION_MS = 36100;
+const AUTOPLAY_END_HOLD_MS = 6100;
 const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
 const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 const INTRO_ASSET_RELEASE_MS = 10000;
@@ -388,10 +386,10 @@ export default function IntroScreen({
   useEffect(() => {
     if (!engaged || started || debugState) return undefined;
     const startedAt = performance.now();
-    const rampDuration = COVER_FLIP_DURATION_MS;
+    const rampDuration = COVER_SEQUENCE_DURATION_MS - PRE_REVEAL_START_MS;
     let frame = 0;
     const tick = (now) => {
-      const progress = clamp01((now - startedAt - COVER_FLIP_START_MS) / rampDuration);
+      const progress = clamp01((now - startedAt - PRE_REVEAL_START_MS) / rampDuration);
       setPreReveal(COVER_PRE_REVEAL_TARGET * (1 - ((1 - progress) ** 3)));
       if (progress < 1) frame = window.requestAnimationFrame(tick);
     };
@@ -687,19 +685,11 @@ export default function IntroScreen({
           style={{
             '--cover-enter-start': `${COVER_ENTER_START_MS}ms`,
             '--cover-enter-duration': `${COVER_ENTER_DURATION_MS}ms`,
-            '--cover-shrink-delay': `${COVER_FLIP_START_MS}ms`,
-            '--cover-shrink-duration': `${COVER_FLIP_DURATION_MS + COVER_BACK_HOLD_MS}ms`,
           }}
         >
           <div className={styles.coverArrivalTilt}>
             <div
               className={styles.coverCard}
-              style={{
-                '--cover-flip-delay': `${COVER_FLIP_START_MS}ms`,
-                '--cover-flip-duration': `${COVER_FLIP_DURATION_MS}ms`,
-                '--cover-glare-delay': `${COVER_GLARE_DELAY_MS}ms`,
-                '--cover-glare-duration': `${COVER_GLARE_DURATION_MS}ms`,
-              }}
             >
               <div className={`${styles.coverFace} ${styles.coverFront}`}>
                 {/* 양면 플리퍼: 매 단계 -180°(우→좌) 회전 — 뒷면에 미리
@@ -741,11 +731,6 @@ export default function IntroScreen({
                   </div>
                 </div>
               </div>
-              <div
-                className={`${styles.coverFace} ${styles.coverBack}`}
-                role="img"
-                aria-label="표지 뒷면 — 라임 플레이스홀더(이미지 별도 제공 예정)"
-              />
             </div>
           </div>
         </div>
