@@ -312,12 +312,13 @@
   perspective: 900px;
 }
 
-/* 양면 페이지 플리퍼 — 단계마다 +180° 회전하며 다음 장을 드러낸다. */
+/* 양면 페이지 플리퍼 — 단계마다 -180° 회전하며 다음 장을 드러낸다.
+   회전 속도는 0.8배(650→810ms)로 여유 있게. */
 .pageFlipper {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  transition: transform 650ms cubic-bezier(0.72, 0, 0.18, 1);
+  transition: transform 810ms cubic-bezier(0.72, 0, 0.18, 1);
   will-change: transform;
 }
 

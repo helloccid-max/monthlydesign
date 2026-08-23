@@ -342,9 +342,14 @@ export default function IntroScreen({
   // 마지막 장은 카드 플립 직전까지 유지된다.
   useEffect(() => {
     if (!engaged || started || debugState) {
-      setArticleFrame(-1);
-      setFaceAIndex(0);
-      setFaceBIndex(1);
+      // started로 넘어갈 때는 플리퍼 회전 상태를 그대로 둔다 — 리셋하면
+      // 누적 회전(-1440°)이 0°로 트랜지션되며 퇴장 중 카드가 마구 돈다.
+      // 처음(유휴)으로 돌아가는 경우에만 초기화한다.
+      if (!engaged || debugState) {
+        setArticleFrame(-1);
+        setFaceAIndex(0);
+        setFaceBIndex(1);
+      }
       return undefined;
     }
     let interval = 0;
@@ -353,11 +358,12 @@ export default function IntroScreen({
     const step = (frameIndex) => {
       setArticleFrame(frameIndex);
       const position = frameIndex + 1;
-      // 나가는 면(직전 면)은 플립 종료 후 가려진 상태에서 다음 장을 싣는다.
+      // 나가는 면(직전 면)은 플립(810ms) 종료 후 가려진 상태에서
+      // 다음 장을 싣는다.
       faceTimers.push(window.setTimeout(() => {
         if (position % 2 === 1) setFaceAIndex(Math.min(position + 1, lastIndex));
         else setFaceBIndex(Math.min(position + 1, lastIndex));
-      }, 720));
+      }, 880));
     };
     const startTimer = window.setTimeout(() => {
       let frameIndex = 0;
@@ -375,9 +381,6 @@ export default function IntroScreen({
       window.clearTimeout(startTimer);
       window.clearInterval(interval);
       faceTimers.forEach((timer) => window.clearTimeout(timer));
-      setArticleFrame(-1);
-      setFaceAIndex(0);
-      setFaceBIndex(1);
     };
   }, [debugState, engaged, started]);
 
