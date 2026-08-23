@@ -24,20 +24,22 @@ const TITLE_FADE_DURATION_MS = 1500;
 // 올라온다 — 2.0s 시작, 3.8s 안착.
 const COVER_ENTER_START_MS = 2000;
 const COVER_ENTER_DURATION_MS = 1800;
-// 표지를 설명하는 1문장이 끝나면(탭 +12.5s) 카드 위에서 그 호의 특집
-// 지면 8장이 비디오 컷처럼 순서대로 넘어간다 — 1.8s 간격, 8장이 플립
-// 시작(26.95s) 직전에 끝난다.
+// 나래이션이 "하이퍼볼릭"을 처음 말하는 순간(탭 +8.6s)부터 그 호의 특집
+// 지면 8장이 1.8s 간격 360° 회전으로 순서대로 넘어가고, 마지막 장은
+// 카드 플립(26.95s)까지 유지된다.
 const ARTICLE_PAGE_COUNT = 8;
-const ARTICLE_CYCLE_START_MS = 12600;
+const ARTICLE_CYCLE_START_MS = 8600;
 const ARTICLE_FRAME_MS = 1800;
 const ARTICLE_PAGES = Array.from(
   { length: ARTICLE_PAGE_COUNT },
   (_, index) => `/covers/article-200107/${String(index + 1).padStart(2, '0')}.webp`
 );
 const INTRO_COVER_SRC = '/covers/D277-2001-07-intro.webp';
-// 플립 시퀀스: 277 표지 → 특집 지면 8장. 매 전환마다 카드가 Y축 180°
-// 회전하며(레퍼런스 영상과 동일) 반대 면에 미리 실린 다음 장을 드러낸다.
+// 플립 시퀀스: 277 표지 → 특집 지면 8장. 매 전환마다 카드가 Y축 360°를
+// 이어 돌며, 도는 중반(뒷면 노출 구간)에 뒷면에 실린 다음 장이 보이고
+// 앞면은 가려진 사이 다음 장으로 교체되어 착지한다.
 const PAGE_SEQUENCE = [INTRO_COVER_SRC, ...ARTICLE_PAGES];
+const PAGE_TURN_MS = 900;
 const COVER_GLARE_DELAY_MS = 26550;
 const COVER_GLARE_DURATION_MS = 900;
 // 글레어 시트가 피크를 지나는 순간 바로 뒤집힌다 — 광택이 회전으로 이어진다.
@@ -59,13 +61,7 @@ const AUTOPLAY_END_HOLD_MS = 8200;
 const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
 const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 const INTRO_ASSET_RELEASE_MS = 10000;
-// 탭 순간 타이틀 글자가 변이한다: 한글 독음의 초성에 해당하는 자음은
-// 랜덤 대문자로, 모음(y 포함 — '시스템스'의 ㅣ)은 랜덤 라임으로.
 const TITLE_LINES = ['From', 'Information', 'Architecture', 'to Generative', 'Systems'];
-const TITLE_VOWEL_SET = 'aeiouyAEIOUY';
-const TITLE_CONSONANT_PATTERN = /[b-df-hj-np-tv-xz]/;
-const TITLE_MUTATION_INTERVAL_MS = 140;
-const TITLE_MUTATION_STOP_MS = 1300;
 
 // Loading → Tap to Play 전환: 기본형 타자기 — Loading을 오른쪽부터 지운 뒤
 // Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
@@ -291,10 +287,12 @@ export default function IntroScreen({
   const [coverAssetReady, setCoverAssetReady] = useState(false);
   const [topologyAssetReady, setTopologyAssetReady] = useState(false);
   const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
-  // 탭 순간의 타이틀 글자 변이 상태 — null이면 원문 그대로.
-  const [titleMutation, setTitleMutation] = useState(null);
   // 카드 위에서 넘어가는 특집 지면 인덱스(-1 = 277 표지).
   const [articleFrame, setArticleFrame] = useState(-1);
+  // 앞면·뒷면에 실린 시퀀스 인덱스 — 앞면은 회전 중반(가려진 사이)에,
+  // 뒷면은 착지 후(안 보일 때)에 갱신된다.
+  const [frontPageIndex, setFrontPageIndex] = useState(0);
+  const [backPageIndex, setBackPageIndex] = useState(1);
   // 플립이 도는 동안 배경 캔버스를 미리 깨워두는 리빌.
   const [preReveal, setPreReveal] = useState(0);
   const completedRef = useRef(false);
@@ -336,31 +334,6 @@ export default function IntroScreen({
     return () => window.clearTimeout(timer);
   }, [coverAssetReady, topologyAssetReady]);
 
-  // 탭 직후 ~1.3초 동안 타이틀 글자를 주기적으로 재추첨(변이)한다 —
-  // 마지막 상태는 타이틀이 떠오르는 동안 그대로 얼어붙는다.
-  useEffect(() => {
-    if (!engaged || started || debugState) {
-      setTitleMutation(null);
-      return undefined;
-    }
-    const roll = () => setTitleMutation(TITLE_LINES.map((line) => [...line].map((glyph) => ({
-      glyph: TITLE_CONSONANT_PATTERN.test(glyph) && Math.random() < 0.45
-        ? glyph.toUpperCase()
-        : glyph,
-      lime: TITLE_VOWEL_SET.includes(glyph) && Math.random() < 0.45,
-    }))));
-    roll();
-    const interval = window.setInterval(roll, TITLE_MUTATION_INTERVAL_MS);
-    const stop = window.setTimeout(
-      () => window.clearInterval(interval),
-      TITLE_MUTATION_STOP_MS
-    );
-    return () => {
-      window.clearInterval(interval);
-      window.clearTimeout(stop);
-    };
-  }, [debugState, engaged, started]);
-
   // 특집 지면 8장을 미리 데워 플립 순간 디코딩 지연이 없게 한다.
   useEffect(() => {
     ARTICLE_PAGES.forEach((src) => {
@@ -369,30 +342,51 @@ export default function IntroScreen({
     });
   }, []);
 
-  // 표지 안착 후 1문장이 끝나면 특집 지면 8장을 180° 플립으로 넘긴다 —
+  // 표지 안착 후 1문장이 끝나면 특집 지면 8장을 360° 연속 회전으로 넘긴다 —
   // 마지막 장은 플립 직전까지 유지된다.
   useEffect(() => {
     if (!engaged || started || debugState) {
       setArticleFrame(-1);
+      setFrontPageIndex(0);
+      setBackPageIndex(1);
       return undefined;
     }
     let interval = 0;
+    const faceTimers = [];
+    const lastIndex = PAGE_SEQUENCE.length - 1;
+    const step = (frameIndex) => {
+      setArticleFrame(frameIndex);
+      const position = frameIndex + 1;
+      // 앞면은 회전 중반(90–270° 사이, 안 보일 때) 다음 장으로 교체.
+      faceTimers.push(window.setTimeout(
+        () => setFrontPageIndex(Math.min(position, lastIndex)),
+        PAGE_TURN_MS * 0.5
+      ));
+      // 뒷면은 착지 직후(안 보일 때) 그다음 장을 실어 둔다.
+      faceTimers.push(window.setTimeout(
+        () => setBackPageIndex(Math.min(position + 1, lastIndex)),
+        PAGE_TURN_MS + 60
+      ));
+    };
     const startTimer = window.setTimeout(() => {
       let frameIndex = 0;
-      setArticleFrame(0);
+      step(0);
       interval = window.setInterval(() => {
         frameIndex += 1;
         if (frameIndex >= ARTICLE_PAGE_COUNT) {
           window.clearInterval(interval);
           return;
         }
-        setArticleFrame(frameIndex);
+        step(frameIndex);
       }, ARTICLE_FRAME_MS);
     }, ARTICLE_CYCLE_START_MS);
     return () => {
       window.clearTimeout(startTimer);
       window.clearInterval(interval);
+      faceTimers.forEach((timer) => window.clearTimeout(timer));
       setArticleFrame(-1);
+      setFrontPageIndex(0);
+      setBackPageIndex(1);
     };
   }, [debugState, engaged, started]);
 
@@ -683,21 +677,8 @@ export default function IntroScreen({
             aria-label="From Information Architecture to Generative Systems"
           >
             <span className={styles.titleFaceHeadline}>
-              {TITLE_LINES.map((line, lineIndex) => (
-                <span key={line}>
-                  {titleMutation
-                    ? titleMutation[lineIndex].map((entry, glyphIndex) => (entry.lime
-                      ? (
-                        <span
-                          key={`${glyphIndex}-${entry.glyph}`}
-                          className={styles.titleGlyphLime}
-                        >
-                          {entry.glyph}
-                        </span>
-                      )
-                      : entry.glyph))
-                    : line}
-                </span>
+              {TITLE_LINES.map((line) => (
+                <span key={line}>{line}</span>
               ))}
             </span>
           </div>
@@ -728,58 +709,43 @@ export default function IntroScreen({
               }}
             >
               <div className={`${styles.coverFace} ${styles.coverFront}`}>
-                {/* 양면 플리퍼: 매 단계 +180° 회전, 숨은 면에 다음 장을
-                    미리 실어 회전이 끝나면 그 장이 정면이 된다. */}
-                {(() => {
-                  const pagePosition = articleFrame + 1;
-                  const faceASrc = PAGE_SEQUENCE[
-                    pagePosition % 2 === 0
-                      ? pagePosition
-                      : Math.min(pagePosition + 1, PAGE_SEQUENCE.length - 1)
-                  ];
-                  const faceBSrc = PAGE_SEQUENCE[
-                    pagePosition % 2 === 1
-                      ? pagePosition
-                      : Math.min(pagePosition + 1, PAGE_SEQUENCE.length - 1)
-                  ];
-                  return (
-                    <div
-                      className={styles.pageFlipper}
-                      style={{ transform: `rotateY(${pagePosition * 180}deg)` }}
-                    >
-                      <div className={styles.pageFace}>
-                        <img
-                          className={styles.coverImage}
-                          src={faceASrc}
-                          alt="월간 디자인 2001년 7월호 277호 표지"
-                          loading="eager"
-                          decoding="async"
-                          fetchpriority="high"
-                          onLoad={(event) => {
-                            const image = event.currentTarget;
-                            if (typeof image.decode !== 'function') {
-                              setCoverAssetReady(true);
-                              return;
-                            }
-                            image.decode()
-                              .catch(() => {})
-                              .finally(() => setCoverAssetReady(true));
-                          }}
-                        />
-                      </div>
-                      <div className={`${styles.pageFace} ${styles.pageFaceBack}`}>
-                        <img
-                          className={styles.coverImage}
-                          src={faceBSrc}
-                          alt=""
-                          aria-hidden="true"
-                          loading="eager"
-                          decoding="async"
-                        />
-                      </div>
-                    </div>
-                  );
-                })()}
+                {/* 양면 플리퍼: 매 단계 +360°를 이어 돌며, 도는 중반에는
+                    뒷면의 다음 장이 보이고 앞면은 가려진 사이 교체된다. */}
+                <div
+                  className={styles.pageFlipper}
+                  style={{ transform: `rotateY(${(articleFrame + 1) * 360}deg)` }}
+                >
+                  <div className={styles.pageFace}>
+                    <img
+                      className={styles.coverImage}
+                      src={PAGE_SEQUENCE[frontPageIndex]}
+                      alt="월간 디자인 2001년 7월호 277호 표지"
+                      loading="eager"
+                      decoding="async"
+                      fetchpriority="high"
+                      onLoad={(event) => {
+                        const image = event.currentTarget;
+                        if (typeof image.decode !== 'function') {
+                          setCoverAssetReady(true);
+                          return;
+                        }
+                        image.decode()
+                          .catch(() => {})
+                          .finally(() => setCoverAssetReady(true));
+                      }}
+                    />
+                  </div>
+                  <div className={`${styles.pageFace} ${styles.pageFaceBack}`}>
+                    <img
+                      className={styles.coverImage}
+                      src={PAGE_SEQUENCE[backPageIndex]}
+                      alt=""
+                      aria-hidden="true"
+                      loading="eager"
+                      decoding="async"
+                    />
+                  </div>
+                </div>
               </div>
               <div
                 className={`${styles.coverFace} ${styles.coverBack}`}
@@ -791,12 +757,6 @@ export default function IntroScreen({
         </div>
         </div>
 
-      </div>
-
-      {/* 탭 후 TAP TO PLAY가 사라진 자리에 3초간 떠 있는 사운드 안내 —
-          나래이션 오디오가 붙을 예정이라 볼륨을 미리 올리게 한다. */}
-      <div className={styles.volumeHint} aria-hidden={engaged ? undefined : 'true'}>
-        SOUND ON
       </div>
 
       <button

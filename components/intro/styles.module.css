@@ -286,12 +286,12 @@
   perspective: 1200px;
 }
 
-/* 양면 페이지 플리퍼 — 단계마다 +180° 회전하며 다음 장을 드러낸다. */
+/* 양면 페이지 플리퍼 — 단계마다 +360°를 이어 돌며 다음 장으로 넘어간다. */
 .pageFlipper {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  transition: transform 650ms cubic-bezier(0.72, 0, 0.18, 1);
+  transition: transform 900ms cubic-bezier(0.72, 0, 0.18, 1);
   will-change: transform;
 }
 
