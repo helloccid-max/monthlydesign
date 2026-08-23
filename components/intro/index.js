@@ -18,7 +18,7 @@ const INTRO_AUTO_ADVANCE_ENABLED = false;
 // 더했다"가 끝나는 ≈탭 +64.8s에 온다.
 // 표지가 화면 아래에서 등장하기 시작하는 순간(2.0s)에 맞춰 타이틀도
 // 함께 회전 상승하며 페이드 아웃한다 — 두 층이 같이 움직인다.
-const TITLE_FADE_START_MS = 2000;
+const TITLE_FADE_START_MS = 2100;
 const TITLE_FADE_DURATION_MS = 1500;
 // 표지는 나래이션이 "2001년 7월호"를 말할 때(탭 +2.1~3.6s 발화) 아래에서
 // 올라온다 — 2.0s 시작, 3.8s 안착.

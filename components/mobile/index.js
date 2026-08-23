@@ -69,6 +69,10 @@ export default function MobileScreen() {
   const [transitioningToLoad, setTransitioningToLoad] = useState(false);
   const [homageMounted, setHomageMounted] = useState(false);
   const [transitioningToHomage, setTransitioningToHomage] = useState(false);
+  // "다시 생성" 역방향 전환: 결과 화면이 우측으로 빠지고 표지 선택이
+  // 좌측(-100%)에서 들어온다 — 전진 방향(우→좌)의 정확한 되감기.
+  const [backStagingToCover, setBackStagingToCover] = useState(false);
+  const [transitioningBackToCover, setTransitioningBackToCover] = useState(false);
   const [generationRequest, setGenerationRequest] = useState(null);
   const [coverArchive, setCoverArchive] = useState(null);
   const [coverPreload, setCoverPreload] = useState({
@@ -257,6 +261,35 @@ export default function MobileScreen() {
     return () => window.clearTimeout(timer);
   }, [loadMounted, step, transitioningToLoad]);
 
+  // 역방향 스테이징: 커버 레이어가 좌측(-100%)에 한 프레임 칠해진 뒤
+  // 전환을 켠다(이중 rAF — 전진 전환과 같은 이유).
+  useEffect(() => {
+    if (!backStagingToCover || step !== STEPS.HOMAGE || transitioningBackToCover) return undefined;
+    let innerFrame = 0;
+    const outerFrame = window.requestAnimationFrame(() => {
+      innerFrame = window.requestAnimationFrame(() => {
+        setBackStagingToCover(false);
+        setTransitioningBackToCover(true);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(outerFrame);
+      window.cancelAnimationFrame(innerFrame);
+    };
+  }, [backStagingToCover, step, transitioningBackToCover]);
+
+  useEffect(() => {
+    if (!transitioningBackToCover) return undefined;
+    const timer = window.setTimeout(() => {
+      setStep(STEPS.COVER);
+      setTransitioningBackToCover(false);
+      setHomageMounted(false);
+      setGenerationRequest(null);
+      setSphereCovers(null);
+    }, SCENE_TRANSITION_MS);
+    return () => window.clearTimeout(timer);
+  }, [transitioningBackToCover]);
+
   // 나래이션 파트 2(표지 생성 경험·디자이너에게 던지는 질문) — 표지 선택
   // 화면 첫 도착 시 한 번만. QA 점프에서는 재생하지 않는다.
   useEffect(() => {
@@ -351,12 +384,11 @@ export default function MobileScreen() {
       goCover: () => {
         setCoverMounted(true);
         setLoadMounted(false);
-        setHomageMounted(false);
         setTransitioningToLoad(false);
         setTransitioningToHomage(false);
-        setGenerationRequest(null);
-        setSphereCovers(null);
-        go(STEPS.COVER);
+        // 홈이지·요청은 슬라이드가 끝난 뒤에 정리한다 — 빠져나가는 동안
+        // 결과 화면이 그대로 보여야 한다.
+        setBackStagingToCover(true);
       },
       // GENERATION_HANDOFF_START: downstream ownership begins at this callback.
       // Generation implementation belongs under components/generation/.
@@ -396,7 +428,9 @@ export default function MobileScreen() {
   }, [go, router]);
 
   if (step === STEPS.INTRO || step === STEPS.COVER || step === STEPS.LOAD || step === STEPS.HOMAGE) {
-    const showCover = step === STEPS.INTRO ? coverMounted : step === STEPS.COVER;
+    const showCover = step === STEPS.INTRO
+      ? coverMounted
+      : (step === STEPS.COVER || backStagingToCover || transitioningBackToCover);
     const showLoad = loadMounted || step === STEPS.LOAD;
     const showHomage = homageMounted || step === STEPS.HOMAGE;
     return (
@@ -406,6 +440,8 @@ export default function MobileScreen() {
         data-transitioning={transitioningToCover ? 'true' : 'false'}
         data-load-transitioning={transitioningToLoad ? 'true' : 'false'}
         data-homage-transitioning={transitioningToHomage ? 'true' : 'false'}
+        data-back-staging={backStagingToCover ? 'true' : 'false'}
+        data-back-transitioning={transitioningBackToCover ? 'true' : 'false'}
         data-cover-preload-ready={coverPreload.ready ? 'true' : 'false'}
         data-cover-preload-loaded={coverPreload.loaded}
       >

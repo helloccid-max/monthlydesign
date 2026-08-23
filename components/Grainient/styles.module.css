@@ -19,14 +19,14 @@
   background:
     radial-gradient(38% 34% at 24% 22%, rgba(168, 242, 42, 0.15), transparent 68%),
     radial-gradient(50% 46% at 55% 84%, rgba(122, 190, 44, 0.1), transparent 72%);
-  animation: grainientDriftA 26s ease-in-out infinite alternate;
+  animation: grainientDriftA 20s ease-in-out infinite alternate;
 }
 
 .blobsB {
   background:
     radial-gradient(44% 40% at 78% 30%, rgba(31, 75, 255, 0.11), transparent 70%),
     radial-gradient(34% 30% at 10% 78%, rgba(240, 250, 230, 0.05), transparent 70%);
-  animation: grainientDriftB 37s ease-in-out infinite alternate-reverse;
+  animation: grainientDriftB 29s ease-in-out infinite alternate-reverse;
 }
 
 /* feTurbulence 그레인 오버레이 — 표면에 미세한 입자 질감을 얹는다. */
@@ -40,34 +40,35 @@
   opacity: 0.7;
 }
 
+/* 이동 폭을 크게 잡아야 블러 46px 위에서도 흐름이 눈에 보인다. */
 @keyframes grainientDriftA {
   0% {
-    transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1);
+    transform: translate3d(-7%, -5%, 0) rotate(0deg) scale(1);
   }
 
   50% {
-    transform: translate3d(2.5%, 2%, 0) rotate(3deg) scale(1.08);
+    transform: translate3d(6%, 4.5%, 0) rotate(7deg) scale(1.18);
   }
 
   100% {
-    transform: translate3d(-1.5%, 3.5%, 0) rotate(-2.5deg) scale(1.03);
+    transform: translate3d(-4%, 7%, 0) rotate(-6deg) scale(1.07);
   }
 }
 
 @keyframes grainientDriftB {
   0% {
-    transform: translate3d(2.5%, 1.5%, 0) rotate(0deg) scale(1.04);
-    opacity: 0.6;
+    transform: translate3d(6%, 4%, 0) rotate(0deg) scale(1.1);
+    opacity: 0.5;
   }
 
   45% {
-    transform: translate3d(-2%, -2.5%, 0) rotate(-3.5deg) scale(1);
+    transform: translate3d(-5.5%, -6%, 0) rotate(-8deg) scale(1);
     opacity: 1;
   }
 
   100% {
-    transform: translate3d(1.5%, -3.5%, 0) rotate(2.5deg) scale(1.09);
-    opacity: 0.75;
+    transform: translate3d(4%, -7.5%, 0) rotate(6deg) scale(1.2);
+    opacity: 0.7;
   }
 }
 

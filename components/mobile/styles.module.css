@@ -92,6 +92,24 @@
   pointer-events: auto;
 }
 
+/* "다시 생성" 역방향 전환: 커버 레이어를 좌측에 대기시켰다가(스테이징,
+   트랜지션 없음) 결과 화면을 우측(+100%)으로 밀어내며 좌→우로 들어온다 —
+   전진 방향의 정확한 되감기라 공간 흐름이 일관된다. */
+.flowViewport[data-back-staging='true'] .coverLayer {
+  transform: translate3d(-100%, 0, 0);
+  transition: none;
+}
+
+.flowViewport[data-back-transitioning='true'] .coverLayer {
+  transform: translate3d(0, 0, 0);
+  pointer-events: none;
+}
+
+.flowViewport[data-back-transitioning='true'] .homageLayer {
+  transform: translate3d(100%, 0, 0);
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .introLayer,
   .coverLayer,
