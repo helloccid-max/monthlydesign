@@ -6,19 +6,27 @@
 }
 
 /* 천천히 떠도는 블러 그라디언트 블롭. 프로젝트 팔레트(라임 #a8f22a,
-   인트로 뒷면 블루 #1f4bff)를 저강도로 쓴다. */
-.root::before {
-  content: '';
+   인트로 블루 #1f4bff)를 저강도로 쓴다. 두 레이어가 다른 주기로 떠돌아
+   결합 필드에 서서히 변주가 생긴다. */
+.blobs {
   position: absolute;
   inset: -22%;
+  filter: blur(46px);
+  will-change: transform, opacity;
+}
+
+.blobsA {
   background:
     radial-gradient(38% 34% at 24% 22%, rgba(168, 242, 42, 0.15), transparent 68%),
+    radial-gradient(50% 46% at 55% 84%, rgba(122, 190, 44, 0.1), transparent 72%);
+  animation: grainientDriftA 26s ease-in-out infinite alternate;
+}
+
+.blobsB {
+  background:
     radial-gradient(44% 40% at 78% 30%, rgba(31, 75, 255, 0.11), transparent 70%),
-    radial-gradient(50% 46% at 55% 84%, rgba(122, 190, 44, 0.1), transparent 72%),
     radial-gradient(34% 30% at 10% 78%, rgba(240, 250, 230, 0.05), transparent 70%);
-  filter: blur(46px);
-  animation: grainientDrift 26s ease-in-out infinite alternate;
-  will-change: transform;
+  animation: grainientDriftB 37s ease-in-out infinite alternate-reverse;
 }
 
 /* feTurbulence 그레인 오버레이 — 표면에 미세한 입자 질감을 얹는다. */
@@ -32,22 +40,40 @@
   opacity: 0.7;
 }
 
-@keyframes grainientDrift {
+@keyframes grainientDriftA {
   0% {
     transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1);
   }
 
   50% {
-    transform: translate3d(2.5%, 2%, 0) rotate(3deg) scale(1.06);
+    transform: translate3d(2.5%, 2%, 0) rotate(3deg) scale(1.08);
   }
 
   100% {
-    transform: translate3d(-1.5%, 3%, 0) rotate(-2.5deg) scale(1.03);
+    transform: translate3d(-1.5%, 3.5%, 0) rotate(-2.5deg) scale(1.03);
+  }
+}
+
+@keyframes grainientDriftB {
+  0% {
+    transform: translate3d(2.5%, 1.5%, 0) rotate(0deg) scale(1.04);
+    opacity: 0.6;
+  }
+
+  45% {
+    transform: translate3d(-2%, -2.5%, 0) rotate(-3.5deg) scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate3d(1.5%, -3.5%, 0) rotate(2.5deg) scale(1.09);
+    opacity: 0.75;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .root::before {
-    animation-duration: 52s;
+  .blobsA,
+  .blobsB {
+    animation-duration: 52s, 74s;
   }
 }

@@ -148,7 +148,7 @@
 .page[data-engaged='true'][data-started='false'] .coverFilm {
   animation:
     coverEnter var(--cover-enter-duration, 1800ms) cubic-bezier(0.55, 0, 0.3, 1) var(--cover-enter-start, 500ms) forwards,
-    coverGrow 2450ms cubic-bezier(0.16, 1, 0.3, 1) var(--article-grow-delay, 8600ms) forwards;
+    coverGrow 3450ms cubic-bezier(0.16, 1, 0.3, 1) var(--article-grow-delay, 8600ms) forwards;
 }
 
 @keyframes coverGrow {

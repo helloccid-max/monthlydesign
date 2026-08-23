@@ -25,11 +25,11 @@ const TITLE_FADE_DURATION_MS = 1500;
 const COVER_ENTER_START_MS = 2000;
 const COVER_ENTER_DURATION_MS = 1800;
 // 나래이션이 "하이퍼볼릭"을 처음 말하는 순간(탭 +8.6s)부터 그 호의 특집
-// 지면 8장이 1.8s 간격 360° 회전으로 순서대로 넘어가고, 마지막 장은
-// 카드 플립(26.95s)까지 유지된다.
+// 지면 8장이 2.8s 간격(회전 0.65s + 대기 2.15s)으로 넘어간다 —
+// 마지막 장 착지 ≈28.85s.
 const ARTICLE_PAGE_COUNT = 8;
 const ARTICLE_CYCLE_START_MS = 8600;
-const ARTICLE_FRAME_MS = 1800;
+const ARTICLE_FRAME_MS = 2800;
 const ARTICLE_PAGES = Array.from(
   { length: ARTICLE_PAGE_COUNT },
   (_, index) => `/covers/article-200107/${String(index + 1).padStart(2, '0')}.webp`
@@ -38,12 +38,12 @@ const INTRO_COVER_SRC = '/covers/D277-2001-07-intro.webp';
 // 플립 시퀀스: 277 표지 → 특집 지면 8장. 레퍼런스 영상처럼 매 전환마다
 // 카드가 Y축 +180° 돌며 반대 면에 미리 실린 다음 장을 드러낸다.
 const PAGE_SEQUENCE = [INTRO_COVER_SRC, ...ARTICLE_PAGES];
-// 8장 페이지 넘김이 끝나면(마지막 착지 ≈21.85s) 잠시 숨을 고른 뒤,
+// 8장 페이지 넘김이 끝나면(마지막 착지 ≈28.85s) 잠시 숨을 고른 뒤,
 // 카드가 위로 회전 상승하며 떠나고 하이퍼볼릭 캔버스가 작은 크기에서
 // 화면 가득 확대되어 이어받는다.
-const COVER_SEQUENCE_DURATION_MS = 22600;
+const COVER_SEQUENCE_DURATION_MS = 29800;
 // 캔버스가 나타나기 전 리빌을 미리 끌어올리는 램프 시작점.
-const PRE_REVEAL_START_MS = 20500;
+const PRE_REVEAL_START_MS = 27700;
 // 플립 중 뒷면이 열리는 동안 캔버스가 새까맣지 않도록 미리 올려두는 리빌 —
 // 플립이 끝나는 시점에 램프도 끝나, 뒷면이 열리는 동안 원판이 살아난다.
 const COVER_PRE_REVEAL_TARGET = 0.55;
@@ -51,9 +51,9 @@ const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
 const FOCUS_DELAY_MS = 650;
 const FOCUS_DURATION_MS = 820;
 const POST_FOCUS_HOLD_MS = 5200;
-// started(22.6s) + 0.745×36100 ≈ 49.5s(morph) / 58.7s + 6100 ≈ 64.8s(종료).
-const AUTOPLAY_DURATION_MS = 36100;
-const AUTOPLAY_END_HOLD_MS = 6100;
+// started(29.8s) + 0.745×26400 ≈ 49.5s(morph) / 56.2s + 8600 ≈ 64.8s(종료).
+const AUTOPLAY_DURATION_MS = 26400;
+const AUTOPLAY_END_HOLD_MS = 8600;
 const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
 const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 const INTRO_ASSET_RELEASE_MS = 10000;
