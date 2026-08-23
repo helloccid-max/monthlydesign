@@ -380,7 +380,8 @@
 
   to {
     opacity: 0;
-    transform: translate3d(0, -64dvh, 0) perspective(1200px) rotateY(180deg) scale(0.8);
+    /* 90°(엣지온)까지만 — 미러로 뒤집혀 한 바퀴처럼 읽히던 구간 제거. */
+    transform: translate3d(0, -64dvh, 0) perspective(1200px) rotateY(90deg) scale(0.8);
   }
 }
 
