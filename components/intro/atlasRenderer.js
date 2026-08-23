@@ -29,7 +29,7 @@ const MARGIN_X = 260, MARGIN_Y = 210;
 const YEAR_MIN = 1976, YEAR_MAX = 2026;
 const TRAVEL_VISIBLE_W = 1200;   /* 순항 고도에서 보이는 필드 폭(맵 단위) */
 const OVERVIEW_VISIBLE_W = 5600; /* 리빌 시작 시 전체 조망 폭 */
-const COVER_MAP_H = 100;         /* 표지 높이(맵 단위) — 순항 시 ~47px */
+const COVER_MAP_H = 78;          /* 표지 높이(맵 단위) — 순항 시 ~37px */
 const DOT_COUNT = 2400;
 const THUMB_CACHE_LIMIT = 640;
 /* 타임라인 표지는 아주 작은 썸네일로만 그린다 — 500px 원본 대신
@@ -254,7 +254,7 @@ export default function createAtlasRenderer(canvas, {
 
     const reveal = viewValue('reveal', now);
     const focus = viewValue('focus', now);
-    viewValue('lower', now);
+    const lower = viewValue('lower', now);
     if (reveal <= 0.001) {
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
       ctx.fillStyle = '#020702'; ctx.fillRect(0, 0, W, H);
@@ -267,13 +267,9 @@ export default function createAtlasRenderer(canvas, {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.fillStyle = '#020702'; ctx.fillRect(0, 0, W, H);
 
-    /* 뷰포트: 포커스 시 하단 밴드로 수납 — 풀블리드(양옆 블랙 마진 없음). */
-    const band = { x: 0, y: H * 0.525, w: W, h: H * 0.475 };
-    const full = { x: 0, y: 0, w: W, h: H };
-    const vp = {
-      x: lerp(full.x, band.x, focus), y: lerp(full.y, band.y, focus),
-      w: lerp(full.w, band.w, focus), h: lerp(full.h, band.h, focus),
-    };
+    /* 뷰포트는 항상 풀블리드 — 라임 패널이 위를 덮어도 시각화는 축소되지
+       않고, 타임라인 morph와 중심 하향 이동(lower)만 일어난다. */
+    const vp = { x: 0, y: 0, w: W, h: H };
 
     ctx.save();
     ctx.beginPath();
@@ -288,9 +284,11 @@ export default function createAtlasRenderer(canvas, {
       creep = 1 + Math.min(0.14, (now - settledAt) * 0.000008) * (1 - focus);
     } else settledAt = 0;
     const visibleW = lerp(OVERVIEW_VISIBLE_W, TRAVEL_VISIBLE_W, smooth(reveal)) / creep;
-    const zoom = (vp.w / visibleW) * lerp(1, band.h / full.h * 2.05, focus * 0.4);
+    const zoom = vp.w / visibleW;
     const cam = cameraCenter(now);
-    const cx = vp.x + vp.w / 2, cy = vp.y + vp.h / 2;
+    /* 스테이트먼트가 위 52.5%를 덮는 동안 투영 중심을 노출 밴드의
+       중앙(아래로 26.25%)에 맞춘다 — 스케일 변화 없는 평행이동. */
+    const cx = vp.x + vp.w / 2, cy = vp.y + vp.h / 2 + H * 0.2625 * lower;
     const toX = (x) => cx + (x - cam.x) * zoom, toY = (y) => cy + (y - cam.y) * zoom;
     const alpha = smooth(clamp(reveal * 1.35, 0, 1));
 
@@ -352,14 +350,16 @@ export default function createAtlasRenderer(canvas, {
       }
     }
 
-    /* 표지 위치: 디스크 좌표와 타임라인 좌표를 morph로 보간해 저장 */
+    /* 표지 위치: 디스크 좌표와 타임라인 좌표를 morph로 보간해 저장.
+       타임라인에서도 정지하지 않는다 — 표지마다 위상이 다른 아주 느린
+       위글(주기 ~11–15초)로 지형이 살아 숨쉰다. */
     let centerCover = null, centerDist = 1e9;
     for (const c of covers) {
       const da = c.diskA + spin;
       const dx = cx + Math.cos(da) * diskR * c.diskU;
       const dy = cy + Math.sin(da) * diskR * c.diskU * 0.94 + Math.sin(now * 0.0009 + c.wob) * 3 * inv;
-      c.sx = lerp(dx, toX(c.x), morph);
-      c.sy = lerp(dy, toY(c.y), morph);
+      c.sx = lerp(dx, toX(c.x), morph) + Math.cos(now * 0.00042 + c.wob * 1.7) * 1.8 * morph;
+      c.sy = lerp(dy, toY(c.y), morph) + Math.sin(now * 0.00058 + c.wob) * 2.4 * morph;
     }
 
     /* 연결선 — 양 끝이 함께 morph되므로 유기적 그물이 지형의 실로 풀린다 */
@@ -447,6 +447,23 @@ export default function createAtlasRenderer(canvas, {
       ctx.font = '700 10px "Neue Haas Grotesk", Inter, sans-serif';
       ctx.fillText('ARCHIVE ATLAS · 578 COVERS', vp.x + 16, vp.y + vp.h - 30);
       ctx.fillText(`IN VIEW ${y0}–${y1}`, vp.x + 16, vp.y + vp.h - 16);
+
+      /* 세로축 설명 — Y는 각 표지를 이미지 분석해 얻은 톤(명도·채도)이라는
+         것을 노출 밴드의 위·아래 라벨과 범례 한 줄로 알린다. */
+      const visTop = H * 0.525 * lower;
+      ctx.font = '600 9px "Neue Haas Grotesk", Inter, sans-serif';
+      ctx.fillStyle = `rgba(255,255,255,${hudA})`;
+      ctx.fillText('BRIGHT · SATURATED', vp.x + 16, visTop + 22);
+      ctx.fillText('DARK · MUTED', vp.x + 16, vp.y + vp.h - 52);
+      ctx.fillStyle = `rgba(255,255,255,${0.66 * hudA})`;
+      ctx.fillText('Y · LUMINANCE + SATURATION, ANALYZED FROM EACH COVER', vp.x + 16, visTop + 36);
+      /* 위–아래를 잇는 가는 축선 */
+      ctx.strokeStyle = `rgba(255,255,255,${0.22 * hudA})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(vp.x + 10, visTop + 28);
+      ctx.lineTo(vp.x + 10, vp.y + vp.h - 58);
+      ctx.stroke();
     }
 
     ctx.restore();
