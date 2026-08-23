@@ -301,7 +301,8 @@ export default function createAtlasRenderer(canvas, {
     /* morph 0 = 유기체 디스크, 1 = 타임라인. */
     const morph = smooth(viewValue('morph', now));
     const inv = 1 - morph;
-    const breath = 1 + 0.022 * Math.sin(now * 0.0006) * inv; /* 디스크의 호흡 */
+    /* 디스크의 호흡 — 진폭·속도를 낮춰 '움찔'이 아니라 숨으로 읽히게. */
+    const breath = 1 + 0.012 * Math.sin(now * 0.00042) * inv;
     const spin = now * 0.000055 * inv + 0.4;                 /* 디스크의 느린 자전 */
     /* 스케일 0에서 자라나지 않는다 — 62% 크기에서 등장해 알파와 함께 안착.
        확대가 끝나면 화면을 가득 채워도 된다 — 최대변 기준 반경. */

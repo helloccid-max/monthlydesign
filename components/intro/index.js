@@ -605,10 +605,16 @@ export default function IntroScreen({
   }, [continueInteraction, debugState, engaged, introAssetsReady]);
 
   const topologySoundReady = started && scrubProgress >= TOPOLOGY_SOUND_START_PROGRESS;
-  // 플립 중 미리 깨운 리빌(preReveal)에서 이어받아 1까지 채운다.
+  // 미리 깨운 리빌(preReveal)에서 이어받아 1까지 채운다. 임펄스 커브는
+  // 중반 가속이 '움찔'로 읽혀서, 양끝 속도가 0인 스무스스텝으로 CSS
+  // 확대와 한 흐름으로 이어지게 한다.
+  const easeSmoothstep = (value) => {
+    const t = clamp01(value);
+    return t * t * (3 - 2 * t);
+  };
   const topologyReveal = started
     ? COVER_PRE_REVEAL_TARGET
-      + (1 - COVER_PRE_REVEAL_TARGET) * easeHumanImpulse(segment(scrubProgress, 0, 0.26))
+      + (1 - COVER_PRE_REVEAL_TARGET) * easeSmoothstep(segment(scrubProgress, 0, 0.24))
     : preReveal;
   // 스테이트먼트(텍스트·라임 분할)는 제거됐다 — 이 지점은 이제 디스크가
   // 타임라인 지도로 morph되는 트리거로만 남는다(나래이션 "50년의 연대기
