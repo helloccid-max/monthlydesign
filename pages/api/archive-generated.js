@@ -31,7 +31,12 @@ function getAuth() {
     authPromise = Promise.resolve(null);
     return authPromise;
   }
-  const auth = new google.auth.JWT(clientEmail, undefined, rawKey.replace(/\\n/g, '\n'), SCOPES);
+  // googleapis v171부터 위치 인자 시그니처가 조용히 실패한다 — 옵션 객체 필수.
+  const auth = new google.auth.JWT({
+    email: clientEmail,
+    key: rawKey.replace(/\\n/g, '\n'),
+    scopes: SCOPES,
+  });
   authPromise = auth.authorize().then(() => auth).catch(() => null);
   return authPromise;
 }
