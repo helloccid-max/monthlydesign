@@ -523,7 +523,10 @@
   cursor: wait;
 }
 
-.startPrompt:disabled > span {
+/* LOADING과 TAP TO PLAY 모두 탭 전까지 같은 호흡으로 깜빡인다 —
+   탭하는 순간(data-engaged) 스위치 프레스로 넘어가며 멈춘다. */
+.startPrompt:disabled > span,
+.page[data-engaged='false'] .startPrompt > span {
   color: #fff;
   transform: translateX(-50%);
   animation: loadingSine 2.4s cubic-bezier(0.37, 0, 0.63, 1) infinite;
@@ -636,7 +639,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .startPrompt:disabled > span {
+  .startPrompt:disabled > span,
+  .page[data-engaged='false'] .startPrompt > span {
     animation: none;
     opacity: 0.72;
   }
