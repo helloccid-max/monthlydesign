@@ -7,16 +7,16 @@ import { google } from 'googleapis';
  *  - Google Sheets에 [이미지 이름, 프롬프트] 행 추가
  *
  * 필요한 환경 변수 (없으면 조용히 건너뛴다 — 생성 플로우를 막지 않는다):
- *  - GOOGLE_SHEETS_SERVICE_EMAIL / GOOGLE_SHEETS_PRIVATE_KEY  (서비스 계정)
- *  - GOOGLE_DRIVE_FOLDER_ID       (서비스 계정에 공유된 Drive 폴더)
- *  - GOOGLE_SHEETS_SPREADSHEET_ID (서비스 계정에 공유된 스프레드시트)
+ *  - GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REFRESH_TOKEN
+ *  - GOOGLE_DRIVE_FOLDER_ID       (업로드 대상 Drive 폴더)
+ *  - GOOGLE_SHEETS_SPREADSHEET_ID (앱이 만든 로그 시트)
  *  - GOOGLE_SHEETS_GENERATED_SHEET (탭 이름, 기본 'generated')
  */
 
-const SCOPES = [
-  'https://www.googleapis.com/auth/drive',
-  'https://www.googleapis.com/auth/spreadsheets',
-];
+/* drive.file은 비민감 스코프 — 구글 검증 없이 프로덕션 게시가 가능해
+   리프레시 토큰이 만료되지 않는다. 앱이 만든 파일(업로드 이미지, 로그
+   시트)에만 접근하므로 사용자의 다른 드라이브 내용은 건드리지 않는다. */
+const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
 // RunPod가 base64 데이터 URL을 돌려주는 경우가 있어 본문 한도를 넉넉히 잡는다.
 export const config = { api: { bodyParser: { sizeLimit: '12mb' } } };
@@ -25,19 +25,18 @@ let authPromise = null;
 
 function getAuth() {
   if (authPromise) return authPromise;
-  const clientEmail = process.env.GOOGLE_SHEETS_SERVICE_EMAIL;
-  const rawKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY;
-  if (!clientEmail || !rawKey) {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
+  if (!clientId || !clientSecret || !refreshToken) {
     authPromise = Promise.resolve(null);
     return authPromise;
   }
-  // googleapis v171부터 위치 인자 시그니처가 조용히 실패한다 — 옵션 객체 필수.
-  const auth = new google.auth.JWT({
-    email: clientEmail,
-    key: rawKey.replace(/\\n/g, '\n'),
-    scopes: SCOPES,
-  });
-  authPromise = auth.authorize().then(() => auth).catch(() => null);
+  // 서비스 계정은 개인 드라이브 저장 용량이 없어(공유 드라이브 전용)
+  // 사용자 계정 OAuth로 업로드한다.
+  const auth = new google.auth.OAuth2(clientId, clientSecret);
+  auth.setCredentials({ refresh_token: refreshToken, scope: SCOPES.join(' ') });
+  authPromise = auth.getAccessToken().then(() => auth).catch(() => null);
   return authPromise;
 }
 
@@ -128,9 +127,9 @@ export default async function handler(req, res) {
       const sheets = google.sheets({ version: 'v4', auth });
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: `${sheetName}!A:B`,
+        range: 'A:C',
         valueInputOption: 'RAW',
-        requestBody: { values: [[name, prompt]] },
+        requestBody: { values: [[name, prompt, new Date().toISOString()]] },
       });
       result.sheet = true;
     }
