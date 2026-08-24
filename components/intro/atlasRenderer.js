@@ -41,7 +41,7 @@ const DECADES = [1980, 1990, 2000, 2010, 2020];
 const yearT = (y) => ((y - YEAR_MIN) * 12) / ((YEAR_MAX - YEAR_MIN) * 12 + 11);
 /* 3차 뷰(아트웍 유형 밴드)의 밴드 순서·라벨. */
 const BAND_ORDER = { photo: 0, illustration: 1, typography: 2, cg: 3 };
-const BAND_NAMES = ['PHOTO', 'ILLUSTRATION', 'TYPOGRAPHY', 'CG'];
+const BAND_NAMES = ['Photo', 'Illustration', 'Typography', 'CG'];
 const seg01 = (v, a, b) => clamp((v - a) / Math.max(1e-4, b - a), 0, 1);
 
 export default function createAtlasRenderer(canvas, {
@@ -531,18 +531,18 @@ export default function createAtlasRenderer(canvas, {
       ctx.textAlign = 'left';
       ctx.fillStyle = `rgba(255,255,255,${hudA})`;
       ctx.font = '700 10px "Neue Haas Grotesk", Inter, sans-serif';
-      ctx.fillText('ARCHIVE ATLAS · 578 COVERS', vp.x + 16, vp.y + vp.h - 30);
-      ctx.fillText(`IN VIEW ${y0}–${y1}`, vp.x + 16, vp.y + vp.h - 16);
+      ctx.fillText('Archive Atlas · 578 Covers', vp.x + 16, vp.y + vp.h - 30);
+      ctx.fillText(`In View ${y0}–${y1}`, vp.x + 16, vp.y + vp.h - 16);
 
       /* 세로축 설명(톤) — 밴드 뷰로 넘어가면 페이드 아웃. */
       const toneA = hudA * (1 - bandGroup);
       if (toneA > 0.02) {
         ctx.font = '600 9px "Neue Haas Grotesk", Inter, sans-serif';
         ctx.fillStyle = `rgba(255,255,255,${toneA})`;
-        ctx.fillText('BRIGHT · SATURATED', vp.x + 16, vp.y + 66);
-        ctx.fillText('DARK · MUTED', vp.x + 16, vp.y + vp.h - 156);
+        ctx.fillText('Bright · Saturated', vp.x + 16, vp.y + 66);
+        ctx.fillText('Dark · Muted', vp.x + 16, vp.y + vp.h - 156);
         ctx.fillStyle = `rgba(255,255,255,${0.66 * toneA})`;
-        ctx.fillText('Y · LUMINANCE + SATURATION, ANALYZED FROM EACH COVER', vp.x + 16, vp.y + 80);
+        ctx.fillText('Y · Luminance + Saturation, analyzed from each cover', vp.x + 16, vp.y + 80);
         ctx.strokeStyle = `rgba(255,255,255,${0.22 * toneA})`;
         ctx.lineWidth = 1;
         ctx.beginPath();
