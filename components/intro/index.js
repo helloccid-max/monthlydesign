@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Grainient from '@/components/Grainient';
 import { startRunPodPrewarm } from '@/lib/runpod/prewarmClient';
 import createAtlasRenderer from './atlasRenderer';
-import { startIntroNarration, stopIntroNarration } from '@/lib/narration';
+import { preloadNarration, startIntroNarration, stopIntroNarration } from '@/lib/narration';
 import styles from './styles.module.css';
 
 const INTRO_IDLE_MS = 1800;
@@ -56,7 +56,12 @@ const AUTOPLAY_DURATION_MS = 26400;
 const AUTOPLAY_END_HOLD_MS = 8600;
 const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
 const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
-const INTRO_ASSET_RELEASE_MS = 10000;
+/* 로딩 화면은 최소 8초 유지한다 — 그 시간 동안 죽은 대기가 아니라
+   뒤 구간에 필요한 것들(나래이션 오디오, 특집 지면 8장, 타임라인
+   썸네일)을 실제로 받아 둔다. 필수 에셋이 늦어도 12초에는 열어준다. */
+const INTRO_MIN_LOADING_MS = 8000;
+const INTRO_ASSET_RELEASE_MS = 12000;
+const ATLAS_PREWARM_COUNT = 200;
 const TITLE_LINES = ['From', 'Information', 'Architecture', 'to Generative', 'Systems'];
 
 // Loading → Tap to Play 전환: 기본형 타자기 — Loading을 오른쪽부터 지운 뒤
@@ -294,6 +299,7 @@ export default function IntroScreen({
   const [coverAssetReady, setCoverAssetReady] = useState(false);
   const [topologyAssetReady, setTopologyAssetReady] = useState(false);
   const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
+  const [minLoadingElapsed, setMinLoadingElapsed] = useState(false);
   // 카드 위에서 넘어가는 특집 지면 인덱스(-1 = 277 표지).
   const [articleFrame, setArticleFrame] = useState(-1);
   // 플리퍼 양면에 실린 시퀀스 인덱스. 들어오는 면은 이전 스텝이 미리
@@ -313,7 +319,8 @@ export default function IntroScreen({
   const startedRef = useRef(false);
   const interactionActiveRef = useRef(false);
   const minimumExitAtRef = useRef(0);
-  const introAssetsReady = (coverAssetReady && topologyAssetReady) || assetReleaseExpired;
+  const essentialAssetsReady = coverAssetReady && topologyAssetReady;
+  const introAssetsReady = (essentialAssetsReady && minLoadingElapsed) || assetReleaseExpired;
 
   const complete = useCallback(() => {
     if (completedRef.current) return;
@@ -340,6 +347,27 @@ export default function IntroScreen({
     const timer = window.setTimeout(() => setAssetReleaseExpired(true), INTRO_ASSET_RELEASE_MS);
     return () => window.clearTimeout(timer);
   }, [coverAssetReady, topologyAssetReady]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMinLoadingElapsed(true), INTRO_MIN_LOADING_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  // 로딩 창을 실제 선행 로딩으로 채운다 — 나래이션 오디오와 타임라인
+  // 썸네일을 미리 받아 두면 이후 구간에 네트워크 대기가 없다.
+  // (특집 지면 8장은 아래 별도 이펙트가 마운트 즉시 데운다.)
+  useEffect(() => {
+    preloadNarration();
+  }, []);
+
+  useEffect(() => {
+    if (!topologyAssetReady) return undefined;
+    const timer = window.setTimeout(
+      () => atlasApiRef.current?.prewarmThumbs?.(ATLAS_PREWARM_COUNT),
+      600
+    );
+    return () => window.clearTimeout(timer);
+  }, [topologyAssetReady]);
 
   // 특집 지면 8장을 미리 데워 플립 순간 디코딩 지연이 없게 한다.
   useEffect(() => {
@@ -747,6 +775,11 @@ export default function IntroScreen({
                       loading="eager"
                       decoding="async"
                       fetchpriority="high"
+                      ref={(node) => {
+                        // SSR로 내려온 이미지는 React가 핸들러를 붙이기 전에
+                        // 이미 complete일 수 있어 onLoad가 영원히 오지 않는다.
+                        if (node?.complete && node.naturalWidth) setCoverAssetReady(true);
+                      }}
                       onLoad={(event) => {
                         const image = event.currentTarget;
                         if (typeof image.decode !== 'function') {

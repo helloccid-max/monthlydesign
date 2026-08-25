@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
+
+/* 생성이 영영 끝나지 않는 경우(큐 정체, 워커 사망)에도 관람객이 로딩
+   화면에 갇히지 않도록 상한을 둔다 — 초과하면 결과 화면으로 넘겨
+   plain 패널과 "다시 생성"으로 빠져나갈 수 있게 한다. */
+const GENERATION_POLL_INTERVAL_MS = 3000;
+const GENERATION_TIMEOUT_MS = 150000;
 import { useRouter } from 'next/router';
 
 export function useLoadLogic({ request, onDone, paused = false } = {}) {
@@ -95,8 +101,14 @@ export function useLoadLogic({ request, onDone, paused = false } = {}) {
         if (isCancelled) return;
 
         // Step 5: Poll status
+        const deadline = Date.now() + GENERATION_TIMEOUT_MS;
         const poll = async () => {
           if (isCancelled) return;
+          if (Date.now() > deadline) {
+            console.error('RunPod job timed out:', jobId);
+            goDone(null);
+            return;
+          }
           const statusRes = await fetch(`/api/runpod/status/${jobId}`);
           if (!statusRes.ok) throw new Error('Status check failed');
           const statusData = await statusRes.json();
@@ -133,6 +145,8 @@ export function useLoadLogic({ request, onDone, paused = false } = {}) {
               }
               // 생성 성공 아카이빙(드라이브 업로드 + 시트 기록) — 설정이 없거나
               // 실패해도 관람객 플로우에는 영향을 주지 않는 best-effort 호출.
+              // keepalive는 본문 64KB 상한이 있어 base64 결과(수 MB)에서
+              // 요청이 조용히 거부된다. 화면 전환 전에 호출되므로 불필요.
               fetch('/api/archive-generated', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -141,8 +155,7 @@ export function useLoadLogic({ request, onDone, paused = false } = {}) {
                   issue: request.issue,
                   prompt: request.prompt,
                 }),
-                keepalive: true,
-              }).catch(() => {});
+              }).catch((error) => console.error('Archive failed:', error));
               goDone(outputUrl);
             } else {
               console.error('No valid output URL from RunPod:', statusData);
@@ -154,11 +167,14 @@ export function useLoadLogic({ request, onDone, paused = false } = {}) {
             // Fallback to local SVG if RunPod fails
             goDone(null);
           } else {
-            setTimeout(poll, 3000);
+            setTimeout(poll, GENERATION_POLL_INTERVAL_MS);
           }
         };
 
-        poll();
+        poll().catch((error) => {
+          console.error('Polling error:', error);
+          if (!isCancelled) goDone(null);
+        });
       } catch (error) {
         console.error('Pipeline error:', error);
         // Fallback to goDone without URL, or handle error

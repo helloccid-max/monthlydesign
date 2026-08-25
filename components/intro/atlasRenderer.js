@@ -666,6 +666,24 @@ export default function createAtlasRenderer(canvas, {
       if (!exploring) { exploring = true; explorationStartedAt = performance.now(); }
       explorationTurns = Math.max(1, Number(turns) || 1);
     },
+    /* 로딩 화면에서 타임라인 썸네일을 미리 받아 둔다 — morph 순간의
+       디코드 폭주를 없앤다. 프레임 예산과 무관한 일회성 워밍. */
+    prewarmThumbs(count = 160) {
+      if (!covers.length) return 0;
+      const total = Math.min(count, covers.length);
+      for (let i = 0; i < total; i++) {
+        const url = covers[i].url;
+        if (thumbCache.has(url)) continue;
+        const img = new Image();
+        img.decoding = 'async';
+        const entry = { img, ready: false, usedAt: performance.now() };
+        img.onload = () => { entry.ready = true; img.decode?.().catch(() => {}); };
+        img.src = url;
+        thumbCache.set(url, entry);
+      }
+      warmCursor = Math.max(warmCursor, total);
+      return total;
+    },
     resize,
     destroy() {
       destroyed = true;

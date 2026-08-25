@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { useEffect } from 'react';
 import '@/styles/globals.css';
 import { RELOAD_BROADCAST_CHANNEL } from '@/lib/socket/events';
@@ -31,7 +32,9 @@ export default function App({ Component, pageProps }) {
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
       </Head>
-      <Component {...pageProps} />
+      <ErrorBoundary>
+        <Component {...pageProps} />
+      </ErrorBoundary>
       {/* 모바일 가로 모드 차단 오버레이 — globals.css의 미디어쿼리로만 표시. */}
       <div className="orientationGuard" aria-hidden="true">
         <span className="orientationGuardIcon" />
