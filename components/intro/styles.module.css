@@ -522,7 +522,7 @@
   animation: loadingSine 2.4s cubic-bezier(0.37, 0, 0.63, 1) infinite;
 }
 
-/* TAP TO PLAY: 투명도 대신 라임 하이라이트가 타자 치듯 번진다(8fps 스텝). */
+/* TAP TO PLAY: 투명도 대신 라임 하이라이트가 타자 치듯 번진다(5fps 스텝). */
 .promptGlyphLime {
   color: var(--editorial-lime);
 }

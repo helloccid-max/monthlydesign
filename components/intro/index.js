@@ -64,9 +64,9 @@ const TITLE_LINES = ['From', 'Information', 'Architecture', 'to Generative', 'Sy
 const START_PROMPT_LOADING_TEXT = 'LOADING';
 const START_PROMPT_READY_TEXT = 'TAP TO PLAY';
 // 준비 완료 프롬프트는 라임 하이라이트가 타자 치듯 번진다 — 단어별로 한
-// 글자씩 물들고, 다음 단어가 시작되면 앞 단어는 흰색으로 돌아간다(8fps).
+// 글자씩 물들고, 다음 단어가 시작되면 앞 단어는 흰색으로 돌아간다(5fps).
 const PROMPT_WORDS = ['TAP', 'TO', 'PLAY'];
-const PROMPT_HIGHLIGHT_STEP_MS = 125;
+const PROMPT_HIGHLIGHT_STEP_MS = 200;
 const PROMPT_HIGHLIGHT_STEPS = [
   { word: 0, lit: 1 }, { word: 0, lit: 2 }, { word: 0, lit: 3 }, { word: 0, lit: 3 },
   { word: 1, lit: 1 }, { word: 1, lit: 2 }, { word: 1, lit: 2 },
