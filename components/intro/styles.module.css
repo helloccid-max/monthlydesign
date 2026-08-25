@@ -638,10 +638,16 @@
   }
 }
 
+/* 투명도 펄스는 전정기관을 자극하는 모션이 아니라 '탭하세요' 신호이므로
+   동작 줄이기에서도 유지한다 — 대신 진폭을 좁히고 주기를 늘린다. */
 @media (prefers-reduced-motion: reduce) {
   .startPrompt:disabled > span,
   .page[data-engaged='false'] .startPrompt > span {
-    animation: none;
-    opacity: 0.72;
+    animation: loadingSineSoft 3.6s cubic-bezier(0.37, 0, 0.63, 1) infinite;
   }
+}
+
+@keyframes loadingSineSoft {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
