@@ -288,15 +288,3 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .refraction {
-    animation: none;
-  }
-
-  .surface::after,
-  .glow,
-  .timedGlare {
-    animation: none;
-  }
-
-}

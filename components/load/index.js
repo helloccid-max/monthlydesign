@@ -79,11 +79,7 @@ function CoverParticleSphere({ imageUrls, seed }) {
     const context = canvas?.getContext('2d');
     if (!canvas || !context || !imageUrls.length) return undefined;
 
-    // 동작 줄이기(reduce motion)에서도 완전히 멈추지 않는다. 생성 대기 화면이
-    // 정지해 있으면 앱이 죽은 것으로 읽힌다. 플로킹 화면과 같은 방침으로
-    // 루프는 유지하고 회전 속도만 낮춘다.
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const motionScale = reduceMotion ? 0.45 : 1;
+    const motionScale = 1;
     const points = fibonacciSphere(imageUrls.length);
     const depthRandom = createRandom(seed ^ 0x9e3779b9);
     const depthOffsets = points.map(() => 0.78 + depthRandom() * 0.44);

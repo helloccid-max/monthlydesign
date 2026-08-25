@@ -233,14 +233,3 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .cover {
-    animation-duration: 620ms;
-    animation-delay: 80ms;
-  }
-
-  .actions {
-    animation-duration: 360ms;
-    animation-delay: 420ms;
-  }
-}

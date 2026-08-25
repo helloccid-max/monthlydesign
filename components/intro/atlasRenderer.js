@@ -70,8 +70,6 @@ export default function createAtlasRenderer(canvas, {
   let covers = [], dots = [], links = [], spokes = [];
   const pan = { x: 0, y: 0, tx: 0, ty: 0 };
   let lastSonifyAt = 0;
-  const REDUCE_MOTION = typeof matchMedia === 'function'
-    && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   try { document.fonts?.load('9px "Neue Haas Grotesk"'); } catch (_) { /* 폰트는 있으면 쓴다 */ }
 
@@ -257,9 +255,9 @@ export default function createAtlasRenderer(canvas, {
     let t;
     if (exploring) {
       if (!SCHEDULE) buildSchedule();
-      const scale = REDUCE_MOTION ? 1.7 : 1;
-      /* 클램프 — 스케줄 종점(2020 서행 끝)에 도달하면 그 자리에 머문다. */
-      const elapsed = Math.min((now - explorationStartedAt) / scale, SCHEDULE.total - 1);
+      /* 나래이션과 초 단위로 동기화된 여정이라 속도를 바꾸지 않는다.
+         클램프 — 스케줄 종점(2020 서행 끝)에 도달하면 그 자리에 머문다. */
+      const elapsed = Math.min(now - explorationStartedAt, SCHEDULE.total - 1);
       t = SCHEDULE.segs[0].from;
       for (const s of SCHEDULE.segs) {
         if (elapsed >= s.t0 && elapsed < s.t0 + s.dur) {

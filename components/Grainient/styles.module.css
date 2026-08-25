@@ -72,9 +72,3 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .blobsA,
-  .blobsB {
-    animation-duration: 52s, 74s;
-  }
-}

@@ -46,7 +46,6 @@ const MAXIMUM_FRAME_DELTA_SECONDS = 0.08;
 // The archive flow is functional navigation, not only decoration. Keep it
 // unmistakably alive when the OS requests reduced motion, while lowering its
 // velocity enough to avoid an aggressive field.
-const REDUCED_MOTION_SPEED_SCALE = 0.72;
 const DEPTH_DISTRIBUTION_INTERVAL = 24;
 const MIDDLE_DEPTH_COUNT_PER_INTERVAL = 16;
 const ULTRA_NEAR_Z_MIN = 500;
@@ -637,8 +636,7 @@ export default function CoverSelectScreen({
     let previousTime = performance.now();
     let viewportWidth = window.innerWidth;
     let viewportHeight = window.innerHeight;
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const motionSpeedScale = reduceMotion ? REDUCED_MOTION_SPEED_SCALE : 1;
+    const motionSpeedScale = 1;
 
     pageRef.current?.style.setProperty('--cover-viewport-height', `${viewportHeight}px`);
 

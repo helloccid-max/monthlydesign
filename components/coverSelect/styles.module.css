@@ -741,13 +741,6 @@
   50% { opacity: 0; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .voiceTypeCursor {
-    animation: none;
-    opacity: 0.85;
-  }
-}
-
 .voiceTranscriptTail .voiceIconSlot {
   flex: none;
   margin-left: 0;
@@ -989,35 +982,3 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .titleShade {
-    opacity: 1;
-    animation: none;
-  }
-
-  .header {
-    opacity: 1;
-    transform: translate(-50%, -50%);
-    animation: none;
-  }
-
-  .titleCharacter {
-    opacity: 1;
-    transform: none;
-    animation: none;
-  }
-
-  .particle {
-    opacity: 1;
-  }
-
-  .voiceTranscript[data-typing='true']::after {
-    animation: none;
-  }
-
-  .voiceWave[data-listening='true'][data-speaking='false'] > span {
-    animation: none;
-    transform: scaleY(0.48);
-  }
-
-}

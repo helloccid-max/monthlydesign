@@ -147,9 +147,4 @@
 /* 생성 대기 텍스트의 웨이브(이동+스케일+색)는 동작 줄이기에서도 그대로 둔다.
    이 화면의 유일한 '살아있음' 신호라서, 끄면 앱이 멈춘 것으로 읽힌다.
    구 회전은 이미 감속 처리되어 있다(components/load/index.js). */
-@media (prefers-reduced-motion: reduce) {
-  .canvas {
-    animation: none;
-    opacity: 1;
-  }
-}
+

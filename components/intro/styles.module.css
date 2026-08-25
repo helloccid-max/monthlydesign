@@ -181,7 +181,6 @@
   }
 }
 
-
 /* QA 점프: 디버그 상태에서는 지연 애니메이션을 기다리지 않는다.
    (started 디버그 상태는 카드·타이틀이 숨고 배경 캔버스가 바로 보인다.) */
 .page[data-debug='true'] .titleFilm,
@@ -255,14 +254,6 @@
     opacity: 1;
     letter-spacing: 0.004em;
     transform: perspective(900px) rotateY(0deg) translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .titleFaceHeadline,
-  .titleFaceHeadline > span {
-    animation-duration: 1ms;
-    animation-delay: 0ms;
   }
 }
 
@@ -640,12 +631,6 @@
 
 /* 투명도 펄스는 전정기관을 자극하는 모션이 아니라 '탭하세요' 신호이므로
    동작 줄이기에서도 유지한다 — 대신 진폭을 좁히고 주기를 늘린다. */
-@media (prefers-reduced-motion: reduce) {
-  .startPrompt:disabled > span,
-  .page[data-engaged='false'] .startPrompt > span {
-    animation: loadingSineSoft 3.6s cubic-bezier(0.37, 0, 0.63, 1) infinite;
-  }
-}
 
 @keyframes loadingSineSoft {
   0%, 100% { opacity: 0.45; }

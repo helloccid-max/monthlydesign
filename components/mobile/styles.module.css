@@ -110,14 +110,3 @@
   pointer-events: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .introLayer,
-  .coverLayer,
-  .loadLayer,
-  .homageLayer {
-    /* This transition communicates scene continuity, so retain a shorter
-       version instead of making the intro and archive appear to hard-cut. */
-    transition-duration: 420ms;
-    transition-timing-function: cubic-bezier(0.2, 0.7, 0.24, 1);
-  }
-}
