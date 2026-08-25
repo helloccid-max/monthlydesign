@@ -63,6 +63,16 @@ const TITLE_LINES = ['From', 'Information', 'Architecture', 'to Generative', 'Sy
 // Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
 const START_PROMPT_LOADING_TEXT = 'LOADING';
 const START_PROMPT_READY_TEXT = 'TAP TO PLAY';
+// 준비 완료 프롬프트는 라임 하이라이트가 타자 치듯 번진다 — 단어별로 한
+// 글자씩 물들고, 다음 단어가 시작되면 앞 단어는 흰색으로 돌아간다(1fps).
+const PROMPT_WORDS = ['TAP', 'TO', 'PLAY'];
+const PROMPT_HIGHLIGHT_STEP_MS = 1000;
+const PROMPT_HIGHLIGHT_STEPS = [
+  { word: 0, lit: 1 }, { word: 0, lit: 2 }, { word: 0, lit: 3 }, { word: 0, lit: 3 },
+  { word: 1, lit: 1 }, { word: 1, lit: 2 }, { word: 1, lit: 2 },
+  { word: 2, lit: 1 }, { word: 2, lit: 2 }, { word: 2, lit: 3 }, { word: 2, lit: 4 },
+  { word: 2, lit: 4 },
+];
 const START_PROMPT_ERASE_DURATION_MS = 233;
 const START_PROMPT_TYPE_DURATION_MS = 500;
 // Mobile image decoding or iframe rendering can occasionally occupy the main
@@ -280,6 +290,7 @@ export default function IntroScreen({
   const [leaving, setLeaving] = useState(false);
   const [scrubProgress, setScrubProgress] = useState(0);
   const [startPromptText, setStartPromptText] = useState(START_PROMPT_LOADING_TEXT);
+  const [promptHighlightStep, setPromptHighlightStep] = useState(0);
   const [coverAssetReady, setCoverAssetReady] = useState(false);
   const [topologyAssetReady, setTopologyAssetReady] = useState(false);
   const [assetReleaseExpired, setAssetReleaseExpired] = useState(false);
@@ -437,6 +448,18 @@ export default function IntroScreen({
     frame = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(frame);
   }, [introAssetsReady]);
+
+  // 준비 완료 후 탭 전까지 라임 하이라이트가 순환한다.
+  useEffect(() => {
+    if (engaged || debugState) return undefined;
+    if (startPromptText !== START_PROMPT_READY_TEXT) return undefined;
+    setPromptHighlightStep(0);
+    const timer = window.setInterval(
+      () => setPromptHighlightStep((step) => (step + 1) % PROMPT_HIGHLIGHT_STEPS.length),
+      PROMPT_HIGHLIGHT_STEP_MS
+    );
+    return () => window.clearInterval(timer);
+  }, [debugState, engaged, startPromptText]);
 
   const clearIdleExit = useCallback(() => {
     window.clearTimeout(inactivityTimerRef.current);
@@ -767,7 +790,28 @@ export default function IntroScreen({
           handleTap();
         }}
       >
-        <span>{startPromptText}</span>
+        <span>
+          {startPromptText === START_PROMPT_READY_TEXT
+            ? PROMPT_WORDS.map((word, wordIndex) => {
+              const step = PROMPT_HIGHLIGHT_STEPS[promptHighlightStep];
+              return (
+                <span key={word}>
+                  {wordIndex > 0 ? '\u00a0' : ''}
+                  {[...word].map((glyph, glyphIndex) => (
+                    <span
+                      key={`${word}-${glyphIndex}`}
+                      className={step.word === wordIndex && glyphIndex < step.lit
+                        ? styles.promptGlyphLime
+                        : undefined}
+                    >
+                      {glyph}
+                    </span>
+                  ))}
+                </span>
+              );
+            })
+            : startPromptText}
+        </span>
       </button>
 
     </main>

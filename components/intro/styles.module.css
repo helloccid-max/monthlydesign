@@ -516,11 +516,15 @@
 
 /* LOADING과 TAP TO PLAY 모두 탭 전까지 같은 호흡으로 깜빡인다 —
    탭하는 순간(data-engaged) 스위치 프레스로 넘어가며 멈춘다. */
-.startPrompt:disabled > span,
-.page[data-engaged='false'] .startPrompt > span {
+.startPrompt:disabled > span {
   color: #fff;
   transform: translateX(-50%);
   animation: loadingSine 2.4s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+/* TAP TO PLAY: 투명도 대신 라임 하이라이트가 타자 치듯 번진다(1fps 스텝). */
+.promptGlyphLime {
+  color: var(--editorial-lime);
 }
 
 @keyframes loadingSine {
