@@ -13,8 +13,17 @@ export default function Document() {
           crossOrigin="anonymous"
         />
         <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/@fontsource/pretendard@5.0.1/index.min.css"
+          rel="preload"
+          href="/fonts/Pretendard-400.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/NeueHaasGrotText-55Roman-Web.woff2"
+          as="font"
+          type="font/woff2"
           crossOrigin="anonymous"
         />
       </Head>

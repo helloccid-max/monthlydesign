@@ -439,9 +439,9 @@
   padding-left: clamp(9px, 2.1vw, 13px);
   font-family: 'Neue Haas Grotesk', 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
   font-size: clamp(0.756rem, 3.15vw, 1.116rem);
-  font-weight: 650;
+  font-weight: 400;
   line-height: 1.42;
-  letter-spacing: 0.045em;
+  letter-spacing: 0.06em;
   will-change: transform;
 }
 

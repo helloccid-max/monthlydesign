@@ -180,8 +180,8 @@
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.58);
   font-family: var(--editorial-sans);
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-weight: 400;
+  letter-spacing: 0.15em;
 }
 
 .end2-actions {
@@ -204,8 +204,8 @@
   color: var(--editorial-black);
   font-family: var(--editorial-sans);
   font-size: 13px;
-  font-weight: 750;
-  letter-spacing: 0.08em;
+  font-weight: 400;
+  letter-spacing: 0.11em;
   cursor: pointer;
   overflow: hidden;
   isolation: isolate;

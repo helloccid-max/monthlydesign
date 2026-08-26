@@ -227,9 +227,9 @@
   text-orientation: mixed;
   color: #fff;
   font-size: 0.7568rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.5;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   opacity: 1;
   white-space: nowrap;
   pointer-events: none;
@@ -244,8 +244,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 30px;
-  padding: 7px 12px;
+  min-height: 32px;
+  padding: 8px 16px;
   border: 0.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   background:
@@ -261,9 +261,9 @@
   color: #fff;
   font-family: 'Neue Haas Grotesk', 'Helvetica Neue', Helvetica, Arial, var(--app-font-family);
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1;
-  letter-spacing: 0.075em;
+  letter-spacing: 0.1em;
   opacity: 0;
   white-space: nowrap;
   pointer-events: none;
@@ -278,7 +278,7 @@
   z-index: 1600;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 17px;
+  gap: 16px;
   justify-items: center;
   opacity: 0;
   pointer-events: none;
@@ -319,8 +319,8 @@
     rgba(7, 8, 10, 0.2);
   color: rgba(247, 249, 241, 0.96);
   font-size: 1.1088rem;
-  font-weight: 760;
-  letter-spacing: -0.01em;
+  font-weight: 400;
+  letter-spacing: 0.005em;
   cursor: pointer;
   touch-action: none;
   user-select: none;
@@ -439,7 +439,7 @@
 }
 
 .continueButton[data-error='true'] .voiceButtonContent {
-  gap: 10px;
+  gap: 8px;
 }
 
 .continueButton[data-error='true'] .voiceTranscript {

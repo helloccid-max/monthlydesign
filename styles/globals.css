@@ -10,6 +10,20 @@
     url('/fonts/NeueHaasGrotText-55Roman-Web.woff') format('woff');
 }
 
+/* 한글 본문 — Pretendard(Inter를 라틴 베이스로 만든 한글 서체)를 자체 호스팅한다.
+   가변 원본(2.0MB, wght 45–930)을 400에 고정해 736KB로 줄인 정적 인스턴스다.
+   프롬프트 전사는 임의의 한글이 오므로 서브셋하지 않고 11,172자를 전부 싣는다.
+   이전에는 jsDelivr의 index.min.css를 물었는데 그 파일에는 한글 서브셋이 없어
+   한글이 시스템 폰트로 떨어지고 있었다. */
+@font-face {
+  font-family: 'Pretendard';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Pretendard-400.woff2') format('woff2');
+}
+
+
 *,
 *::before,
 *::after {
@@ -23,7 +37,7 @@ html {
 }
 
 :root {
-  --app-font-family: 'Neue Haas Grotesk', 'SD Jan', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  --app-font-family: 'Neue Haas Grotesk', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
   --ui-sans: 'Neue Haas Grotesk', 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
   --editorial-serif: 'Iowan Old Style', 'Bodoni 72', Didot, 'Times New Roman', serif;
   --editorial-sans: var(--ui-sans);
@@ -226,9 +240,9 @@ select {
   .orientationGuard p {
     margin: 0;
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: 400;
     line-height: 1.7;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
   }
 
   .orientationGuard p span {
