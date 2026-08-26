@@ -41,6 +41,15 @@ const DECADES = [1980, 1990, 2000, 2010, 2020];
 const yearT = (y) => ((y - YEAR_MIN) * 12) / ((YEAR_MAX - YEAR_MIN) * 12 + 11);
 /* 3차 뷰(아트웍 유형 밴드)의 밴드 순서·라벨. */
 const BAND_ORDER = { photo: 0, illustration: 1, typography: 2, cg: 3 };
+/* HUD 서체 — 단일 웨이트(400)만 로드되므로 굵기 대신 크기·트래킹으로
+   위계를 만든다. 11/12px는 팔 길이 관람 거리의 가독 하한. */
+/* 디스크 단계에서 동시에 이미지로 그리는 표지 비율. 578장을 전부 썸네일로
+   올리면 실기기에서 프레임이 무너지고 화면도 번잡해진다. 나머지는 대표색
+   점으로 남아 '전부 분석됐다'는 사실은 하단 진행 바가 대신 말한다.
+   morph(타임라인 전환)가 진행되면 1로 풀려 지도에서는 전부 이미지가 된다. */
+const DISK_THUMB_FRACTION = 0.14;
+const HUD_FONT_SM = '400 11px "Neue Haas Grotesk", sans-serif';
+const HUD_FONT_LG = '400 12px "Neue Haas Grotesk", sans-serif';
 const BAND_NAMES = ['Photo', 'Illustration', 'Typography', 'CG'];
 const seg01 = (v, a, b) => clamp((v - a) / Math.max(1e-4, b - a), 0, 1);
 const TAU = Math.PI * 2;
@@ -151,6 +160,9 @@ export default function createAtlasRenderer(canvas, {
           return `${r},${g},${b}`;
         })(),
         featured: i % 8 === 0, /* 스캔 전에도 보이는 씨앗 — 나머지는 레이더가 깨운다 */
+        /* 디스크 단계에서 썸네일로 승격될 후보 순위. 황금비 해시라 발행
+           순서·클러스터와 상관이 없어 원판 전체에 고르게 흩어진다. */
+        thumbKey: (i * 0.618033988749895) % 1,
         wob: rnd() * Math.PI * 2,
       };
     });
@@ -395,6 +407,19 @@ export default function createAtlasRenderer(canvas, {
   let warmCursor = 0;
   let frame = 0;
   let settledAt = 0;
+  /* HUD 글자는 표지 위에 얹히므로 어두운 그림자로 바탕을 만든다.
+     스크림(가림막)을 깔면 눈금선·표지까지 같이 죽는데, 그림자는 글자
+     주변만 눌러 시각화를 가리지 않는다. fillText 호출만 감싸 그림자가
+     다른 드로로 새지 않게 한다. */
+  function hudText(text, x, y) {
+    ctx.shadowColor = 'rgba(2,3,2,0.92)';
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetY = 0;
+    ctx.fillText(text, x, y);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+  }
+
   function draw(now) {
     if (destroyed) return;
     frame = requestAnimationFrame(draw);
@@ -478,14 +503,14 @@ export default function createAtlasRenderer(canvas, {
       /* 텍스트는 감쇠 없이 순수 화이트 — morph 진입 페이드만 탄다 */
       ctx.fillStyle = `rgba(255,255,255,${gridA})`;
       ctx.lineWidth = 1;
-      ctx.font = '600 9px "Neue Haas Grotesk", Inter, sans-serif';
+      ctx.font = HUD_FONT_SM;
       ctx.textAlign = 'center';
       for (let year = 1980; year <= 2020; year += 10) {
         const t = ((year - YEAR_MIN) * 12) / ((YEAR_MAX - YEAR_MIN) * 12 + 11);
         const gx = toX(MARGIN_X + t * (MAP_W - 2 * MARGIN_X));
         if (gx < vp.x - 40 || gx > vp.x + vp.w + 40) continue;
         ctx.beginPath(); ctx.moveTo(gx, vp.y); ctx.lineTo(gx, vp.y + vp.h); ctx.stroke();
-        if (zoom > 0.12) ctx.fillText(String(year), gx, vp.y + 18);
+        if (zoom > 0.12) hudText(String(year), gx, vp.y + 19);
       }
     }
 
@@ -586,8 +611,9 @@ export default function createAtlasRenderer(canvas, {
       ctx.fillRect(x - size / 2, y - size / 2, size, size);
     }
 
-    /* 표지 — 디스크에서는 1/8만 이미지, 나머지는 점.
+    /* 표지 — 디스크에서는 일부만 이미지, 나머지는 대표색 점.
        morph가 진행되면 점들이 이미지로 '생성'되며 아카이브가 펼쳐진다. */
+    const thumbFraction = lerp(DISK_THUMB_FRACTION, 1, smooth(morph));
     for (const c of covers) {
       const x = c.sx, y = c.sy;
       const hT = c.h * zoom;
@@ -598,21 +624,31 @@ export default function createAtlasRenderer(canvas, {
       if (x < vp.x - w || x > vp.x + vp.w + w || y < vp.y - h || y > vp.y + vp.h + h) continue;
       const dc = Math.hypot(x - cx, y - cy);
       if (dc < centerDist) { centerDist = dc; centerCover = c; }
-      if (scanActive && readouts.length < SCAN_READOUT_MAX && !c.featured) {
+      /* 레이더가 지난 표지는 디스크 단계에서도 이미지가 된다 — 점이
+         '분석되어' 데이터셋이 되는 과정. 페이드가 아니라 하드 컷이라
+         한 장씩 탁탁 켜지는 느낌이 산다. featured는 스캔 전의 씨앗. */
+      const scanned = (c.featured || scan >= c.scanU) ? 1 : 0;
+      /* 스캔됐다고 전부 이미지가 되지는 않는다 — 씨앗과 상한 안쪽만 승격하고,
+         나머지는 '분석 완료'를 뜻하는 밝은 점으로 남는다. morph가 진행되면
+         상한이 1까지 풀려 지도에서는 모두 이미지가 된다. */
+      const promoted = (c.featured || c.thumbKey < thumbFraction) ? scanned : 0;
+      const imageAlpha = Math.max(promoted, morph);
+      /* 추출값은 실제로 이미지가 된 표지에만 붙인다 — 빈 공간에 숫자만
+         떠 있으면 무엇을 가리키는지 읽히지 않는다. */
+      if (scanActive && promoted && readouts.length < SCAN_READOUT_MAX && !c.featured) {
         const since = scan - c.scanU;
         if (since >= 0 && since < SCAN_READOUT_WINDOW) {
           readouts.push({ c, x, y, h, fade: 1 - since / SCAN_READOUT_WINDOW });
         }
       }
-      /* 레이더가 지난 표지는 디스크 단계에서도 이미지가 된다 — 점이
-         '분석되어' 데이터셋이 되는 과정. 페이드가 아니라 하드 컷이라
-         한 장씩 탁탁 켜지는 느낌이 산다. featured는 스캔 전의 씨앗. */
-      const scanned = (c.featured || scan >= c.scanU) ? 1 : 0;
-      const imageAlpha = Math.max(scanned, morph);
-      const speckAlpha = (1 - scanned) * inv;
+      const speckAlpha = (1 - promoted) * inv;
       if (speckAlpha > 0.02) {
-        ctx.fillStyle = `rgba(${c.speckColor},${0.62 * speckAlpha * alpha})`;
-        ctx.fillRect(x - 1.3, y - 1.3, 2.6, 2.6);
+        /* 분석 전은 흐린 점, 분석 후(미승격)는 또렷한 점 — 레이더가 지나간
+           자리가 점의 밝기만으로도 읽힌다. */
+        const speckA = (scanned ? 0.9 : 0.5) * speckAlpha * alpha;
+        const r = scanned ? 1.6 : 1.3;
+        ctx.fillStyle = `rgba(${c.speckColor},${speckA})`;
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
       }
       if (imageAlpha < 0.02) continue;
       /* 전환 중에는 점→이미지 승격 문턱을 높여(16px→7px) 한 프레임에
@@ -648,7 +684,7 @@ export default function createAtlasRenderer(canvas, {
     /* 방금 분석된 표지의 추출값 — 레이더가 훑고 간 자리에 잠깐 뜬다.
        타임라인 Y축(명도·채도)이 어디서 왔는지 미리 알려주는 역할. */
     if (readouts.length) {
-      ctx.font = '600 8px "Neue Haas Grotesk", Inter, sans-serif';
+      ctx.font = HUD_FONT_SM;
       ctx.textAlign = 'left';
       for (const r of readouts) {
         const a = r.fade * inv * alpha;
@@ -674,22 +710,38 @@ export default function createAtlasRenderer(canvas, {
     if (inv > 0.02) {
       const a = inv * alpha * 0.86;
       ctx.textAlign = 'left';
-      ctx.font = '600 10px "Neue Haas Grotesk", Inter, sans-serif';
+      ctx.font = HUD_FONT_LG;
       ctx.fillStyle = `rgba(255,255,255,${a})`;
-      ctx.fillText('Angle · 12 Visual Clusters', vp.x + 16, vp.y + 66);
-      ctx.fillText('Radius · Distance from Cluster Center', vp.x + 16, vp.y + 80);
+      hudText('Angle · 12 Visual Clusters', vp.x + 16, vp.y + 66);
+      hudText('Radius · Distance from Cluster Center', vp.x + 16, vp.y + 84);
     }
 
-    /* 분석 진행 카운터 — 레이더가 도는 동안 표지 수가 올라간다. */
+    /* 분석 진행 바 — 레이더가 도는 동안 0→100%로 찬다. 개수 대신 비율로
+       읽히므로 화면에 실제로 그려지는 썸네일 수와 무관하게 '아카이브 전체를
+       훑고 있다'는 사실이 전달된다. */
     if (scanActive) {
-      const done = Math.min(covers.length, Math.round(scan * covers.length));
       const a = inv * alpha;
+      const pct = clamp(scan, 0, 1);
+      const barW = Math.min(vp.w - 32, 232);
+      const barX = vp.x + 16;
+      const barY = vp.y + vp.h - 22;
       ctx.textAlign = 'left';
-      ctx.font = '700 10px "Neue Haas Grotesk", Inter, sans-serif';
+      ctx.font = HUD_FONT_LG;
       ctx.fillStyle = `rgba(255,255,255,${a})`;
-      ctx.fillText(`Analyzing Archive`, vp.x + 16, vp.y + vp.h - 30);
+      hudText('Analyzing Archive', barX, barY - 10);
+      ctx.textAlign = 'right';
       ctx.fillStyle = `rgba(168,242,42,${a})`;
-      ctx.fillText(`${done} / ${covers.length}`, vp.x + 16, vp.y + vp.h - 16);
+      hudText(`${Math.round(pct * 100)}%`, barX + barW, barY - 10);
+      ctx.textAlign = 'left';
+      /* 트랙 → 채움. 납작한 사각형이라 HUD의 다른 선들과 같은 언어로 읽힌다. */
+      ctx.shadowColor = 'rgba(2,3,2,0.92)';
+      ctx.shadowBlur = 5;
+      ctx.fillStyle = `rgba(255,255,255,${0.16 * a})`;
+      ctx.fillRect(barX, barY, barW, 3);
+      ctx.fillStyle = `rgba(168,242,42,${a})`;
+      ctx.fillRect(barX, barY, barW * pct, 3);
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
     }
 
     /* HUD — 지도 상태에서만: 현재 시야의 연대 범위 */
@@ -702,23 +754,23 @@ export default function createAtlasRenderer(canvas, {
       const y1 = Math.min(YEAR_MAX, Math.round(camYear + halfYears));
       ctx.textAlign = 'left';
       ctx.fillStyle = `rgba(255,255,255,${hudA})`;
-      ctx.font = '700 10px "Neue Haas Grotesk", Inter, sans-serif';
-      ctx.fillText('Archive Atlas · 578 Covers', vp.x + 16, vp.y + vp.h - 30);
-      ctx.fillText(`In View ${y0}–${y1}`, vp.x + 16, vp.y + vp.h - 16);
+      ctx.font = HUD_FONT_LG;
+      hudText('Archive Atlas · 578 Covers', vp.x + 16, vp.y + vp.h - 34);
+      hudText(`In View ${y0}–${y1}`, vp.x + 16, vp.y + vp.h - 16);
 
       /* 세로축 설명(톤) — 밴드 뷰로 넘어가면 페이드 아웃. */
       const toneA = hudA * (1 - bandGroup);
       if (toneA > 0.02) {
-        ctx.font = '600 9px "Neue Haas Grotesk", Inter, sans-serif';
+        ctx.font = HUD_FONT_SM;
         ctx.fillStyle = `rgba(255,255,255,${toneA})`;
-        ctx.fillText('Bright · Saturated', vp.x + 16, vp.y + 66);
-        ctx.fillText('Dark · Muted', vp.x + 16, vp.y + vp.h - 156);
+        hudText('Bright · Saturated', vp.x + 16, vp.y + 66);
+        hudText('Dark · Muted', vp.x + 16, vp.y + vp.h - 156);
         ctx.fillStyle = `rgba(255,255,255,${0.66 * toneA})`;
-        ctx.fillText('Y · Luminance + Saturation, analyzed from each cover', vp.x + 16, vp.y + 80);
+        hudText('Y · Luminance + Saturation, analyzed from each cover', vp.x + 16, vp.y + 84);
         ctx.strokeStyle = `rgba(255,255,255,${0.22 * toneA})`;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(vp.x + 10, vp.y + 74);
+        ctx.moveTo(vp.x + 10, vp.y + 78);
         ctx.lineTo(vp.x + 10, vp.y + vp.h - 166);
         ctx.stroke();
       }
@@ -726,11 +778,11 @@ export default function createAtlasRenderer(canvas, {
       /* 3차 뷰: 아트웍 유형 밴드 라벨·구분선. */
       if (bandGroup > 0.02) {
         const bandA = alpha * bandGroup;
-        ctx.font = '600 9px "Neue Haas Grotesk", Inter, sans-serif';
+        ctx.font = HUD_FONT_SM;
         for (let i = 0; i < BAND_NAMES.length; i++) {
           const top = bandsTop + i * bandPitch;
           ctx.fillStyle = `rgba(255,255,255,${bandA})`;
-          ctx.fillText(BAND_NAMES[i], vp.x + 16, top + 12);
+          hudText(BAND_NAMES[i], vp.x + 16, top + 13);
           if (i > 0) {
             ctx.strokeStyle = `rgba(255,255,255,${0.1 * bandA})`;
             ctx.lineWidth = 1;
