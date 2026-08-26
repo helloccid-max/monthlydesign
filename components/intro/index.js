@@ -68,11 +68,17 @@ const TITLE_LINES = ['From', 'Information', 'Architecture', 'to Generative', 'Sy
 // Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
 const START_PROMPT_LOADING_TEXT = 'LOADING';
 const START_PROMPT_READY_TEXT = 'TAP TO PLAY';
-// 준비 완료 프롬프트는 라임이 단어 단위로 쌓인다 — TAP / TAP TO /
-// TAP TO PLAY / 전부 흰색을 반복(3fps).
+// 준비 완료 프롬프트는 50% 그레이가 단어 단위로 쌓인다 — TAP / TAP TO /
+// TAP TO PLAY / 전부 흰색. 스텝마다 머무는 길이가 다르다(3fps 단위 ×
+// 2, 1, 3, 3박) — 한 바퀴 약 3초.
 const PROMPT_WORDS = ['TAP', 'TO', 'PLAY'];
 const PROMPT_HIGHLIGHT_STEP_MS = 333;
-const PROMPT_HIGHLIGHT_STEPS = [1, 2, 3, 0];
+const PROMPT_HIGHLIGHT_STEPS = [
+  { lit: 1, hold: 2 },
+  { lit: 2, hold: 1 },
+  { lit: 3, hold: 3 },
+  { lit: 0, hold: 3 },
+];
 const START_PROMPT_ERASE_DURATION_MS = 233;
 const START_PROMPT_TYPE_DURATION_MS = 500;
 // Mobile image decoding or iframe rendering can occasionally occupy the main
@@ -477,11 +483,16 @@ export default function IntroScreen({
     if (engaged || debugState) return undefined;
     if (startPromptText !== START_PROMPT_READY_TEXT) return undefined;
     setPromptHighlightStep(0);
-    const timer = window.setInterval(
-      () => setPromptHighlightStep((step) => (step + 1) % PROMPT_HIGHLIGHT_STEPS.length),
-      PROMPT_HIGHLIGHT_STEP_MS
-    );
-    return () => window.clearInterval(timer);
+    let timer = 0;
+    const advance = (index) => {
+      timer = window.setTimeout(() => {
+        const next = (index + 1) % PROMPT_HIGHLIGHT_STEPS.length;
+        setPromptHighlightStep(next);
+        advance(next);
+      }, PROMPT_HIGHLIGHT_STEPS[index].hold * PROMPT_HIGHLIGHT_STEP_MS);
+    };
+    advance(0);
+    return () => window.clearTimeout(timer);
   }, [debugState, engaged, startPromptText]);
 
   const clearIdleExit = useCallback(() => {
@@ -823,8 +834,8 @@ export default function IntroScreen({
             ? PROMPT_WORDS.map((word, wordIndex) => (
               <span
                 key={word}
-                className={wordIndex < PROMPT_HIGHLIGHT_STEPS[promptHighlightStep]
-                  ? styles.promptGlyphLime
+                className={wordIndex < PROMPT_HIGHLIGHT_STEPS[promptHighlightStep].lit
+                  ? styles.promptWordDim
                   : undefined}
               >
                 {wordIndex > 0 ? '\u00a0' : ''}

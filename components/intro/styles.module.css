@@ -522,9 +522,9 @@
   animation: loadingSine 2.4s cubic-bezier(0.37, 0, 0.63, 1) infinite;
 }
 
-/* TAP TO PLAY: 투명도 대신 라임 하이라이트가 단어 단위로 쌓인다(3fps 스텝). */
-.promptGlyphLime {
-  color: var(--editorial-lime);
+/* TAP TO PLAY: 단어 단위로 50% 그레이가 쌓였다가 전부 흰색으로 돌아온다. */
+.promptWordDim {
+  color: #808080;
 }
 
 @keyframes loadingSine {
