@@ -522,9 +522,14 @@
   animation: loadingSine 2.4s cubic-bezier(0.37, 0, 0.63, 1) infinite;
 }
 
-/* TAP TO PLAY: 단어 단위로 50% 그레이가 쌓였다가 전부 흰색으로 돌아온다. */
+/* TAP TO PLAY: 색이 아니라 투명도가 50% → 100%로 오른다. 부모(.startPrompt)가
+   96%라 켜진 단어는 100%로 못박아 두 상태의 차이를 명확히 한다. */
 .promptWordDim {
-  color: #808080;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.promptWordLit {
+  color: rgba(255, 255, 255, 1);
 }
 
 @keyframes loadingSine {

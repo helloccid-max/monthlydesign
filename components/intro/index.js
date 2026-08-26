@@ -73,16 +73,21 @@ const TITLE_LINES = ['From', 'Information', 'Architecture', 'to Generative', 'Sy
 // Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
 const START_PROMPT_LOADING_TEXT = 'LOADING';
 const START_PROMPT_READY_TEXT = 'TAP TO PLAY';
-// 준비 완료 프롬프트는 50% 그레이가 단어 단위로 쌓인다 — TAP / TAP TO /
-// TAP TO PLAY / 전부 흰색. 스텝마다 머무는 길이가 다르다(3fps 단위 ×
-// 2, 1, 3, 3박) — 한 바퀴 약 3초.
+// 준비 완료 프롬프트는 전체 50%에서 시작해 흰색이 단어 단위로 쌓인다 —
+// 전체 50% / TAP / TAP TO / TAP TO PLAY. 전부 흰색이 된 뒤 두 번 깜빡이고
+// 다시 전체 50%로 돌아간다. hold는 3fps 단위(333ms) 배수 — 2, 1, 3박에
+// 블링크 0.5박 네 번, 한 바퀴 약 3.6초.
 const PROMPT_WORDS = ['TAP', 'TO', 'PLAY'];
 const PROMPT_HIGHLIGHT_STEP_MS = 333;
 const PROMPT_HIGHLIGHT_STEPS = [
+  { lit: 0, hold: 3 },
   { lit: 1, hold: 2 },
   { lit: 2, hold: 1 },
   { lit: 3, hold: 3 },
-  { lit: 0, hold: 3 },
+  { lit: 3, hold: 0.5, off: true },
+  { lit: 3, hold: 0.5 },
+  { lit: 3, hold: 0.5, off: true },
+  { lit: 3, hold: 0.5 },
 ];
 const START_PROMPT_ERASE_DURATION_MS = 233;
 const START_PROMPT_TYPE_DURATION_MS = 500;
@@ -682,6 +687,10 @@ export default function IntroScreen({
   // 타임라인 지도로 morph되는 트리거로만 남는다(나래이션 "50년의 연대기
   // 지도" ≈ 탭 +50.2초).
   const finalSplitActive = scrubProgress >= MORPH_PROGRESS;
+  // 전부 흰색이 된 뒤의 깜빡임 — span 통째로 껐다 켠다. 스텝이 166ms라
+  // 트랜지션이 붙으면 뭉개지므로 opacity 전환은 걸지 않는다.
+  const promptBlinkOff = startPromptText === START_PROMPT_READY_TEXT
+    && Boolean(PROMPT_HIGHLIGHT_STEPS[promptHighlightStep].off);
 
   useEffect(() => {
     if (!topologySoundReady) return;
@@ -843,14 +852,14 @@ export default function IntroScreen({
           handleTap();
         }}
       >
-        <span>
+        <span style={promptBlinkOff ? { opacity: 0 } : undefined}>
           {startPromptText === START_PROMPT_READY_TEXT
             ? PROMPT_WORDS.map((word, wordIndex) => (
               <span
                 key={word}
                 className={wordIndex < PROMPT_HIGHLIGHT_STEPS[promptHighlightStep].lit
-                  ? styles.promptWordDim
-                  : undefined}
+                  ? styles.promptWordLit
+                  : styles.promptWordDim}
               >
                 {wordIndex > 0 ? '\u00a0' : ''}
                 {word}
