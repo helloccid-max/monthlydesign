@@ -19,6 +19,7 @@ import {
   submitRunPodWarmup,
   summarizeRunPodHealth,
 } from '@/lib/runpod/warmupServer';
+import { reconcileMinWorkers } from '@/lib/runpod/workerSchedule';
 
 function json(res, status, data) {
   res.setHeader('cache-control', 'no-store, max-age=0');
@@ -58,6 +59,11 @@ export default async function handler(req, res) {
   let lockToken = null;
   try {
     const existing = await readWarmupState(endpointId);
+    /* 여기까지 왔다는 건 아직 준비 캐시가 없다는 뜻 — 즉 자주 오는 경로가
+       아니다. 이 김에 상시 워커 수가 스케줄과 맞는지 확인한다. */
+    if (!(Number(existing?.readyUntil || 0) > now)) {
+      await reconcileMinWorkers(endpointId, apiKey, now);
+    }
     if (Number(existing?.readyUntil || 0) > now) {
       return json(res, 200, { enabled: true, status: 'ready', source: existing.source || 'cached' });
     }
