@@ -112,7 +112,11 @@ export default async function handler(req, res) {
       jobId: null,
       lockToken,
     });
-    const run = await submitRunPodWarmup(endpointId, apiKey);
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+    const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+    const run = await submitRunPodWarmup(endpointId, apiKey, {
+      origin: host ? `${proto}://${host}` : '',
+    });
     const jobId = run?.id || null;
     if (!jobId) throw new Error('RunPod warmup did not return a job id');
 
