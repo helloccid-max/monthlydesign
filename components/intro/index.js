@@ -25,10 +25,10 @@ const TITLE_FADE_DURATION_MS = 1500;
 const COVER_ENTER_START_MS = 2000;
 const COVER_ENTER_DURATION_MS = 1800;
 // 나래이션이 "인터넷의 복잡한 연결 관계를"의 "인터넷"을 말하는 순간
-// (오디오 5.14s → 탭 +6.35s)에 표지가 이미지 1로 넘어가고, 이후 2.8s
-// 간격(회전 0.81s + 대기)으로 8장이 이어진다 — 마지막 착지 ≈26.8s.
+// (오디오 5.37s → 탭 +6.57s)에 표지가 이미지 1로 넘어가고, 이후 2.8s
+// 간격(회전 0.81s + 대기)으로 8장이 이어진다 — 마지막 착지 ≈27.0s.
 const ARTICLE_PAGE_COUNT = 8;
-const ARTICLE_CYCLE_START_MS = 6350;
+const ARTICLE_CYCLE_START_MS = 6570;
 const ARTICLE_FRAME_MS = 2800;
 const ARTICLE_PAGES = Array.from(
   { length: ARTICLE_PAGE_COUNT },
@@ -38,12 +38,12 @@ const INTRO_COVER_SRC = '/covers/D277-2001-07-intro.webp';
 // 플립 시퀀스: 277 표지 → 특집 지면 8장. 레퍼런스 영상처럼 매 전환마다
 // 카드가 Y축 +180° 돌며 반대 면에 미리 실린 다음 장을 드러낸다.
 const PAGE_SEQUENCE = [INTRO_COVER_SRC, ...ARTICLE_PAGES];
-// 8장 페이지 넘김이 끝나면(마지막 착지 ≈28.85s) 잠시 숨을 고른 뒤,
+// 8장 페이지 넘김이 끝나면(마지막 착지 ≈27.0s) 잠시 숨을 고른 뒤,
 // 카드가 위로 회전 상승하며 떠나고 하이퍼볼릭 캔버스가 작은 크기에서
 // 화면 가득 확대되어 이어받는다.
-const COVER_SEQUENCE_DURATION_MS = 29800;
+const COVER_SEQUENCE_DURATION_MS = 30000;
 // 캔버스가 나타나기 전 리빌을 미리 끌어올리는 램프 시작점.
-const PRE_REVEAL_START_MS = 27700;
+const PRE_REVEAL_START_MS = 27900;
 // 플립 중 뒷면이 열리는 동안 캔버스가 새까맣지 않도록 미리 올려두는 리빌 —
 // 플립이 끝나는 시점에 램프도 끝나, 뒷면이 열리는 동안 원판이 살아난다.
 const COVER_PRE_REVEAL_TARGET = 0.55;
@@ -51,9 +51,13 @@ const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
 const FOCUS_DELAY_MS = 650;
 const FOCUS_DURATION_MS = 820;
 const POST_FOCUS_HOLD_MS = 5200;
-// started(29.8s) + 0.745×26400 ≈ 49.5s(morph) / 56.2s + 8600 ≈ 64.8s(종료).
-const AUTOPLAY_DURATION_MS = 26400;
-const AUTOPLAY_END_HOLD_MS = 8600;
+// 새 나래이션(85.3s) 기준 앵커 — started(30.0s) + 0.745×24830 ≈ 48.5s
+// ("50년의 연대기 지도로 펼쳐지는"에서 타임라인 morph),
+// + 0.955×24830 ≈ 53.7s("여기서 더 나아가"에서 유형 밴드 뷰),
+// 54.8s + 5470 ≈ 60.3s(파트 1 종료와 함께 인트로 종료).
+const AUTOPLAY_DURATION_MS = 24830;
+const AUTOPLAY_END_HOLD_MS = 5470;
+const BAND_VIEW_PROGRESS = 0.955;
 const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
 const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 /* 로딩 화면은 최소 8초 유지한다 — 그 시간 동안 죽은 대기가 아니라
@@ -693,9 +697,10 @@ export default function IntroScreen({
     atlasApiRef.current?.setFocus(finalSplitActive, 0, 1280);
   }, [finalSplitActive]);
 
-  // 3차 뷰(아트웍 유형 밴드): 스크럽 종점(≈56.2s, "아카이브를 자유롭게
-  // 탐색…" 직전)에 타임라인이 이동 중 줌아웃되며 유형 밴드로 재정렬된다.
-  const bandActive = scrubProgress >= 0.995;
+  // 3차 뷰(아트웍 유형 밴드): "여기서 더 나아가 AI를 통해 자신만의 표지를
+  // 직접 생성해 보는 경험을 더했다"(≈탭 53.7s)에 맞춰 타임라인이 이동 중
+  // 줌아웃되며 유형 밴드로 재정렬된다.
+  const bandActive = scrubProgress >= BAND_VIEW_PROGRESS;
   useEffect(() => {
     atlasApiRef.current?.setBand(bandActive, 0, 3000);
   }, [bandActive]);
