@@ -5,6 +5,7 @@ import {
   WORKER_ACTIVE_START_HOUR_KST,
   desiredMinWorkers,
   kstHourAt,
+  getRunPodAdminApiKey,
   readRunPodMinWorkers,
   setRunPodMinWorkers,
 } from '@/lib/runpod/workerSchedule';
@@ -51,11 +52,12 @@ export default async function handler(req, res) {
   try {
     /* 이미 맞으면 건드리지 않는다 — 매시 도는 크론이 같은 값을 계속 쓰지
        않게 하고, 대시보드에서 수동으로 바꾼 값도 다음 정시에만 되돌린다. */
-    const current = await readRunPodMinWorkers(endpointId, apiKey).catch(() => null);
+    const adminKey = getRunPodAdminApiKey();
+    const current = await readRunPodMinWorkers(endpointId, adminKey).catch(() => null);
     if (current === workersMin) {
       return json(res, 200, { ok: true, kstHour, window, workersMin, changed: false });
     }
-    await setRunPodMinWorkers(endpointId, apiKey, workersMin);
+    await setRunPodMinWorkers(endpointId, adminKey, workersMin);
 
     /* 워커를 켜는 것만으로는 부족하다 — 컨테이너가 뜨는 것과 체크포인트가
        VRAM에 올라오는 것은 다르고, 후자가 70초다. 그대로 두면 아침 첫
