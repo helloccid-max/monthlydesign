@@ -691,6 +691,14 @@ export default function IntroScreen({
     atlasApiRef.current?.setReveal(topologyReveal);
   }, [topologyReveal]);
 
+  // 분석 레이더 — 리빌이 끝난 뒤부터 morph 직전까지 원판을 한 바퀴 훑는다.
+  // 나래이션 "표지 아카이브를 하나의 데이터셋으로 삼아 분석하고"(탭 41~46s)가
+  // 이 구간 한복판에 온다.
+  const analysisScan = segment(scrubProgress, 0.12, 0.68);
+  useEffect(() => {
+    atlasApiRef.current?.setScan(analysisScan);
+  }, [analysisScan]);
+
   useEffect(() => {
     // 라임 패널이 사라졌으므로 중심 하향(lower)은 보내지 않는다 —
     // 풀스크린 그대로 morph만 일어난다.

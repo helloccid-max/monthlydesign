@@ -43,6 +43,12 @@ const yearT = (y) => ((y - YEAR_MIN) * 12) / ((YEAR_MAX - YEAR_MIN) * 12 + 11);
 const BAND_ORDER = { photo: 0, illustration: 1, typography: 2, cg: 3 };
 const BAND_NAMES = ['Photo', 'Illustration', 'Typography', 'CG'];
 const seg01 = (v, a, b) => clamp((v - a) / Math.max(1e-4, b - a), 0, 1);
+const TAU = Math.PI * 2;
+/* 분석 스캔: 라임 레이더가 원판을 한 바퀴 훑고, 지나간 표지가 점에서
+   이미지로 '생성'된다 — 나래이션 "하나의 데이터셋으로 삼아 분석하고"를
+   화면으로 옮긴 것. */
+const SCAN_READOUT_WINDOW = 0.03;  /* 추출값이 떠 있는 폭 */
+const SCAN_READOUT_MAX = 5;        /* 한 프레임에 그리는 추출값 개수 상한 */
 
 export default function createAtlasRenderer(canvas, {
   onReady,
@@ -64,6 +70,8 @@ export default function createAtlasRenderer(canvas, {
     /* band 0 = 타임라인(톤 축), 1 = 아트웍 유형 밴드(3차 뷰) —
        전반부는 X 줌아웃, 후반부는 유형별 재정렬. */
     band: { value: 0, from: 0, to: 0, startedAt: 0, duration: 1 },
+    /* scan 0→1 = 디스크 구간의 분석 레이더 한 바퀴. */
+    scan: { value: 0, from: 0, to: 0, startedAt: 0, duration: 1 },
   };
   let READY = false;
   let exploring = false, explorationStartedAt = 0, explorationTurns = 1, explorationDone = false;
@@ -110,7 +118,7 @@ export default function createAtlasRenderer(canvas, {
         /* 디스크(유기체) 좌표: 골든앵글 배치 + 중심 밀집 반경 */
         diskA: i * 2.399963 + (rnd() - 0.5) * 0.3,
         diskU: Math.pow(rnd(), 0.62),
-        featured: i % 8 === 0, /* 디스크에서는 1/8만 이미지 — morph되며 '생성'된다 */
+        featured: i % 8 === 0, /* 스캔 전에도 보이는 씨앗 — 나머지는 레이더가 깨운다 */
         wob: rnd() * Math.PI * 2,
       };
     });
@@ -151,6 +159,11 @@ export default function createAtlasRenderer(canvas, {
       }
       c.gridRow = chosen === null ? targetRow : chosen;
       c.y = gridTop + (c.gridRow + 0.5) * ((gridBottom - gridTop) / rows);
+    }
+
+    /* 분석 레이더가 지나는 차례 — 디스크 각도순이라 훑는 방향과 일치한다. */
+    for (const c of covers) {
+      c.scanU = (((c.diskA % TAU) + TAU) % TAU) / TAU;
     }
 
     /* 3차 뷰: 유형 밴드 내부 세로 위치 — 밴드 안에서도 밝은 표지가 위. */
@@ -351,6 +364,7 @@ export default function createAtlasRenderer(canvas, {
     /* 3차 뷰(유형 밴드): 전반부는 X 줌아웃(Y·텍스트는 그대로), 후반부는
        유형별 재정렬. */
     const bandRaw = viewValue('band', now);
+    const scan = viewValue('scan', now);
     const bandZoom = smooth(seg01(bandRaw, 0, 0.6));
     const bandGroup = smooth(seg01(bandRaw, 0.35, 1));
     let visibleW = lerp(OVERVIEW_VISIBLE_W, TRAVEL_VISIBLE_W, smooth(reveal)) / creep;
@@ -419,6 +433,31 @@ export default function createAtlasRenderer(canvas, {
       }
     }
 
+    /* 분석 레이더 — 디스크를 한 바퀴 훑는 라임 선. 지나간 자리의 표지가
+       점에서 이미지로 피어난다(아래 승격 로직). */
+    const scanActive = inv > 0.02 && scan > 0.001 && scan < 0.999;
+    if (scanActive) {
+      const scanA = spin + scan * TAU;
+      const reach = diskR * 1.06;
+      const glow = ctx.createLinearGradient(cx, cy, cx + Math.cos(scanA) * reach, cy + Math.sin(scanA) * reach * 0.94);
+      glow.addColorStop(0, `rgba(168,242,42,${0.05 * inv * alpha})`);
+      glow.addColorStop(0.55, `rgba(168,242,42,${0.34 * inv * alpha})`);
+      glow.addColorStop(1, 'rgba(168,242,42,0)');
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(scanA) * reach, cy + Math.sin(scanA) * reach * 0.94);
+      ctx.stroke();
+      /* 훑고 지나간 잔상 — 방금 지난 각도 구간을 옅게 채운다. */
+      ctx.fillStyle = `rgba(168,242,42,${0.028 * inv * alpha})`;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, reach, scanA - 0.5, scanA);
+      ctx.closePath();
+      ctx.fill();
+    }
+
     /* morph 순간의 이미지 로딩 폭주 방지: 디스크 단계에서 매 프레임 몇 장씩
        미리 데워 전환 시점엔 대부분 디코딩이 끝나 있게 한다. */
     if (reveal > 0.25 && warmCursor < covers.length) {
@@ -432,6 +471,7 @@ export default function createAtlasRenderer(canvas, {
        타임라인에서는 제 위치에 정확히 고정된다(위글 없음) — 축의 의미가
        그대로 읽히게. */
     let centerCover = null, centerDist = 1e9;
+    const readouts = [];
     const bandsTop = vp.y + vp.h * 0.09;
     const bandPitch = (vp.h * 0.82) / BAND_NAMES.length;
     for (const c of covers) {
@@ -487,8 +527,18 @@ export default function createAtlasRenderer(canvas, {
       if (x < vp.x - w || x > vp.x + vp.w + w || y < vp.y - h || y > vp.y + vp.h + h) continue;
       const dc = Math.hypot(x - cx, y - cy);
       if (dc < centerDist) { centerDist = dc; centerCover = c; }
-      const imageAlpha = c.featured ? 1 : morph;
-      const speckAlpha = c.featured ? 0 : inv;
+      if (scanActive && readouts.length < SCAN_READOUT_MAX && !c.featured) {
+        const since = scan - c.scanU;
+        if (since >= 0 && since < SCAN_READOUT_WINDOW) {
+          readouts.push({ c, x, y, h, fade: 1 - since / SCAN_READOUT_WINDOW });
+        }
+      }
+      /* 레이더가 지난 표지는 디스크 단계에서도 이미지가 된다 — 점이
+         '분석되어' 데이터셋이 되는 과정. 페이드가 아니라 하드 컷이라
+         한 장씩 탁탁 켜지는 느낌이 산다. featured는 스캔 전의 씨앗. */
+      const scanned = (c.featured || scan >= c.scanU) ? 1 : 0;
+      const imageAlpha = Math.max(scanned, morph);
+      const speckAlpha = (1 - scanned) * inv;
       if (speckAlpha > 0.02) {
         ctx.fillStyle = `hsla(92,9%,74%,${0.55 * speckAlpha * alpha})`;
         ctx.fillRect(x - 1.3, y - 1.3, 2.6, 2.6);
@@ -521,6 +571,43 @@ export default function createAtlasRenderer(canvas, {
       }
       ctx.restore();
       ctx.globalAlpha = 1;
+    }
+
+    /* 방금 분석된 표지의 추출값 — 레이더가 훑고 간 자리에 잠깐 뜬다.
+       타임라인 Y축(명도·채도)이 어디서 왔는지 미리 알려주는 역할. */
+    if (readouts.length) {
+      ctx.font = '600 8px "Neue Haas Grotesk", Inter, sans-serif';
+      ctx.textAlign = 'left';
+      for (const r of readouts) {
+        const a = r.fade * inv * alpha;
+        if (a < 0.03) continue;
+        const tx = r.x + r.h * 0.42 + 4;
+        const ty = r.y - r.h * 0.18;
+        ctx.strokeStyle = `rgba(168,242,42,${0.5 * a})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(r.x + r.h * 0.34, r.y);
+        ctx.lineTo(tx - 2, r.y);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(168,242,42,${0.92 * a})`;
+        ctx.fillText(
+          `L·${Math.round(r.c.toneRank / Math.max(1, covers.length - 1) * 100)}`
+            + `  ${r.c.year}`,
+          tx, ty
+        );
+      }
+    }
+
+    /* 분석 진행 카운터 — 레이더가 도는 동안 표지 수가 올라간다. */
+    if (scanActive) {
+      const done = Math.min(covers.length, Math.round(scan * covers.length));
+      const a = inv * alpha;
+      ctx.textAlign = 'left';
+      ctx.font = '700 10px "Neue Haas Grotesk", Inter, sans-serif';
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      ctx.fillText(`Analyzing Archive`, vp.x + 16, vp.y + vp.h - 30);
+      ctx.fillStyle = `rgba(168,242,42,${a})`;
+      ctx.fillText(`${done} / ${covers.length}`, vp.x + 16, vp.y + vp.h - 16);
     }
 
     /* HUD — 지도 상태에서만: 현재 시야의 연대 범위 */
@@ -662,6 +749,10 @@ export default function createAtlasRenderer(canvas, {
     },
     setLowerCenter(lowered, delay = 0, duration = 1280) {
       setView('lower', lowered ? 1 : 0, Number(delay) || 0, Number(duration) || 1280);
+    },
+    /* 디스크 구간의 분석 레이더 진행도(0→1). */
+    setScan(progress) {
+      setView('scan', clamp(Number(progress) || 0, 0, 1), 0, 220);
     },
     /* 3차 뷰: 타임라인 이동 중 줌아웃 → 아트웍 유형 밴드로 재정렬. */
     setBand(active, delay = 0, duration = 3000) {
