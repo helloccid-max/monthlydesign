@@ -13,6 +13,7 @@ import {
   writeWarmupState,
 } from '@/lib/runpod/warmupStore';
 import {
+  cancelRunPodJob,
   createReadyState,
   getRunPodCredentials,
   getRunPodHealth,
@@ -71,6 +72,12 @@ export default async function handler(req, res) {
         status: 'cooldown',
         retryInMs: Number(existing.retryAt) - now,
       });
+    }
+
+    /* 시한을 넘긴 워밍업 잡이 남아 있으면 새 잡을 얹기 전에 치운다.
+       그러지 않으면 큐가 고아 잡으로 쌓여 워커가 실제 생성을 못 받는다. */
+    if (existing?.status === 'warming' && existing.jobId) {
+      await cancelRunPodJob(endpointId, apiKey, existing.jobId).catch(() => null);
     }
 
     const health = await getRunPodHealth(endpointId, apiKey);

@@ -3,12 +3,14 @@ import {
   isRunPodWarmupEnabled,
 } from '@/lib/runpod/warmupConfig';
 import {
+  clearWarmupState,
   isWarmupStoreConfigured,
   readWarmupState,
   releaseWarmupLock,
   writeWarmupState,
 } from '@/lib/runpod/warmupStore';
 import {
+  cancelRunPodJob,
   createFailedState,
   createReadyState,
   getRunPodCredentials,
@@ -78,15 +80,31 @@ export default async function handler(req, res) {
         await releaseWarmupLock(endpointId, state.lockToken).catch(() => false);
         return json(res, 200, { enabled: true, status: 'failed', jobStatus, health: summary });
       }
-      /* 아직 진행 중 — 큐에 갇힌 것과 워커가 물고 있는 것은 원인이 다르므로
-         jobStatus와 워커 수를 그대로 실어 보낸다. IN_QUEUE에 workerId가 계속
-         null이면 엔드포인트가 워커를 못 띄우고 있다는 뜻이다. */
+      const stale = now - Number(state.requestedAt || 0) >= RUNPOD_WARMUP_LOCK_SECONDS * 1000;
+      /* 락 시한을 넘겼는데도 아직 큐에 있다면 그 잡은 되살아나지 않는다.
+         워커가 한 대뿐인 엔드포인트에서는 이런 잡 하나가 뒤따르는 실제 생성
+         잡까지 막으므로 취소하고 상태를 비운다 — 다음 호출이 엔드포인트를
+         새로 보고 판단한다. */
+      if (stale) {
+        await cancelRunPodJob(endpointId, apiKey, state.jobId).catch(() => null);
+        await releaseWarmupLock(endpointId, state.lockToken).catch(() => false);
+        await clearWarmupState(endpointId).catch(() => null);
+        return json(res, 200, {
+          enabled: true,
+          status: 'idle',
+          cancelled: state.jobId,
+          jobStatus,
+          health: summary,
+        });
+      }
+      /* 아직 시한 안 — 큐에 갇힌 것과 워커가 물고 있는 것은 원인이 다르므로
+         jobStatus와 워커 수를 그대로 실어 보낸다. */
       return json(res, 200, {
         enabled: true,
         status: 'warming',
         jobId: state.jobId,
         jobStatus,
-        stale: now - Number(state.requestedAt || 0) >= RUNPOD_WARMUP_LOCK_SECONDS * 1000,
+        stale,
         health: summary,
       });
     }
