@@ -44,6 +44,27 @@ const BAND_ORDER = { photo: 0, illustration: 1, typography: 2, cg: 3 };
 const BAND_NAMES = ['Photo', 'Illustration', 'Typography', 'CG'];
 const seg01 = (v, a, b) => clamp((v - a) / Math.max(1e-4, b - a), 0, 1);
 const TAU = Math.PI * 2;
+/* 표지 대표색(LAB)을 점 색으로 쓴다. 원본 채도 중앙값이 8.8로 낮아
+   그대로 쓰면 회색이 되므로 채도를 키우고, 아주 어두운 표지는 검은
+   배경에서 보이도록 명도 바닥을 둔다. */
+const SPECK_CHROMA_GAIN = 2.4;
+const SPECK_MIN_L = 46;
+function labToRgb(L, a, b) {
+  const fy = (L + 16) / 116;
+  const fx = fy + a / 500;
+  const fz = fy - b / 200;
+  const inv = (t) => (t > 6 / 29 ? t * t * t : 3 * ((6 / 29) ** 2) * (t - 4 / 29));
+  const X = 0.95047 * inv(fx), Y = inv(fy), Z = 1.08883 * inv(fz);
+  const lin = [
+    X * 3.2406 + Y * -1.5372 + Z * -0.4986,
+    X * -0.9689 + Y * 1.8758 + Z * 0.0415,
+    X * 0.0557 + Y * -0.204 + Z * 1.057,
+  ];
+  return lin.map((u) => {
+    const v = u <= 0.0031308 ? 12.92 * u : 1.055 * (Math.max(u, 0) ** (1 / 2.4)) - 0.055;
+    return Math.round(clamp(v, 0, 1) * 255);
+  });
+}
 /* 분석 스캔: 라임 레이더가 원판을 한 바퀴 훑고, 지나간 표지가 점에서
    이미지로 '생성'된다 — 나래이션 "하나의 데이터셋으로 삼아 분석하고"를
    화면으로 옮긴 것. */
@@ -115,9 +136,20 @@ export default function createAtlasRenderer(canvas, {
         y: MARGIN_Y + v * (MAP_H - 2 * MARGIN_Y),
         h: COVER_MAP_H * (0.82 + 0.36 * (f.complexity ?? 0.4)),
         aspect: 0.74,
-        /* 디스크(유기체) 좌표: 골든앵글 배치 + 중심 밀집 반경 */
-        diskA: i * 2.399963 + (rnd() - 0.5) * 0.3,
-        diskU: Math.pow(rnd(), 0.62),
+        /* 디스크 좌표는 아래에서 데이터로 채운다 — 각도=시각 군집,
+           반경=군집 전형성(중심일수록 전형적). */
+        diskA: 0,
+        diskU: 0.5,
+        jitter: (rnd() - 0.5),
+        speckColor: (() => {
+          const [L, ca, cb] = f.color || [62, 0, 0];
+          const [r, g, b] = labToRgb(
+            Math.max(SPECK_MIN_L, L),
+            (ca || 0) * SPECK_CHROMA_GAIN,
+            (cb || 0) * SPECK_CHROMA_GAIN
+          );
+          return `${r},${g},${b}`;
+        })(),
         featured: i % 8 === 0, /* 스캔 전에도 보이는 씨앗 — 나머지는 레이더가 깨운다 */
         wob: rnd() * Math.PI * 2,
       };
@@ -160,6 +192,45 @@ export default function createAtlasRenderer(canvas, {
       c.gridRow = chosen === null ? targetRow : chosen;
       c.y = gridTop + (c.gridRow + 0.5) * ((gridBottom - gridTop) / rows);
     }
+
+    /* ── 디스크 배치(1안: 군집 방사) ──
+       각도: 시각 군집 12개가 원주를 12등분해 각자의 부채꼴을 가지고,
+             부채꼴 안에서는 발행순으로 펼쳐진다.
+       반경: 군집 중심(특징 공간 무게중심)으로부터의 거리 순위.
+             전형적인 표지가 안쪽, 이질적인 표지가 바깥 테두리에 놓인다 —
+             2001년 원본 하이퍼볼릭의 '중심=핵심, 바깥=주변'을 계승한다. */
+    const clusterGroups = new Map();
+    for (const c of covers) {
+      if (!clusterGroups.has(c.cluster)) clusterGroups.set(c.cluster, []);
+      clusterGroups.get(c.cluster).push(c);
+    }
+    const clusterIds = [...clusterGroups.keys()].sort((a, b) => a - b);
+    const wedge = TAU / Math.max(1, clusterIds.length);
+    clusterIds.forEach((id, wedgeIndex) => {
+      const group = clusterGroups.get(id);
+      /* 무게중심 — 정규화된 특징 4종. */
+      const axes = group.map((c) => [
+        c.toneRank / Math.max(1, covers.length - 1),
+        c.complexity,
+        c.entropy,
+        clamp((c.regions ?? 4) / 12, 0, 1),
+      ]);
+      const centroid = axes[0].map((_, k) => axes.reduce((sum, v) => sum + v[k], 0) / axes.length);
+      const scored = group.map((c, i) => ({
+        c,
+        d: Math.hypot(...axes[i].map((v, k) => v - centroid[k])),
+      }));
+      /* 반경: 중심 거리 순위 → 면적 균등을 위해 제곱근, 살짝 중심 밀집. */
+      [...scored].sort((a, b) => a.d - b.d).forEach((entry, rank) => {
+        const u = group.length > 1 ? rank / (group.length - 1) : 0.5;
+        entry.c.diskU = Math.pow(u, 0.58) * 0.98 + 0.02;
+      });
+      /* 각도: 부채꼴 안에서 발행순 — 군집의 시대 흐름이 부채꼴을 훑는다. */
+      [...group].sort((a, b) => a.x - b.x).forEach((c, order) => {
+        const slot = (order + 0.5) / group.length;
+        c.diskA = (wedgeIndex + clamp(slot + c.jitter * 0.06, 0.02, 0.98)) * wedge;
+      });
+    });
 
     /* 분석 레이더가 지나는 차례 — 디스크 각도순이라 훑는 방향과 일치한다. */
     for (const c of covers) {
@@ -540,7 +611,7 @@ export default function createAtlasRenderer(canvas, {
       const imageAlpha = Math.max(scanned, morph);
       const speckAlpha = (1 - scanned) * inv;
       if (speckAlpha > 0.02) {
-        ctx.fillStyle = `hsla(92,9%,74%,${0.55 * speckAlpha * alpha})`;
+        ctx.fillStyle = `rgba(${c.speckColor},${0.62 * speckAlpha * alpha})`;
         ctx.fillRect(x - 1.3, y - 1.3, 2.6, 2.6);
       }
       if (imageAlpha < 0.02) continue;
@@ -548,7 +619,8 @@ export default function createAtlasRenderer(canvas, {
          수백 장이 동시에 이미지가 되는 피크를 없앤다. */
       const speckThreshold = lerp(16, 7, morph);
       if (h < speckThreshold) {
-        ctx.fillStyle = `hsla(92,9%,72%,${0.5 * imageAlpha * alpha})`;
+        /* 이미지로 그리기엔 너무 작은 구간 — 표지의 대표색 점으로 추상화. */
+        ctx.fillStyle = `rgba(${c.speckColor},${0.72 * imageAlpha * alpha})`;
         ctx.fillRect(x - 1.2, y - 1.2, 2.4, 2.4);
         continue;
       }
@@ -596,6 +668,16 @@ export default function createAtlasRenderer(canvas, {
           tx, ty
         );
       }
+    }
+
+    /* 디스크 축 범례 — 각도·반경이 무엇을 뜻하는지 밝힌다. */
+    if (inv > 0.02) {
+      const a = inv * alpha * 0.86;
+      ctx.textAlign = 'left';
+      ctx.font = '600 10px "Neue Haas Grotesk", Inter, sans-serif';
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      ctx.fillText('Angle · 12 Visual Clusters', vp.x + 16, vp.y + 66);
+      ctx.fillText('Radius · Distance from Cluster Center', vp.x + 16, vp.y + 80);
     }
 
     /* 분석 진행 카운터 — 레이더가 도는 동안 표지 수가 올라간다. */
@@ -711,8 +793,9 @@ export default function createAtlasRenderer(canvas, {
     /* clientWidth/Height는 레이아웃 크기 — 조상 트랜스폼(카드 줌)의 영향을
        받지 않으므로 백킹 해상도가 항상 뷰포트 기준으로 유지된다. */
     W = canvas.clientWidth || 1; H = canvas.clientHeight || 1;
-    /* 텍스트 선명도의 핵심: 모바일에서도 DPR을 1로 깎지 않는다(상한 2). */
-    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    /* 텍스트 선명도의 핵심: 상한 2로 두면 DPR 3 기기에서 캔버스 전체가
+       1.5배 확대되어 HUD 글자가 흐려진다. 3까지 허용한다. */
+    DPR = Math.min(window.devicePixelRatio || 1, 3);
     canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
   }
   window.addEventListener('resize', resize);
