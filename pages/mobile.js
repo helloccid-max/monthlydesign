@@ -1,13 +1,6 @@
-import Head from 'next/head';
 import MobileScreen from '@/components/mobile';
 
 export default function Mobile() {
-  return (
-    <>
-      <Head>
-        <title>Design After Prompt | Monthly Design Homage</title>
-      </Head>
-      <MobileScreen />
-    </>
-  );
+  // 사이트 타이틀은 두지 않는다 — 작품 화면 밖의 문구를 노출하지 않는다.
+  return <MobileScreen />;
 }

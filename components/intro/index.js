@@ -68,16 +68,11 @@ const TITLE_LINES = ['From', 'Information', 'Architecture', 'to Generative', 'Sy
 // Tap to Play를 왼쪽부터 타이핑한다. 진행에 ease-in을 걸어 갈수록 빨라진다.
 const START_PROMPT_LOADING_TEXT = 'LOADING';
 const START_PROMPT_READY_TEXT = 'TAP TO PLAY';
-// 준비 완료 프롬프트는 라임 하이라이트가 타자 치듯 번진다 — 단어별로 한
-// 글자씩 물들고, 다음 단어가 시작되면 앞 단어는 흰색으로 돌아간다(5fps).
+// 준비 완료 프롬프트는 라임이 단어 단위로 쌓인다 — TAP / TAP TO /
+// TAP TO PLAY / 전부 흰색을 반복(3fps).
 const PROMPT_WORDS = ['TAP', 'TO', 'PLAY'];
-const PROMPT_HIGHLIGHT_STEP_MS = 200;
-const PROMPT_HIGHLIGHT_STEPS = [
-  { word: 0, lit: 1 }, { word: 0, lit: 2 }, { word: 0, lit: 3 }, { word: 0, lit: 3 },
-  { word: 1, lit: 1 }, { word: 1, lit: 2 }, { word: 1, lit: 2 },
-  { word: 2, lit: 1 }, { word: 2, lit: 2 }, { word: 2, lit: 3 }, { word: 2, lit: 4 },
-  { word: 2, lit: 4 },
-];
+const PROMPT_HIGHLIGHT_STEP_MS = 333;
+const PROMPT_HIGHLIGHT_STEPS = [1, 2, 3, 0];
 const START_PROMPT_ERASE_DURATION_MS = 233;
 const START_PROMPT_TYPE_DURATION_MS = 500;
 // Mobile image decoding or iframe rendering can occasionally occupy the main
@@ -825,24 +820,17 @@ export default function IntroScreen({
       >
         <span>
           {startPromptText === START_PROMPT_READY_TEXT
-            ? PROMPT_WORDS.map((word, wordIndex) => {
-              const step = PROMPT_HIGHLIGHT_STEPS[promptHighlightStep];
-              return (
-                <span key={word}>
-                  {wordIndex > 0 ? '\u00a0' : ''}
-                  {[...word].map((glyph, glyphIndex) => (
-                    <span
-                      key={`${word}-${glyphIndex}`}
-                      className={step.word === wordIndex && glyphIndex < step.lit
-                        ? styles.promptGlyphLime
-                        : undefined}
-                    >
-                      {glyph}
-                    </span>
-                  ))}
-                </span>
-              );
-            })
+            ? PROMPT_WORDS.map((word, wordIndex) => (
+              <span
+                key={word}
+                className={wordIndex < PROMPT_HIGHLIGHT_STEPS[promptHighlightStep]
+                  ? styles.promptGlyphLime
+                  : undefined}
+              >
+                {wordIndex > 0 ? '\u00a0' : ''}
+                {word}
+              </span>
+            ))
             : startPromptText}
         </span>
       </button>
