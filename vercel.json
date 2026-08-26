@@ -7,7 +7,7 @@
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/runpod-workers",
+      "path": "/api/cron/runpod-workers-close",
       "schedule": "0 12 * * *"
     }
   ]
