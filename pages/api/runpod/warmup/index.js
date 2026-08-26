@@ -14,7 +14,6 @@ import {
 } from '@/lib/runpod/warmupStore';
 import {
   cancelRunPodJob,
-  createReadyState,
   getRunPodCredentials,
   getRunPodHealth,
   submitRunPodWarmup,
@@ -80,13 +79,16 @@ export default async function handler(req, res) {
       await cancelRunPodJob(endpointId, apiKey, existing.jobId).catch(() => null);
     }
 
+    /* 유휴 워커가 있다는 건 컨테이너가 떠 있다는 뜻일 뿐, 체크포인트가 VRAM에
+       올라와 있다는 보장이 아니다. Min Workers를 1로 두면 엔드포인트는 늘
+       idle을 보고하는데, 컨테이너가 막 뜬 뒤 첫 생성은 모델 로딩에 70초가
+       걸렸고 모델이 올라온 뒤에는 4초였다(실측). 그래서 유휴 워커를 ready로
+       치지 않고 잡을 한 번 태워 모델을 올린다 — 모델이 올라왔다는 근거는
+       readyUntil 캐시뿐이고, 그건 성공한 잡만 쓴다. */
     const health = await getRunPodHealth(endpointId, apiKey);
     const summary = summarizeRunPodHealth(health);
-    if (summary.idle > 0 || summary.ready > 0) {
-      await writeWarmupState(endpointId, createReadyState({ source: 'endpoint-health', now }));
-      return json(res, 200, { enabled: true, status: 'ready', source: 'endpoint-health' });
-    }
-    if (summary.activeWorkers > 0 || summary.activeJobs > 0) {
+    if (summary.activeJobs > 0) {
+      /* 이미 도는 잡이 있으면 그게 모델을 올린다 — 겹쳐 넣지 않는다. */
       await writeWarmupState(endpointId, {
         status: 'warming',
         source: 'endpoint-health',

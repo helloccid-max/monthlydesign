@@ -112,13 +112,11 @@ export default async function handler(req, res) {
     /* 3) 그 밖에는 저장값을 되풀이하지 않고 엔드포인트를 실제로 본다.
        예전에는 만료된 ready를 그대로 돌려줘서, 식은 지 한참인 엔드포인트가
        계속 ready로 보고됐다. */
+    /* 여기서도 유휴 워커를 ready로 승격하지 않는다 — 컨테이너가 떴다는 것과
+       모델이 올라왔다는 것은 다르고, ready는 성공한 잡으로만 세운다. */
     const health = await getRunPodHealth(endpointId, apiKey);
     const summary = summarizeRunPodHealth(health);
-    if (summary.idle > 0 || summary.ready > 0) {
-      await writeWarmupState(endpointId, createReadyState({ source: 'endpoint-health', now }));
-      return json(res, 200, { enabled: true, status: 'ready', source: 'endpoint-health', health: summary });
-    }
-    if (summary.activeWorkers > 0 || summary.activeJobs > 0) {
+    if (summary.activeJobs > 0) {
       return json(res, 200, { enabled: true, status: 'warming', source: 'endpoint-health', health: summary });
     }
     return json(res, 200, { enabled: true, status: 'idle', health: summary });
