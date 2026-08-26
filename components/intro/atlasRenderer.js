@@ -445,15 +445,20 @@ export default function createAtlasRenderer(canvas, {
       c.sy = lerp(dy, targetY, morph);
     }
 
-    /* 연결선 — 양 끝이 함께 morph되므로 유기적 그물이 지형의 실로 풀린다 */
-    ctx.lineWidth = 0.6;
-    for (const l of links) {
-      const x1 = l.a.sx, y1 = l.a.sy, x2 = l.b.sx, y2 = l.b.sy;
-      if (Math.max(x1, x2) < vp.x - 30 || Math.min(x1, x2) > vp.x + vp.w + 30) continue;
-      ctx.strokeStyle = `rgba(200,206,196,${l.alpha * alpha})`;
-      ctx.beginPath(); ctx.moveTo(x1, y1);
-      ctx.quadraticCurveTo((x1 + x2) / 2, (y1 + y2) / 2 - 12 * zoom * morph, x2, y2);
-      ctx.stroke();
+    /* 연결선 — 양 끝이 함께 morph되므로 유기적 그물이 지형의 실로 풀린다.
+       유형 밴드로 재정렬될 때는 양 끝이 다른 밴드로 흩어지며 표지 사이에
+       긴 세로줄만 남으므로, 밴드 전환이 시작되기 전에 먼저 사라진다. */
+    const linkFade = 1 - smooth(seg01(bandRaw, 0, 0.45));
+    if (linkFade > 0.01) {
+      ctx.lineWidth = 0.6;
+      for (const l of links) {
+        const x1 = l.a.sx, y1 = l.a.sy, x2 = l.b.sx, y2 = l.b.sy;
+        if (Math.max(x1, x2) < vp.x - 30 || Math.min(x1, x2) > vp.x + vp.w + 30) continue;
+        ctx.strokeStyle = `rgba(200,206,196,${l.alpha * alpha * linkFade})`;
+        ctx.beginPath(); ctx.moveTo(x1, y1);
+        ctx.quadraticCurveTo((x1 + x2) / 2, (y1 + y2) / 2 - 12 * zoom * morph, x2, y2);
+        ctx.stroke();
+      }
     }
 
     /* 별점 */
