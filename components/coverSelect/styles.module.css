@@ -197,6 +197,14 @@
   box-shadow: 0 18px 54px rgba(0, 0, 0, 0.56);
 }
 
+/* near 티어는 원근 확대가 커서 3배 래스터로는 부족하다(3x 레티나 기준
+   필요 530 device px vs 래스터 405). 4배로 올려 여유를 준다. */
+.particle[data-depth='near'] img {
+  width: 400%;
+  height: 400%;
+  transform: scale(0.25);
+}
+
 .particle[data-selected='true'][data-depth='near'] {
   box-shadow:
     0 18px 48px rgba(0, 0, 0, 0.15),

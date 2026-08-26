@@ -263,9 +263,12 @@ const ArchiveParticle = memo(function ArchiveParticle({
   onToggle,
 }) {
   const { cover } = particle;
-  // 선택 확대 시 500px 필드용 이미지는 3x 레티나 기준 해상도가 모자란다.
-  // 선택되면 800px 세트(archive-lg)를 프리로드해 완료 시에만 교체한다.
-  // lg 파일이 없는 달(손상 원본 등)은 onerror로 조용히 기본 이미지를 유지.
+  // 500px 필드용 이미지는 3x 레티나에서 해상도가 모자란다 — 측정상 near
+  // 티어는 표시 530 device px인데 래스터가 405뿐이라 1.3배 업스케일된다.
+  // 그래서 선택 확대뿐 아니라 near 티어도 800px 세트(archive-lg)를
+  // 프리로드해 완료 시에만 교체한다. lg 파일이 없는 달(손상 원본 등)은
+  // onerror로 조용히 기본 이미지를 유지.
+  const needsHighRes = isSelected || particle.depthName === 'near';
   const [highResReady, setHighResReady] = useState(false);
   const highResUrl = cover.imageUrl.replace('/covers/archive/', '/covers/archive-lg/');
   const hasHighResVariant = highResUrl !== cover.imageUrl;
@@ -275,7 +278,7 @@ const ArchiveParticle = memo(function ArchiveParticle({
   }, [cover.id]);
 
   useEffect(() => {
-    if (!isSelected || highResReady || !hasHighResVariant) return undefined;
+    if (!needsHighRes || highResReady || !hasHighResVariant) return undefined;
     let active = true;
     const image = new Image();
     image.onload = () => {
@@ -285,7 +288,7 @@ const ArchiveParticle = memo(function ArchiveParticle({
     return () => {
       active = false;
     };
-  }, [isSelected, highResReady, hasHighResVariant, highResUrl]);
+  }, [needsHighRes, highResReady, hasHighResVariant, highResUrl]);
 
   return (
     <button
@@ -318,7 +321,7 @@ const ArchiveParticle = memo(function ArchiveParticle({
       }}
     >
       <img
-        src={isSelected && highResReady ? highResUrl : cover.imageUrl}
+        src={needsHighRes && highResReady ? highResUrl : cover.imageUrl}
         alt=""
         onLoad={(event) => {
           const image = event.currentTarget;
