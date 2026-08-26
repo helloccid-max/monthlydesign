@@ -1,4 +1,5 @@
-import { getRunPodCredentials } from '@/lib/runpod/warmupServer';
+import { getRunPodCredentials, submitRunPodWarmup } from '@/lib/runpod/warmupServer';
+import { safelyWriteWarmupState } from '@/lib/runpod/warmupStore';
 import {
   WORKER_ACTIVE_END_HOUR_KST,
   WORKER_ACTIVE_START_HOUR_KST,
@@ -55,7 +56,37 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true, kstHour, window, workersMin, changed: false });
     }
     await setRunPodMinWorkers(endpointId, apiKey, workersMin);
-    return json(res, 200, { ok: true, kstHour, window, workersMin, changed: true, from: current });
+
+    /* 워커를 켜는 것만으로는 부족하다 — 컨테이너가 뜨는 것과 체크포인트가
+       VRAM에 올라오는 것은 다르고, 후자가 70초다. 그대로 두면 아침 첫
+       관람객이 그 70초를 낸다. 그래서 여는 시각에 워밍업 잡을 함께 넣어
+       개관 전에 모델을 올려 둔다. 잡이 큐에 들어간 것만 확인하고 끝낸다 —
+       완료를 기다리면 크론 함수가 그만큼 붙잡힌다. */
+    let warmupJobId = null;
+    if (workersMin === 1) {
+      try {
+        const host = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+        const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+        const run = await submitRunPodWarmup(endpointId, apiKey, {
+          origin: host ? `${proto}://${host}` : '',
+        });
+        warmupJobId = run?.id || null;
+        if (warmupJobId) {
+          await safelyWriteWarmupState(endpointId, {
+            status: 'warming',
+            source: 'schedule-open',
+            requestedAt: now,
+            lastWarmupRequestedAt: now,
+            jobId: warmupJobId,
+          });
+        }
+      } catch {
+        // 워밍업 실패가 스케줄 변경까지 되돌릴 이유는 없다.
+      }
+    }
+    return json(res, 200, {
+      ok: true, kstHour, window, workersMin, changed: true, from: current, warmupJobId,
+    });
   } catch (error) {
     return json(res, 502, {
       ok: false,
