@@ -25,10 +25,10 @@ const TITLE_FADE_DURATION_MS = 1500;
 const COVER_ENTER_START_MS = 2000;
 const COVER_ENTER_DURATION_MS = 1800;
 // 나래이션이 "인터넷의 복잡한 연결 관계를"의 "인터넷"을 말하는 순간
-// (오디오 5.37s → 탭 +6.57s)에 표지가 이미지 1로 넘어가고, 이후 2.8s
+// (오디오 5.31s → 탭 +6.51s)에 표지가 이미지 1로 넘어가고, 이후 2.8s
 // 간격(회전 0.81s + 대기)으로 8장이 이어진다 — 마지막 착지 ≈27.0s.
 const ARTICLE_PAGE_COUNT = 8;
-const ARTICLE_CYCLE_START_MS = 6570;
+const ARTICLE_CYCLE_START_MS = 6510;
 const ARTICLE_FRAME_MS = 2800;
 const ARTICLE_PAGES = Array.from(
   { length: ARTICLE_PAGE_COUNT },
@@ -51,13 +51,14 @@ const EXPLORATION_FALLBACK_MS = COVER_SEQUENCE_DURATION_MS;
 const FOCUS_DELAY_MS = 650;
 const FOCUS_DURATION_MS = 820;
 const POST_FOCUS_HOLD_MS = 5200;
-// 새 나래이션(85.3s) 기준 앵커 — started(30.0s) + 0.745×24830 ≈ 48.5s
-// ("50년의 연대기 지도로 펼쳐지는"에서 타임라인 morph),
-// + 0.955×24830 ≈ 53.7s("여기서 더 나아가"에서 유형 밴드 뷰),
-// 54.8s + 5470 ≈ 60.3s(파트 1 종료와 함께 인트로 종료).
-const AUTOPLAY_DURATION_MS = 24830;
-const AUTOPLAY_END_HOLD_MS = 5470;
-const BAND_VIEW_PROGRESS = 0.955;
+// 나래이션 파트 1(62.7s) 기준 앵커 — started(30.0s) + 0.674×30000 ≈ 50.2s
+// ("하이퍼볼릭 구조에서 출발해 50년의 연대기 지도로"에서 타임라인 morph),
+// + 0.928×30000 ≈ 57.9s("여기서 더 나아가"에서 유형 밴드 뷰),
+// 60.0s + 3870 ≈ 63.9s(파트 1 종료와 함께 인트로 종료).
+const AUTOPLAY_DURATION_MS = 30000;
+const AUTOPLAY_END_HOLD_MS = 3870;
+const MORPH_PROGRESS = 0.674;
+const BAND_VIEW_PROGRESS = 0.928;
 const TOPOLOGY_SOUND_START_PROGRESS = 0.24;
 const TOPOLOGY_SOUND_FADE_IN_SECONDS = 1.35;
 /* 로딩 화면은 최소 8초 유지한다 — 그 시간 동안 죽은 대기가 아니라
@@ -679,8 +680,8 @@ export default function IntroScreen({
     : preReveal;
   // 스테이트먼트(텍스트·라임 분할)는 제거됐다 — 이 지점은 이제 디스크가
   // 타임라인 지도로 morph되는 트리거로만 남는다(나래이션 "50년의 연대기
-  // 지도" ≈ 탭 +49.5초).
-  const finalSplitActive = scrubProgress >= 0.745;
+  // 지도" ≈ 탭 +50.2초).
+  const finalSplitActive = scrubProgress >= MORPH_PROGRESS;
 
   useEffect(() => {
     if (!topologySoundReady) return;
@@ -692,9 +693,9 @@ export default function IntroScreen({
   }, [topologyReveal]);
 
   // 분석 레이더 — 리빌이 끝난 뒤부터 morph 직전까지 원판을 한 바퀴 훑는다.
-  // 나래이션 "표지 아카이브를 하나의 데이터셋으로 삼아 분석하고"(탭 41~46s)가
-  // 이 구간 한복판에 온다.
-  const analysisScan = segment(scrubProgress, 0.12, 0.68);
+  // 나래이션 "표지 아카이브를 하나의 데이터셋으로 삼아 분석하고"(탭 43~49s)가
+  // 이 구간 끝자락에 맞물린다.
+  const analysisScan = segment(scrubProgress, 0.12, 0.65);
   useEffect(() => {
     atlasApiRef.current?.setScan(analysisScan);
   }, [analysisScan]);
