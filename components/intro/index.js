@@ -74,24 +74,24 @@ const TITLE_LINES = ['From', 'Information', 'Architecture', 'to Generative', 'Sy
 const START_PROMPT_LOADING_TEXT = 'LOADING';
 const START_PROMPT_READY_TEXT = 'TAP TO PLAY';
 // 준비 완료 프롬프트는 전체 50%에서 시작해 흰색이 단어 단위로 쌓인다 —
-// 전체 50% / TAP / TAP TO / TAP TO PLAY. 전부 켜진 뒤 두 번 깜빡이고 다시
-// 전체 50%로 돌아간다. hold는 3fps 단위(333ms) 배수.
+// 전체 50% / TAP / TAP TO / TAP TO PLAY. 세 단어는 1:1:1로 500ms씩 균등하게
+// 켜지고, 전부 켜진 뒤 두 번 깜빡이고 다시 전체 50%로 돌아간다.
+// hold는 밀리초 — 500과 133은 공통 프레임 단위로 떨어지지 않는다.
 //
 // 깜빡임은 off를 on보다 짧게 둔다(133 / 233ms). 같은 길이면 눈 깜빡임이
 // 아니라 신호가 끊기는 글리치로 읽힌다. 마지막 on은 533ms로 길게 잡아
 // 착지를 만든다 — 여기서 짧게 끊고 50%로 떨어지면 100%→50%는 0%보다
 // 대비가 약해서 '세 번째 깜빡임을 하다 만' 것처럼 보인다.
 const PROMPT_WORDS = ['TAP', 'TO', 'PLAY'];
-const PROMPT_HIGHLIGHT_STEP_MS = 333;
 const PROMPT_HIGHLIGHT_STEPS = [
-  { lit: 0, hold: 3 },
-  { lit: 1, hold: 2 },
-  { lit: 2, hold: 1 },
-  { lit: 3, hold: 2.4 },
-  { lit: 3, hold: 0.4, off: true },
-  { lit: 3, hold: 0.7 },
-  { lit: 3, hold: 0.4, off: true },
-  { lit: 3, hold: 1.6 },
+  { lit: 0, hold: 1000 },
+  { lit: 1, hold: 500 },
+  { lit: 2, hold: 500 },
+  { lit: 3, hold: 500 },
+  { lit: 3, hold: 133, off: true },
+  { lit: 3, hold: 233 },
+  { lit: 3, hold: 133, off: true },
+  { lit: 3, hold: 533 },
 ];
 const START_PROMPT_ERASE_DURATION_MS = 233;
 const START_PROMPT_TYPE_DURATION_MS = 500;
@@ -503,7 +503,7 @@ export default function IntroScreen({
         const next = (index + 1) % PROMPT_HIGHLIGHT_STEPS.length;
         setPromptHighlightStep(next);
         advance(next);
-      }, PROMPT_HIGHLIGHT_STEPS[index].hold * PROMPT_HIGHLIGHT_STEP_MS);
+      }, PROMPT_HIGHLIGHT_STEPS[index].hold);
     };
     advance(0);
     return () => window.clearTimeout(timer);
