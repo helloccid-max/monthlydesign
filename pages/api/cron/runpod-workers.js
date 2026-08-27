@@ -6,6 +6,7 @@ import {
   desiredMinWorkers,
   kstHourAt,
   getRunPodAdminApiKey,
+  isScheduleActive,
   readRunPodMinWorkers,
   setRunPodMinWorkers,
 } from '@/lib/runpod/workerSchedule';
@@ -48,7 +49,10 @@ export default async function handler(req, res) {
     ? Number(override)
     : desiredMinWorkers(now);
 
-  const window = `${WORKER_ACTIVE_START_HOUR_KST}-${WORKER_ACTIVE_END_HOUR_KST} KST`;
+  const scheduleActive = isScheduleActive(now);
+  const window = scheduleActive
+    ? `${WORKER_ACTIVE_START_HOUR_KST}-${WORKER_ACTIVE_END_HOUR_KST} KST`
+    : 'ended';
   try {
     /* 이미 맞으면 건드리지 않는다 — 매시 도는 크론이 같은 값을 계속 쓰지
        않게 하고, 대시보드에서 수동으로 바꾼 값도 다음 정시에만 되돌린다. */
