@@ -27,9 +27,21 @@ const mulberry32 = (s) => () => {
 const MAP_W = 6200, MAP_H = 1500;
 const MARGIN_X = 260, MARGIN_Y = 120;
 const YEAR_MIN = 1976, YEAR_MAX = 2026;
-const TRAVEL_VISIBLE_W = 1200;   /* 순항 고도에서 보이는 필드 폭(맵 단위) */
-const OVERVIEW_VISIBLE_W = 5600; /* 리빌 시작 시 전체 조망 폭 */
+/* 순항 고도에서 보이는 필드 폭(맵 단위).
+   가로 줌이 vp.w / visibleW이고 표지 크기가 그 줌에 실리기 때문에, 이 값을
+   상수로 두면 화면이 넓어질수록 표지가 그대로 커진다(1920폭에서 125px,
+   세로로 5줄밖에 안 들어감). 폭에 비례해 늘려서 표지의 화면상 크기를
+   붙잡아 두고, 넓은 화면은 표지를 키우는 대신 더 긴 연대를 보여준다. */
 const COVER_MAP_H = 78;          /* 표지 높이(맵 단위) — 순항 시 ~37px */
+const TRAVEL_COVER_TARGET_PX = 40;
+function travelVisibleW(width) {
+  const raw = (width * COVER_MAP_H) / TRAVEL_COVER_TARGET_PX;
+  return clamp(raw, 1200, 3600);
+}
+const OVERVIEW_VISIBLE_W = 5600; /* 리빌 시작 시 전체 조망 폭 */
+/* 표지가 놓이는 맵 세로 구간. 아래를 더 잘라 화면 하단 HUD(Archive Atlas…)와
+   겹치지 않게 하고, 전체 덩어리를 위로 올린다. 톤 라벨도 이 값에서 뽑는다. */
+const GRID_TOP = 120, GRID_BOTTOM = 1250;
 const DOT_COUNT = 2400;
 const THUMB_CACHE_LIMIT = 640;
 /* 타임라인 표지는 아주 작은 썸네일로만 그린다 — 500px 원본 대신
@@ -171,12 +183,12 @@ export default function createAtlasRenderer(canvas, {
        양자화해 줄을 맞춘다. X가 겹치는 이웃과 행이 충돌하면 목표 행에서
        가장 가까운 빈 행으로 옮긴다(±1, ±2 …). 정렬은 유지되고 겹침은
        구조적으로 사라지며, 배치가 랜덤이 아니라 격자로 읽힌다. */
-    const kX = Math.max(1e-6, W / TRAVEL_VISIBLE_W);
+    const kX = Math.max(1e-6, W / travelVisibleW(W));
     const kY = Math.max(1e-6, (H * 0.88) / MAP_H);
     const yFactor = kX / kY;
     const maxCoverH = covers.reduce((m, c) => Math.max(m, c.h), 1);
     const rowPitch = (maxCoverH + 12) * yFactor;
-    const gridTop = 150, gridBottom = MAP_H - 150;
+    const gridTop = GRID_TOP, gridBottom = GRID_BOTTOM;
     const rows = Math.max(4, Math.floor((gridBottom - gridTop) / rowPitch));
     const lastRank = Math.max(1, covers.length - 1);
     const byX = [...covers].sort((a, b) => a.x - b.x);
@@ -463,21 +475,26 @@ export default function createAtlasRenderer(canvas, {
     const scan = viewValue('scan', now);
     const bandZoom = smooth(seg01(bandRaw, 0, 0.6));
     const bandGroup = smooth(seg01(bandRaw, 0.35, 1));
-    let visibleW = lerp(OVERVIEW_VISIBLE_W, TRAVEL_VISIBLE_W, smooth(reveal)) / creep;
+    /* morph 0 = 유기체 디스크, 1 = 타임라인. 카메라가 이 값을 쓰므로
+       좌표계보다 먼저 구한다. */
+    const morph = smooth(viewValue('morph', now));
+    const inv = 1 - morph;
+    let visibleW = lerp(OVERVIEW_VISIBLE_W, travelVisibleW(vp.w), smooth(reveal)) / creep;
     visibleW = lerp(visibleW, MAP_W * 1.04, bandZoom);
     const zoom = vp.w / visibleW;
     const cam = cameraCenter(now);
     const camX = lerp(cam.x, MAP_W / 2, bandZoom);
+    /* 세로 표류(±MAP_H*0.11)는 디스크 단계의 부유감이지, 라벨이 붙은 데이터
+       축에는 있으면 안 된다. 흔들리는 만큼 표지가 'Dark · Muted' 아래로
+       내려간다. morph가 진행될수록 중앙에 고정한다(드래그 pan은 유지). */
+    const camY = lerp(cam.y, MAP_H * 0.5 + pan.y, morph);
     const cx = vp.x + vp.w / 2, cy = vp.y + vp.h / 2 + H * 0.2625 * lower;
     /* 세로는 화면을 채우는 전용 줌 — 색상(톤) 정렬 축이 중앙에 뭉치지 않고
        화면 높이의 88%에 펼쳐진다. 가로(연대) 줌과는 독립. */
     const zoomY = (vp.h * 0.88) / MAP_H;
-    const toX = (x) => cx + (x - camX) * zoom, toY = (y) => cy + (y - cam.y) * zoomY;
+    const toX = (x) => cx + (x - camX) * zoom, toY = (y) => cy + (y - camY) * zoomY;
     const alpha = smooth(clamp(reveal * 1.35, 0, 1));
 
-    /* morph 0 = 유기체 디스크, 1 = 타임라인. */
-    const morph = smooth(viewValue('morph', now));
-    const inv = 1 - morph;
     /* 디스크의 호흡 — 진폭·속도를 낮춰 '움찔'이 아니라 숨으로 읽히게. */
     const breath = 1 + 0.012 * Math.sin(now * 0.00042) * inv;
     const spin = now * 0.000055 * inv + 0.4;                 /* 디스크의 느린 자전 */
@@ -758,20 +775,26 @@ export default function createAtlasRenderer(canvas, {
       hudText('Archive Atlas · 578 Covers', vp.x + 16, vp.y + vp.h - 34);
       hudText(`In View ${y0}–${y1}`, vp.x + 16, vp.y + vp.h - 16);
 
-      /* 세로축 설명(톤) — 밴드 뷰로 넘어가면 페이드 아웃. */
+      /* 세로축 설명(톤) — 밴드 뷰로 넘어가면 페이드 아웃.
+         라벨 위치를 화면 상수로 두면 표지 밴드와 어긋나 표지가 'Dark ·
+         Muted' 아래로 넘어간다. 실제 표지가 놓이는 구간(GRID_TOP~GRID_BOTTOM)
+         을 투영하고 표지 반 장만큼 여유를 둬, 라벨이 항상 밴드를 감싼다. */
       const toneA = hudA * (1 - bandGroup);
       if (toneA > 0.02) {
+        const halfCover = COVER_MAP_H * 1.18 * 0.5 * zoom;
+        const bandTop = toY(GRID_TOP) - halfCover;
+        const bandBottom = toY(GRID_BOTTOM) + halfCover;
         ctx.font = HUD_FONT_SM;
         ctx.fillStyle = `rgba(255,255,255,${toneA})`;
-        hudText('Bright · Saturated', vp.x + 16, vp.y + 66);
-        hudText('Dark · Muted', vp.x + 16, vp.y + vp.h - 156);
+        hudText('Bright · Saturated', vp.x + 16, bandTop - 10);
+        hudText('Dark · Muted', vp.x + 16, bandBottom + 18);
         ctx.fillStyle = `rgba(255,255,255,${0.66 * toneA})`;
-        hudText('Y · Luminance + Saturation, analyzed from each cover', vp.x + 16, vp.y + 84);
+        hudText('Y · Luminance + Saturation, analyzed from each cover', vp.x + 16, bandTop + 8);
         ctx.strokeStyle = `rgba(255,255,255,${0.22 * toneA})`;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(vp.x + 10, vp.y + 78);
-        ctx.lineTo(vp.x + 10, vp.y + vp.h - 166);
+        ctx.moveTo(vp.x + 10, bandTop + 16);
+        ctx.lineTo(vp.x + 10, bandBottom + 6);
         ctx.stroke();
       }
 
@@ -823,7 +846,7 @@ export default function createAtlasRenderer(canvas, {
   const onPointerMove = (e) => {
     if (!pointerActive) return;
     const reveal = VIEW.reveal.value, focus = VIEW.focus.value;
-    const visibleW = lerp(OVERVIEW_VISIBLE_W, TRAVEL_VISIBLE_W, smooth(reveal));
+    const visibleW = lerp(OVERVIEW_VISIBLE_W, travelVisibleW(W), smooth(reveal));
     const zoom = W / visibleW;
     pan.tx = clamp(pan.tx - (e.clientX - lastPX) / zoom, -MAP_W * 0.4, MAP_W * 0.4);
     if (focus < 0.5) pan.ty = clamp(pan.ty - (e.clientY - lastPY) / zoom, -MAP_H * 0.45, MAP_H * 0.45);
