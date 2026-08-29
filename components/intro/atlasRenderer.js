@@ -52,7 +52,12 @@ const atlasThumbUrl = (id) => `/covers/archive-atlas/${id}.webp?v=${ATLAS_THUMB_
 const DECADES = [1980, 1990, 2000, 2010, 2020];
 const yearT = (y) => ((y - YEAR_MIN) * 12) / ((YEAR_MAX - YEAR_MIN) * 12 + 11);
 /* 3차 뷰(아트웍 유형 밴드)의 밴드 순서·라벨. */
-const BAND_ORDER = { photo: 0, illustration: 1, typography: 2, cg: 3 };
+/* 아트웍 유형 — 제작 방식으로 이름을 통일한다. 'CG'는 1987년 와이어프레임
+   표지를 부르던 1990년대 용어이고, 2026년에는 화면에 나오는 거의 모든 것을
+   뜻해서 아무것도 구분하지 못한다. 'Rendering'은 사진도 드로잉도 아닌
+   '계산해서 만든 이미지'를 정확히 가리키고, 나머지 셋과 같은 층위의 낱말이다.
+   넷 다 '어떻게 만들어진 이미지인가'를 답한다. */
+const BAND_ORDER = { photography: 0, illustration: 1, typography: 2, rendering: 3 };
 /* HUD 서체 — 단일 웨이트(400)만 로드되므로 굵기 대신 크기·트래킹으로
    위계를 만든다. 11/12px는 팔 길이 관람 거리의 가독 하한. */
 /* 디스크 단계에서 동시에 이미지로 그리는 표지 비율. 578장을 전부 썸네일로
@@ -62,7 +67,7 @@ const BAND_ORDER = { photo: 0, illustration: 1, typography: 2, cg: 3 };
 const DISK_THUMB_FRACTION = 0.14;
 const HUD_FONT_SM = '400 11px "Neue Haas Grotesk", sans-serif';
 const HUD_FONT_LG = '400 12px "Neue Haas Grotesk", sans-serif';
-const BAND_NAMES = ['Photo', 'Illustration', 'Typography', 'CG'];
+const BAND_NAMES = ['Photography', 'Illustration', 'Typography', 'Rendering'];
 const seg01 = (v, a, b) => clamp((v - a) / Math.max(1e-4, b - a), 0, 1);
 const TAU = Math.PI * 2;
 /* 표지 대표색(LAB)을 점 색으로 쓴다. 원본 채도 중앙값이 8.8로 낮아
@@ -124,6 +129,7 @@ export default function createAtlasRenderer(canvas, {
   try { document.fonts?.load('9px "Neue Haas Grotesk"'); } catch (_) { /* 폰트는 있으면 쓴다 */ }
 
   /* ---------- 데이터 → 지도 배치 ---------- */
+  let bandCounts = BAND_NAMES.map(() => 0);
   function buildAtlas(payload) {
     const list = (payload.covers || []).filter((c) => c && c.imageUrl && /^(\d{4})_(\d{2})$/.test(c.id));
     /* 톤(명도·채도 혼합)의 순위 균등화 — 값 분포가 중앙에 몰려 있어도
@@ -183,6 +189,9 @@ export default function createAtlasRenderer(canvas, {
        양자화해 줄을 맞춘다. X가 겹치는 이웃과 행이 충돌하면 목표 행에서
        가장 가까운 빈 행으로 옮긴다(±1, ±2 …). 정렬은 유지되고 겹침은
        구조적으로 사라지며, 배치가 랜덤이 아니라 격자로 읽힌다. */
+    /* 밴드 라벨에 붙일 장수 — 데이터에서 세므로 분류가 바뀌면 같이 바뀐다. */
+    bandCounts = BAND_NAMES.map((_, i) => covers.filter((c) => c.bandIndex === i).length);
+
     const kX = Math.max(1e-6, W / travelVisibleW(W));
     const kY = Math.max(1e-6, (H * 0.88) / MAP_H);
     const yFactor = kX / kY;
@@ -805,7 +814,7 @@ export default function createAtlasRenderer(canvas, {
         for (let i = 0; i < BAND_NAMES.length; i++) {
           const top = bandsTop + i * bandPitch;
           ctx.fillStyle = `rgba(255,255,255,${bandA})`;
-          hudText(BAND_NAMES[i], vp.x + 16, top + 13);
+          hudText(`${BAND_NAMES[i]} · ${bandCounts[i]}`, vp.x + 16, top + 13);
           if (i > 0) {
             ctx.strokeStyle = `rgba(255,255,255,${0.1 * bandA})`;
             ctx.lineWidth = 1;
