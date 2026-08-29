@@ -52,12 +52,17 @@ const atlasThumbUrl = (id) => `/covers/archive-atlas/${id}.webp?v=${ATLAS_THUMB_
 const DECADES = [1980, 1990, 2000, 2010, 2020];
 const yearT = (y) => ((y - YEAR_MIN) * 12) / ((YEAR_MAX - YEAR_MIN) * 12 + 11);
 /* 3차 뷰(아트웍 유형 밴드)의 밴드 순서·라벨. */
-/* 아트웍 유형 — 제작 방식으로 이름을 통일한다. 'CG'는 1987년 와이어프레임
-   표지를 부르던 1990년대 용어이고, 2026년에는 화면에 나오는 거의 모든 것을
-   뜻해서 아무것도 구분하지 못한다. 'Rendering'은 사진도 드로잉도 아닌
-   '계산해서 만든 이미지'를 정확히 가리키고, 나머지 셋과 같은 층위의 낱말이다.
-   넷 다 '어떻게 만들어진 이미지인가'를 답한다. */
-const BAND_ORDER = { photography: 0, illustration: 1, typography: 2, rendering: 3 };
+/* 아트웍 유형 — 넷 다 분야 이름으로 맞춘다. 앞의 셋이 사진·일러스트레이션·
+   타이포그래피라는 분야인데 네 번째만 기법('Rendering')이나 과정
+   ('Computation')으로 부르면 층위가 어긋난다.
+   'Rendering'은 42장 중 30장에만 맞기도 했다 — 2001년 7월호의 하이퍼볼릭
+   그래프, 2014년 2월호의 네이버 데이터 모자이크, 2000년 1월호의 정보
+   그래픽은 렌더가 아니라 계산해서 그린 다이어그램이고, 하필 그 첫 번째가
+   이 프로젝트가 출발한 표지다. 컴퓨터 그래픽스는 렌더링과 정보 시각화를
+   모두 품는 분야라 그 둘이 한 밴드에 있는 이유가 설명된다.
+   1994년 6월호 표지에 'COMPUTER GRAPHICS'가 그대로 인쇄돼 있다 —
+   아카이브 자신의 어휘이기도 하다. */
+const BAND_ORDER = { photography: 0, illustration: 1, typography: 2, computerGraphics: 3 };
 /* HUD 서체 — 단일 웨이트(400)만 로드되므로 굵기 대신 크기·트래킹으로
    위계를 만든다. 11/12px는 팔 길이 관람 거리의 가독 하한. */
 /* 디스크 단계에서 동시에 이미지로 그리는 표지 비율. 578장을 전부 썸네일로
@@ -67,7 +72,7 @@ const BAND_ORDER = { photography: 0, illustration: 1, typography: 2, rendering: 
 const DISK_THUMB_FRACTION = 0.14;
 const HUD_FONT_SM = '400 11px "Neue Haas Grotesk", sans-serif';
 const HUD_FONT_LG = '400 12px "Neue Haas Grotesk", sans-serif';
-const BAND_NAMES = ['Photography', 'Illustration', 'Typography', 'Rendering'];
+const BAND_NAMES = ['Photography', 'Illustration', 'Typography', 'Computer Graphics'];
 const seg01 = (v, a, b) => clamp((v - a) / Math.max(1e-4, b - a), 0, 1);
 const TAU = Math.PI * 2;
 /* 표지 대표색(LAB)을 점 색으로 쓴다. 원본 채도 중앙값이 8.8로 낮아
