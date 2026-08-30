@@ -12,6 +12,10 @@ const FLOW_Y = -0.625;
 const NEIGHBOR_RADIUS = 172;
 const SEPARATION_RADIUS = 58;
 const COVER_BASE_SIZE = 12;
+/* 12vmin은 1080 높이 화면에서 130px이 되고, 가장 가까운 티어의 투영 배율
+   3.96배가 곱해져 표지 한 장이 513px까지 커진다. 픽셀 상한을 둬 최대값을
+   그 70%로 잡는다 — 375 화면에서는 12vmin이 45px이라 상한에 닿지 않는다. */
+const COVER_MAX_PX = 91;
 const SELECTED_Z = 605;
 const SELECTED_CENTER_Y = 0.45;
 const SELECTED_SAFE_MARGIN = 24;
@@ -213,6 +217,15 @@ function getNaturalZ(boid, time) {
   return boid.z + (primary + secondary) * boid.zRange;
 }
 
+/* 결과 화면(.cover)이 쓰는 것과 같은 산식. 두 화면에 같은 표지가 연달아
+   나오는데 크기가 달라 보이면 화면이 바뀐 게 아니라 표지가 바뀐 것처럼
+   읽힌다. 720px 분기까지 그대로 따라간다. */
+function matchedCoverWidth(viewportWidth, viewportHeight) {
+  return viewportWidth >= 720
+    ? Math.min((viewportWidth - 120) * 0.8, (viewportHeight - 220) * 0.5882, 448)
+    : Math.min((viewportWidth - 32) * 0.8, (viewportHeight - 210) * 0.5882, 416);
+}
+
 function getContainedSelectedZ(element, viewportWidth, viewportHeight) {
   const fallbackWidth = Math.max(32, Math.min(Math.min(viewportWidth, viewportHeight) * 0.12, 220));
   const baseWidth = element?.offsetWidth || fallbackWidth;
@@ -229,7 +242,11 @@ function getContainedSelectedZ(element, viewportWidth, viewportHeight) {
   const verticalRoom = verticalHalfRoom * 2;
   const maximumContainedScale = Math.max(
     1,
-    Math.min(horizontalRoom / baseWidth, verticalRoom / baseHeight)
+    Math.min(
+      horizontalRoom / baseWidth,
+      verticalRoom / baseHeight,
+      matchedCoverWidth(viewportWidth, viewportHeight) / baseWidth
+    )
   );
   const desiredScale = FIELD_PERSPECTIVE / (FIELD_PERSPECTIVE - SELECTED_Z);
   const containedScale = Math.min(desiredScale, maximumContainedScale);
@@ -313,7 +330,7 @@ const ArchiveParticle = memo(function ArchiveParticle({
         if (event.detail === 0) onToggle(particle.id, cover.id);
       }}
       style={{
-        '--size': `${particle.size}vmin`,
+        '--size': `min(${particle.size}vmin, ${COVER_MAX_PX}px)`,
         '--z': particle.zIndex,
         '--initial-x': `${particle.initialX}vw`,
         '--initial-y': `${particle.initialY}vh`,

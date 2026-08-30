@@ -3,6 +3,10 @@ import { useLoadLogic } from './logic';
 import { MONTHLY_DESIGN_COVERS } from '@/lib/monthlyDesignCovers';
 import styles from './styles.module.css';
 
+/* 로딩 구 표지 크기를 정하는 기준 폭의 상한 — 1920 화면에서 정확히 절반이
+   되고, 이보다 좁은 화면에서는 아무것도 바뀌지 않는다. */
+const SPHERE_SIZE_REFERENCE_W = 960;
+
 const MOBILE_PARTICLE_COUNT = 96;
 const DESKTOP_PARTICLE_COUNT = 156;
 const BITMAP_MAX = 220;
@@ -160,7 +164,11 @@ function CoverParticleSphere({ imageUrls, seed }) {
         const bitmap = bitmaps[index];
         if (!bitmap) return;
         const point = projected[index];
-        const size = Math.max(54, width * 0.13) + point.scale * Math.max(58, width * 0.18);
+        /* 표지 크기가 캔버스 폭에 그대로 비례해서, 1920 화면에서는 한 장이
+           250~595px까지 커졌다. 기준 폭에 상한을 둬 넓은 화면에서 더 자라지
+           않게 한다 — 960 미만(휴대폰·태블릿)에서는 계산이 그대로다. */
+        const sizeBase = Math.min(width, SPHERE_SIZE_REFERENCE_W);
+        const size = Math.max(54, sizeBase * 0.13) + point.scale * Math.max(58, sizeBase * 0.18);
         const sourceWidth = bitmap.naturalWidth || bitmap.width;
         const sourceHeight = bitmap.naturalHeight || bitmap.height;
         const aspect = sourceWidth / Math.max(1, sourceHeight);
